@@ -298,9 +298,19 @@ function Onboarding({ onComplete }) {
   const [bio, setBio] = React.useState('');
   const [tourSlide, setTourSlide] = React.useState(0);
   const [liPosted, setLiPosted] = React.useState(false);
+  const [avatarUrl, setAvatarUrl] = React.useState(null);
+  const fileInputRef = React.useRef(null);
 
   const canAdvance = { 1: pledgeAccepted, 2: bio.length > 0, 3: true, 4: liPosted }[step];
   const next = () => step < 4 ? setStep(step + 1) : onComplete();
+
+  function handleAvatarChange(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => setAvatarUrl(ev.target.result);
+    reader.readAsDataURL(file);
+  }
 
   // Resolve the track name for this user (ME may be a registered user with no track)
   const userTrack = ME.track ? (TRACKS.find(t => t.code === ME.track) || TRACKS[0]) : TRACKS[0];
@@ -365,9 +375,14 @@ function Onboarding({ onComplete }) {
             <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr', gap: 32 }}>
               <div>
                 <div className="t-label-muted" style={{ marginBottom: 10 }}>AVATAR</div>
-                <AvatarWithRing name={ME.name} size={140} tier={ME.tier || 'entry'} />
-                <button className="btn btn-ghost btn-sm" style={{ marginTop: 12, width: '100%', justifyContent: 'center' }}>
-                  <i className="fa-solid fa-camera" /> UPLOAD
+                {avatarUrl
+                  ? <img src={avatarUrl} alt="avatar" style={{ width: 140, height: 140, borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--lime)' }} />
+                  : <AvatarWithRing name={ME.name} size={140} tier={ME.tier || 'entry'} />
+                }
+                <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleAvatarChange} />
+                <button className="btn btn-ghost btn-sm" style={{ marginTop: 12, width: '100%', justifyContent: 'center' }}
+                  onClick={() => fileInputRef.current.click()}>
+                  <i className="fa-solid fa-camera" /> {avatarUrl ? 'CHANGE PHOTO' : 'UPLOAD'}
                 </button>
               </div>
               <div>
