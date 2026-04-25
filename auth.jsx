@@ -121,7 +121,12 @@ function LoginScreen({ onSignIn }) {
       await window.__userRegistry.register({ name: suName, email: suEmail, password: suPass });
       setVerificationSent(true);
     } catch (err) {
-      setError('Registration failed. Please try again.');
+      const msg = (err?.message || '').toLowerCase();
+      if (msg.includes('already registered') || msg.includes('already exists') || msg.includes('duplicate')) {
+        setError('An account with this email already exists. Try signing in instead.');
+      } else {
+        setError('Registration failed: ' + (err?.message || 'please try again.'));
+      }
     } finally {
       setLoading(false);
     }
