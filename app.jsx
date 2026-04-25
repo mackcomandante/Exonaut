@@ -2,7 +2,8 @@
 
 function App() {
   const [authStage, setAuthStage] = React.useState(() => localStorage.getItem('exo:auth') || 'login');
-  const [roleView, setRoleView] = React.useState(() => localStorage.getItem('exo:role') || 'exonaut');
+  const authRole = localStorage.getItem('exo:authRole') || localStorage.getItem('exo:role') || 'exonaut';
+  const [roleView, setRoleView] = React.useState(() => authRole);
   const [route, setRoute] = React.useState(() => localStorage.getItem('exo:route') || 'dashboard');
   const [missionId, setMissionId] = React.useState(() => localStorage.getItem('exo:mission') || null);
   const [tweaksOpen, setTweaksOpen] = React.useState(false);
@@ -186,7 +187,7 @@ function App() {
       {sidebar}
       <main className="main">
         <Topbar crumbs={crumbMap[route] || ['EXONAUT']} onNavigate={navigate} />
-        <RoleSwitcher current={roleView} onChange={switchRole} />
+        <RoleSwitcher current={roleView} onChange={switchRole} userRole={authRole} />
         <div className="content" style={{ paddingTop: 48 }}>{page}</div>
       </main>
 

@@ -23,10 +23,11 @@ function LoginScreen({ onSignIn }) {
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   function applySession(userId, role, homeRoute, isFirstTimeExonaut) {
-    localStorage.setItem('exo:userId',  userId);
-    localStorage.setItem('exo:role',    role);
-    localStorage.setItem('exo:route',   homeRoute);
-    localStorage.setItem('exo:auth',    isFirstTimeExonaut ? 'onboarding' : 'app');
+    localStorage.setItem('exo:userId',    userId);
+    localStorage.setItem('exo:role',      role);
+    localStorage.setItem('exo:authRole',  role);
+    localStorage.setItem('exo:route',     homeRoute);
+    localStorage.setItem('exo:auth',      isFirstTimeExonaut ? 'onboarding' : 'app');
     location.reload();
   }
 
