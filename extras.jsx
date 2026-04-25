@@ -130,6 +130,7 @@ function KudosModal({ onClose, onSent }) {
   const [search, setSearch] = React.useState('');
 
   const kudos = useKudos();
+  const registeredUsers = window.useRegisteredUsers ? window.useRegisteredUsers() : [];
 
   // Identify who's posting — varies by role.
   const me = React.useMemo(() => {
@@ -142,11 +143,17 @@ function KudosModal({ onClose, onSent }) {
     return { id: (typeof ME_ID !== 'undefined') ? ME_ID : 'u14', name: (typeof ME !== 'undefined') ? ME.name : 'You', role: 'exonaut', badge: null };
   }, []);
 
-  // Recipient pool = whole community (active + alumni), minus self.
+  // Recipient pool = registered users + static USERS, minus self.
   const pool = React.useMemo(() => {
-    const members = (typeof getCommunityMembers === 'function') ? getCommunityMembers() : USERS.map(u => ({ ...u, status: 'active' }));
-    return members.filter(m => m.id !== me.id);
-  }, [me.id]);
+    const fromRegistered = registeredUsers.map(u => ({ id: u.userId, name: u.name, track: null, status: 'active' }));
+    const staticUsers = (typeof USERS !== 'undefined') ? USERS.map(u => ({ ...u, status: u.status || 'active' })) : [];
+    const seen = new Set();
+    return [...fromRegistered, ...staticUsers].filter(u => {
+      if (!u.id || seen.has(u.id) || u.id === me.id) return false;
+      seen.add(u.id);
+      return true;
+    });
+  }, [registeredUsers, me.id]);
 
   const filteredPool = React.useMemo(() => {
     if (!search.trim()) return pool;
@@ -162,11 +169,30 @@ function KudosModal({ onClose, onSent }) {
 
   const handleSend = () => {
     if (!recipient || !message) return;
+    const recipientUser = pool.find(u => u.id === recipient);
+    const recipientName = recipientUser?.name || 'a community member';
     kudos.give({
       from: me.id, fromName: me.role === 'exonaut' ? null : me.name, fromRole: me.role,
       to: recipient, msg: message, pillar,
     });
-    onSent?.({ recipient, message, pillar });
+    // Post kudos to Message Board
+    window.__boardStore?.createThread({
+      title: `Kudos to ${recipientName}`,
+      body: `${me.name} gave kudos to ${recipientName}: "${message}" — Pillar: ${pillar}`,
+      channel: 'general',
+      authorId: me.id,
+      authorName: me.name,
+      authorRole: me.role,
+    });
+    // Notify recipient
+    window.__notifStore?.add({
+      toUserId: recipient,
+      type: 'kudos',
+      title: `${me.name} sent you kudos`,
+      sub: `"${message.length > 80 ? message.slice(0, 80) + '…' : message}"`,
+      icon: 'fa-hand-sparkles',
+    });
+    onSent?.({ recipient, message, pillar, recipientName });
     onClose();
   };
 

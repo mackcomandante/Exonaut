@@ -201,7 +201,7 @@ function App() {
 
       {celebration && <Celebration kind={celebration.kind} payload={celebration.payload} onClose={() => setCelebration(null)} />}
       {kudosOpen && <KudosModal onClose={() => setKudosOpen(false)}
-                                onSent={(k) => { const rec = USERS.find(u => u.id === k.recipient); pushToast({ title: 'KUDOS SENT', sub: `+2 pts to you · to ${rec?.name}`, icon: 'fa-hand-sparkles' }); }} />}
+                                onSent={(k) => { pushToast({ title: 'KUDOS SENT', sub: `+2 pts to you · to ${k.recipientName || 'them'}`, icon: 'fa-hand-sparkles' }); }} />}
       <ToastStack toasts={toasts} />
 
       <TweaksFab onClick={() => setTweaksOpen(v => !v)} />

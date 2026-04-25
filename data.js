@@ -3,7 +3,12 @@
 const COHORT = {
   code: 'EXO-BATCH-2026',
   name: 'Batch 2026–2027',
-  week: 2,
+  week: (() => {
+    const start = new Date('2026-10-06');
+    const now = new Date();
+    if (now < start) return 0;
+    return Math.min(Math.floor((now - start) / (7 * 86400000)) + 1, 12);
+  })(),
   weekTotal: 12,
   size: 30,
   startDate: 'OCT 06 2026',

@@ -25,22 +25,29 @@ function HeroStats() {
   const { total: livePoints, delta: liveDelta } = useComputedPoints(ME_ID);
   const liveBadges = useLiveBadges();
   const earnedCount = liveBadges.filter(b => b.earned).length;
+
+  const tierOrder = ['entry', 'builder', 'prime', 'elite', 'apex', 'corps'];
+  const tierKey = livePoints >= 900 ? 'apex' : livePoints >= 600 ? 'elite' : livePoints >= 300 ? 'prime' : livePoints >= 100 ? 'builder' : 'entry';
+  const tierIdx = tierOrder.indexOf(tierKey);
+  const nextTierKey = tierIdx < tierOrder.length - 1 ? tierOrder[tierIdx + 1] : null;
+  const nextTierMin = nextTierKey && TIERS[nextTierKey]?.min != null ? TIERS[nextTierKey].min : null;
+  const tierLabel = tierKey.toUpperCase();
+  const tierMeta = nextTierKey && nextTierMin != null ? `${Math.max(0, nextTierMin - livePoints)} TO ${nextTierKey.toUpperCase()}` : 'MAX TIER';
+
+  const activeMissions = MISSIONS.filter(m => m.status !== 'approved');
+
   return (
     <div className="stat-grid card-hud">
       <StatCell label="TOTAL POINTS" icon="fa-bolt" value={livePoints} lime
-        meta={liveDelta > 0 ? `AUTO · +${liveDelta} JUST GRADED` : 'AUTO · +85 THIS WEEK'} metaDir="up" />
+        meta={liveDelta > 0 ? `AUTO · +${liveDelta} JUST GRADED` : null} metaDir="up" />
       <StatCell label="RANK" icon="fa-ranking-star"
-        value={`#${ME_RANK}`} unit={`of ${COHORT.size}`}
-        meta="+3 vs LAST WK" metaDir="up" />
+        value={`#${ME_RANK}`} unit={`of ${COHORT.size}`} />
       <StatCell label="TIER" icon="fa-shield-halved"
-        value="PRIME" unit={`·\u00A0${livePoints - TIERS.prime.min} over`}
-        meta={`${Math.max(0, 600 - livePoints)} TO ELITE`} metaDir="flat" />
+        value={tierLabel} meta={tierMeta} metaDir="flat" />
       <StatCell label="MISSIONS" icon="fa-bullseye"
-        value="3" unit="of 7"
-        meta="2 DUE THIS WEEK" metaDir="flat" />
+        value={activeMissions.length} unit={`of ${MISSIONS.length}`} />
       <StatCell label="BADGES" icon="fa-medal"
-        value={earnedCount} unit="of 22"
-        meta="AUTO · SILVER STRATEGIST" metaDir="up" />
+        value={earnedCount} unit="of 22" />
     </div>
   );
 }
@@ -69,45 +76,25 @@ function PillarGrid() {
       <PillarCard idx="01" klass="p1" title="Project" weight={40}
         current={ME.p1} max={400} caption="40% WEIGHT">
         <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--off-white-40)', letterSpacing: '0.05em', marginBottom: 10 }}>RECENT SUBMISSIONS</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 600, letterSpacing: '0.05em' }}>
-            <span style={{ color: 'var(--off-white-68)' }}>Client Discovery Memo</span>
-            <span className="status-pill status-approved">APPR</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 600, letterSpacing: '0.05em' }}>
-            <span style={{ color: 'var(--off-white-68)' }}>Competitive Landscape</span>
-            <span className="status-pill status-in-progress">WIP</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 600, letterSpacing: '0.05em' }}>
-            <span style={{ color: 'var(--off-white-68)' }}>AI Strategy Canon</span>
-            <span className="status-pill status-approved">APPR</span>
-          </div>
-        </div>
+        {ME.p1 === 0
+          ? <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--off-white-40)' }}>No submissions yet.</div>
+          : null}
       </PillarCard>
 
       <PillarCard idx="02" klass="p2" title="Client" weight={35}
         current={ME.p2} max={350} caption="35% WEIGHT">
-        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--off-white-40)', letterSpacing: '0.05em', marginBottom: 10 }}>CLIENT · KESTREL BIOTICS</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-          <div style={{ display: 'flex', gap: 2 }}>
-            {[1,2,3,4,5].map(i => (
-              <i key={i} className={'fa-solid fa-star'} style={{ fontSize: 14, color: i <= 4 ? 'var(--platinum)' : 'var(--off-white-15)' }} />
-            ))}
-          </div>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--off-white-68)' }}>4.0 / 5.0</span>
-        </div>
-        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--off-white-40)', letterSpacing: '0.05em' }}>
-          LAST TOUCH · OCT 17 · 3D AGO
-        </div>
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--off-white-40)', letterSpacing: '0.05em', marginBottom: 10 }}>CLIENT STATUS</div>
+        {ME.p2 === 0
+          ? <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--off-white-40)' }}>No client assigned yet.</div>
+          : null}
       </PillarCard>
 
       <PillarCard idx="03" klass="p3" title="Recruitment" weight={25}
         current={ME.p3} max={250} caption="25% WEIGHT">
         <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--off-white-40)', letterSpacing: '0.05em', marginBottom: 10 }}>PIPELINE STATUS</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 24, color: 'var(--lavender)', fontWeight: 700 }}>1</span>
-          <span style={{ fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700, color: 'var(--off-white-68)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>CANDIDATE SUBMITTED</span>
-        </div>
+        {ME.p3 === 0
+          ? <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--off-white-40)', marginBottom: 14 }}>No recruits submitted yet.</div>
+          : null}
         <button className="btn btn-ghost btn-sm" onClick={() => window.__openKudos?.()}>
           <i className="fa-solid fa-user-plus" /> ADD A RECRUIT
         </button>
@@ -275,13 +262,26 @@ function Dashboard({ onNavigate, onOpenMission }) {
             "We don't wait for the map. We build it."
           </div>
         </div>
-        <div style={{ textAlign: 'right' }}>
-          <div className="t-label-muted">DAY</div>
-          <div className="t-mono" style={{ fontSize: 40, color: 'var(--off-white)', fontWeight: 700, lineHeight: 1 }}>
-            11<span style={{ color: 'var(--off-white-40)', fontSize: 22 }}>/84</span>
-          </div>
-          <div className="t-micro" style={{ marginTop: 6 }}>{COHORT.weekTotal * 7 - 11} DAYS TO DEMO DAY</div>
-        </div>
+        {(() => {
+          const start = new Date('2026-10-06');
+          const demoDay = new Date('2027-01-29');
+          const now = new Date();
+          const totalDays = Math.round((demoDay - start) / 86400000);
+          const elapsed = now < start ? 0 : Math.min(Math.round((now - start) / 86400000), totalDays);
+          const remaining = Math.max(0, totalDays - elapsed);
+          const started = now >= start;
+          return (
+            <div style={{ textAlign: 'right' }}>
+              <div className="t-label-muted">{started ? 'DAY' : 'STARTS'}</div>
+              <div className="t-mono" style={{ fontSize: 40, color: 'var(--off-white)', fontWeight: 700, lineHeight: 1 }}>
+                {started
+                  ? <>{elapsed}<span style={{ color: 'var(--off-white-40)', fontSize: 22 }}>/{totalDays}</span></>
+                  : <span style={{ fontSize: 22 }}>OCT 06</span>}
+              </div>
+              {started && <div className="t-micro" style={{ marginTop: 6 }}>{remaining} DAYS TO DEMO DAY</div>}
+            </div>
+          );
+        })()}
       </div>
 
       <div className="enter enter-d1"><HeroStats /></div>
