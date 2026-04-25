@@ -67,11 +67,16 @@ function LoginScreen({ onSignIn }) {
         email: email.trim().toLowerCase(),
         password,
       });
-      if (authData?.user) {
-        if (!authData.user.email_confirmed_at) {
-          setError('Please verify your email first — check your inbox for a confirmation link.');
-          return;
+      if (authError) {
+        const msg = (authError.message || '').toLowerCase();
+        if (msg.includes('email not confirmed') || msg.includes('not confirmed')) {
+          setError('Email not verified yet — check your inbox and click the confirmation link.');
+        } else {
+          setError('Invalid email or password.');
         }
+        return;
+      }
+      if (authData?.user) {
         const reg = await window.__userRegistry.find(email);
         if (reg) {
           const loginId = reg.role === 'lead' && reg.leadId ? reg.leadId : reg.userId;
