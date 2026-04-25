@@ -198,55 +198,17 @@ function TierCertificate({ tierKey, tierData, earned, name, cohort, cohortName, 
           fontFamily="EB Garamond, serif" fontSize="13" fontStyle="italic"
           fill="rgba(255,255,255,0.35)">has achieved the rank of</text>
 
-        {/* Tier label — split qualifier + rank for multi-word labels */}
-        {(() => {
-          const parts = tierData.label.toUpperCase().split(' ');
-          if (parts.length === 1) {
-            return (
-              <>
-                <text x="298" y="268"
-                  fontFamily="Montserrat, sans-serif" fontSize="42" fontWeight="900"
-                  fill={color} letterSpacing="3" filter={`url(#glow-${tierKey})`}>
-                  {parts[0]}
-                </text>
-                <text x="298" y="290"
-                  fontFamily="JetBrains Mono, monospace" fontSize="9"
-                  fill={color} fillOpacity="0.5" letterSpacing="2.5">
-                  {tierData.min != null ? `UNLOCKED AT ${tierData.min} PTS` : 'AWARDED BY MISSION COMMANDER'}
-                </text>
-              </>
-            );
-          }
-          // Scale rank-word font size by character count so it always fits.
-          // Right panel runs x=298 → x=690, giving 392 px of room.
-          // Montserrat 900 is ~0.70× em wide per glyph on average.
-          // At 36px: 7 chars × 25px + 6×1px spacing ≈ 181px  → fits BUILDER
-          // At 42px: 5 chars × 29px + 4×1px spacing ≈ 149px  → fits PRIME / ELITE
-          // At 46px: 4 chars × 32px + 3×1px spacing ≈ 131px  → fits APEX
-          const rankWord = parts.slice(1).join(' ');
-          const rankFs   = rankWord.length <= 4 ? 46
-                         : rankWord.length <= 5 ? 42
-                         : 36;
-          return (
-            <>
-              <text x="298" y="240"
-                fontFamily="Montserrat, sans-serif" fontSize="11" fontWeight="700"
-                fill={color} fillOpacity="0.5" letterSpacing="7">
-                {parts[0]}
-              </text>
-              <text x="298" y={240 + rankFs + 4}
-                fontFamily="Montserrat, sans-serif" fontSize={rankFs} fontWeight="900"
-                fill={color} letterSpacing="1" filter={`url(#glow-${tierKey})`}>
-                {rankWord}
-              </text>
-              <text x="298" y={240 + rankFs + 22}
-                fontFamily="JetBrains Mono, monospace" fontSize="9"
-                fill={color} fillOpacity="0.5" letterSpacing="2.5">
-                {tierData.min != null ? `UNLOCKED AT ${tierData.min} PTS` : 'AWARDED BY MISSION COMMANDER'}
-              </text>
-            </>
-          );
-        })()}
+        {/* Tier label — always "EXONAUT"; tier identity lives on the shield badge */}
+        <text x="298" y="268"
+          fontFamily="Montserrat, sans-serif" fontSize="42" fontWeight="900"
+          fill={color} letterSpacing="3" filter={`url(#glow-${tierKey})`}>
+          EXONAUT
+        </text>
+        <text x="298" y="290"
+          fontFamily="JetBrains Mono, monospace" fontSize="9"
+          fill={color} fillOpacity="0.5" letterSpacing="2.5">
+          {tierData.min != null ? `UNLOCKED AT ${tierData.min} PTS` : 'AWARDED BY MISSION COMMANDER'}
+        </text>
 
         {/* ── Divider line ── */}
         <line x1="298" y1="320" x2="690" y2="320"
