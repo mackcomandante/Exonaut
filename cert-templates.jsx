@@ -129,42 +129,70 @@ function TierCertificate({ tierKey, tierData, earned, name, cohort, cohortName, 
           fontFamily="EB Garamond, serif" fontSize="13" fontStyle="italic"
           fill="rgba(255,255,255,0.35)">has achieved the rank of</text>
 
-        {/* Tier label — big */}
-        <text x="298" y="264"
-          fontFamily="Montserrat, sans-serif" fontSize="40" fontWeight="900"
-          fill={color} letterSpacing="3" filter={`url(#glow-${tierKey})`}>
-          {tierData.label.toUpperCase()}
-        </text>
-
-        {/* Points threshold */}
-        <text x="298" y="288"
-          fontFamily="JetBrains Mono, monospace" fontSize="9"
-          fill={color} fillOpacity="0.5" letterSpacing="2.5">
-          {tierData.min != null ? `UNLOCKED AT ${tierData.min} PTS` : 'AWARDED BY MISSION COMMANDER'}
-        </text>
+        {/* Tier label — split qualifier + rank for multi-word labels */}
+        {(() => {
+          const parts = tierData.label.toUpperCase().split(' ');
+          if (parts.length === 1) {
+            // Single word (Entry: "EXONAUT")
+            return (
+              <>
+                <text x="298" y="268"
+                  fontFamily="Montserrat, sans-serif" fontSize="42" fontWeight="900"
+                  fill={color} letterSpacing="3" filter={`url(#glow-${tierKey})`}>
+                  {parts[0]}
+                </text>
+                <text x="298" y="290"
+                  fontFamily="JetBrains Mono, monospace" fontSize="9"
+                  fill={color} fillOpacity="0.5" letterSpacing="2.5">
+                  {tierData.min != null ? `UNLOCKED AT ${tierData.min} PTS` : 'AWARDED BY MISSION COMMANDER'}
+                </text>
+              </>
+            );
+          }
+          // Multi-word: "EXONAUT BUILDER" → small qualifier + large rank word
+          return (
+            <>
+              <text x="298" y="242"
+                fontFamily="Montserrat, sans-serif" fontSize="13" fontWeight="700"
+                fill={color} fillOpacity="0.55" letterSpacing="6">
+                {parts[0]}
+              </text>
+              <text x="298" y="284"
+                fontFamily="Montserrat, sans-serif" fontSize="46" fontWeight="900"
+                fill={color} letterSpacing="2" filter={`url(#glow-${tierKey})`}>
+                {parts.slice(1).join(' ')}
+              </text>
+              <text x="298" y="302"
+                fontFamily="JetBrains Mono, monospace" fontSize="9"
+                fill={color} fillOpacity="0.5" letterSpacing="2.5">
+                {tierData.min != null ? `UNLOCKED AT ${tierData.min} PTS` : 'AWARDED BY MISSION COMMANDER'}
+              </text>
+            </>
+          );
+        })()}
 
         {/* ── Divider line ── */}
-        <line x1="298" y1="316" x2="690" y2="316"
+        <line x1="298" y1="320" x2="690" y2="320"
           stroke={color} strokeWidth="0.4" strokeOpacity="0.25"/>
 
         {/* ── Footer: date + signature ── */}
         {/* Date */}
-        <text x="298" y="342"
+        <text x="298" y="346"
           fontFamily="JetBrains Mono, monospace" fontSize="8.5"
           fill="rgba(255,255,255,0.25)" letterSpacing="1.5">
           {displayDate ? `ISSUED · ${displayDate}` : 'NOT YET EARNED'}
         </text>
-        <text x="298" y="358"
+        <text x="298" y="362"
           fontFamily="JetBrains Mono, monospace" fontSize="8"
           fill="rgba(255,255,255,0.18)" letterSpacing="1">{certCode}</text>
 
-        {/* Signature block — shifted left toward centre */}
-        <text x="570" y="336" textAnchor="middle"
+        {/* Signature block */}
+        <text x="570" y="340" textAnchor="middle"
           fontFamily="Montserrat, sans-serif" fontSize="12" fontWeight="600"
           fill="rgba(255,255,255,0.38)" letterSpacing="0.5">Mack Comandante</text>
-        <line x1="510" y1="325" x2="630" y2="325"
+        <line x1="510" y1="328" x2="630" y2="328"
           stroke="rgba(255,255,255,0.12)" strokeWidth="1"/>
-        <text x="570" y="354" textAnchor="middle"
+        <text x="570" y="358" textAnchor="middle"
           fontFamily="JetBrains Mono, monospace" fontSize="7.5"
           fill="rgba(255,255,255,0.2)" letterSpacing="1">MISSION COMMANDER</text>
 
