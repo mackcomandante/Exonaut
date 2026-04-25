@@ -32,6 +32,12 @@ function App() {
   React.useEffect(() => { localStorage.setItem('exo:auth', authStage); }, [authStage]);
   React.useEffect(() => { localStorage.setItem('exo:role', roleView); }, [roleView]);
 
+  async function handleSignOut() {
+    await window.__db.auth.signOut();
+    ['exo:auth','exo:userId','exo:role','exo:authRole','exo:route','exo:mission','exo:userName','exo:userTrack'].forEach(k => localStorage.removeItem(k));
+    location.reload();
+  }
+
   const navigate = (id) => {
     setRoute(id);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -121,7 +127,7 @@ function App() {
   let page, sidebar;
 
   if (roleView === 'exonaut') {
-    sidebar = <Sidebar current={route} onNavigate={navigate} onSignOut={() => { setAuthStage('login'); localStorage.removeItem('exo:auth'); }} />;
+    sidebar = <Sidebar current={route} onNavigate={navigate} onSignOut={handleSignOut} />;
     if (route === 'dashboard')        page = <Dashboard onNavigate={navigate} onOpenMission={openMission} />;
     else if (route === 'leaderboard') page = <Leaderboard onBack={() => navigate('dashboard')} />;
     else if (route === 'profile')     page = <Profile onOpenMission={openMission} onTriggerBadge={(b) => onCelebrate('badge', { badge: b })} />;
@@ -139,7 +145,7 @@ function App() {
     const gradeMatch = route.startsWith('lead-grade');
     const subId = gradeMatch && route.includes(':') ? route.split(':')[1] : null;
     const _r = gradeMatch ? 'lead-grade' : route;
-    sidebar = <LeadSidebar current={_r} onNavigate={navigate} onSignOut={() => { setAuthStage('login'); localStorage.removeItem('exo:auth'); }} />;
+    sidebar = <LeadSidebar current={_r} onNavigate={navigate} onSignOut={handleSignOut} />;
     if (route === 'lead-home')        page = <LeadHome onNavigate={navigate} />;
     else if (route === 'lead-roster') page = <LeadRoster />;
     else if (route === 'lead-queue')  page = <LeadQueue onNavigate={navigate} />;
@@ -152,7 +158,7 @@ function App() {
     else if (gradeMatch)              page = <LeadGrade subId={subId} onBack={() => navigate('lead-queue')} />;
     else                              page = <LeadHome onNavigate={navigate} />;
   } else if (roleView === 'commander') {
-    sidebar = <CommanderSidebar current={route} onNavigate={navigate} onSignOut={() => { setAuthStage('login'); localStorage.removeItem('exo:auth'); }} />;
+    sidebar = <CommanderSidebar current={route} onNavigate={navigate} onSignOut={handleSignOut} />;
     if (route === 'cmdr-home')        page = <CommanderHome onNavigate={navigate} />;
     else if (route === 'cmdr-leads')  page = <CommanderLeads />;
     else if (route === 'cmdr-exonauts') page = <CommanderExonauts />;
@@ -167,7 +173,7 @@ function App() {
     else if (route === 'settings')    page = <SettingsPage />;
     else                              page = <CommanderHome onNavigate={navigate} />;
   } else if (roleView === 'admin') {
-    sidebar = <PlatformAdminSidebar current={route} onNavigate={navigate} onSignOut={() => { setAuthStage('login'); localStorage.removeItem('exo:auth'); }} />;
+    sidebar = <PlatformAdminSidebar current={route} onNavigate={navigate} onSignOut={handleSignOut} />;
     if (route === 'pa-cohorts')      page = <AdminCohorts />;
     else if (route === 'pa-managers') page = <AdminManagers />;
     else if (route === 'pa-assign')  page = <AdminAssign />;

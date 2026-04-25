@@ -22,8 +22,13 @@ function LoginScreen({ onSignIn }) {
 
   const switchMode = (m) => { setMode(m); setError(''); setVerificationSent(false); };
 
-  // ── Auto-login when user returns from verification link ───────────────────
+  // ── Auto-login ONLY when returning from email verification link ──────────
+  // Guard: only run if Supabase put a verification token in the URL.
   React.useEffect(() => {
+    const isVerificationRedirect =
+      location.hash.includes('access_token') || location.search.includes('code=');
+    if (!isVerificationRedirect) return;
+
     async function checkVerifiedSession() {
       const { data: { session } } = await window.__db.auth.getSession();
       if (!session) return;
