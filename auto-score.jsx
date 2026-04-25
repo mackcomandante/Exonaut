@@ -110,6 +110,10 @@
         if (total >= t.at && !window.__autoTiers.celebratedKeys.has(t.key)) {
           window.__autoTiers.celebratedKeys.add(t.key);
           setTimeout(() => onCelebrate('tier', { tier: t.key }), 1400);
+          // Persist earned tier to DB so the certificate reflects it
+          if (window.__userRegistry?.updateTier && typeof ME_ID !== 'undefined' && ME_ID) {
+            window.__userRegistry.updateTier(ME_ID, t.key);
+          }
         }
       }
     }, [total, onCelebrate]);

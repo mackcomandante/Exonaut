@@ -21,6 +21,8 @@
       password:  row.password,
       role:      row.role,
       leadId:    row.lead_id,
+      cohortId:  row.cohort_id  || 'c2627',   // batch assigned by Admin
+      tier:      row.tier       || 'entry',    // persisted tier (for display)
       homeRoute: row.home_route,
       createdAt: row.created_at,
     };
@@ -73,6 +75,8 @@
         password,
         role:       'exonaut',
         lead_id:    null,
+        cohort_id:  'c2627',   // default batch — Admin can reassign
+        tier:       'entry',   // starting tier
         home_route: 'dashboard',
       };
       const { error: dbError } = await window.__db.from('registered_users').insert(row);
@@ -90,6 +94,24 @@
         })
         .eq('user_id', userId);
       if (error) console.error('updateRole:', error);
+    },
+
+    // Called by Admin (cohort-store) when reassigning a user to a batch
+    async updateCohortAssignment(userId, cohortId) {
+      const { error } = await window.__db
+        .from('registered_users')
+        .update({ cohort_id: cohortId })
+        .eq('user_id', userId);
+      if (error) console.error('updateCohortAssignment:', error);
+    },
+
+    // Called by auto-score when an Exonaut's tier crosses a threshold
+    async updateTier(userId, tier) {
+      const { error } = await window.__db
+        .from('registered_users')
+        .update({ tier })
+        .eq('user_id', userId);
+      if (error) console.error('updateTier:', error);
     },
 
     async remove(userId) {

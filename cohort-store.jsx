@@ -74,12 +74,14 @@
       notify();
     },
     // Assignment overrides — Platform Admin can move Exonauts between cohorts.
-    // Stored as { [userId]: cohortId }. Falls back to user.cohort from data.js.
+    // Written to both localStorage (fast local reads) and Supabase (source of truth).
     assignUserToCohort(userId, cohortId) {
       if (!state.assignments) state.assignments = {};
       state.assignments[userId] = cohortId;
       persist(state);
       notify();
+      // Write-through to DB so the cert and other views stay in sync
+      window.__userRegistry?.updateCohortAssignment?.(userId, cohortId);
     },
     getAssignments() { return state.assignments || {}; },
     // Track assignment overrides — { [userId]: trackCode }

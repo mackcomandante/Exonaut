@@ -1511,15 +1511,26 @@ function BadgeCard({ badge, earned, currentPts }) {
 }
 
 function CertsBadgesPage() {
-  const liveBadges = window.useLiveBadges ? window.useLiveBadges() : BADGES;
+  const liveBadges   = window.useLiveBadges ? window.useLiveBadges() : BADGES;
   const { total: currentPts } = window.useComputedPoints ? window.useComputedPoints(ME_ID) : { total: 0 };
-  const tierKey = window.getTierFromPts ? window.getTierFromPts(currentPts) : 'entry';
+  const tierKey      = window.getTierFromPts ? window.getTierFromPts(currentPts) : 'entry';
+  const [certView, setCertView] = React.useState(tierKey);
+
+  // Pull the Exonaut's DB record so we get their Admin-assigned batch + persisted tier
+  const allUsers  = window.useRegisteredUsers ? window.useRegisteredUsers() : [];
+  const myRecord  = allUsers.find(u => u.userId === ME_ID);
+  // Cohort: DB record first → cohort-store localStorage override → default
+  const myCohortId   = myRecord?.cohortId
+    || (window.getUserCohort ? window.getUserCohort(ME_ID) : null)
+    || 'c2627';
+  const allCohorts   = (typeof COHORTS !== 'undefined') ? COHORTS : [];
+  const myCohort     = allCohorts.find(c => c.id === myCohortId) || allCohorts[0] || { code: COHORT.code, name: COHORT.name }; // which cert is shown full-size
 
   const badgeCategories = [
-    { key: 'milestone', label: 'Milestone Badges', icon: 'fa-star', desc: 'Earned by hitting point thresholds' },
-    { key: 'track',     label: 'Track Badges',     icon: 'fa-route', desc: 'Awarded for completing your track' },
+    { key: 'milestone', label: 'Milestone Badges', icon: 'fa-star',        desc: 'Earned by hitting point thresholds' },
+    { key: 'track',     label: 'Track Badges',     icon: 'fa-route',       desc: 'Awarded for completing your track' },
     { key: 'pillar',    label: 'Pillar Badges',    icon: 'fa-layer-group', desc: 'Maxing out individual pillars' },
-    { key: 'special',   label: 'Special Awards',   icon: 'fa-trophy', desc: 'Rare achievements and program awards' },
+    { key: 'special',   label: 'Special Awards',   icon: 'fa-trophy',      desc: 'Rare achievements and program awards' },
   ];
 
   return (
@@ -1535,18 +1546,50 @@ function CertsBadgesPage() {
         </div>
       </div>
 
-      {/* Tier Certifications */}
+      {/* ── Tier Certifications ── */}
       <div className="section-head" style={{ marginBottom: 14 }}>
         <h2 style={{ fontSize: 16 }}>Tier Certifications</h2>
         <span className="section-meta">5 TIERS · POINTS-BASED PROGRESSION</span>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12, marginBottom: 36 }}>
+
+      {/* Tier selector pills */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 20 }}>
         {TIER_ORDER.map(tk => {
           const td = TIERS[tk];
           const earned = td.min != null ? currentPts >= td.min : false;
           const isCurrent = tk === tierKey;
-          return <TierCard key={tk} tierKey={tk} tierData={td} earned={earned} currentPts={currentPts} isCurrentTier={isCurrent} />;
+          return (
+            <button key={tk} onClick={() => setCertView(tk)} style={{
+              padding: '6px 14px', borderRadius: 3, cursor: 'pointer',
+              fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700,
+              letterSpacing: '0.1em',
+              background: certView === tk ? td.color + '20' : 'transparent',
+              border: `1px solid ${certView === tk ? td.color : 'var(--off-white-15)'}`,
+              color: certView === tk ? td.color : 'var(--off-white-40)',
+              filter: earned ? 'none' : 'grayscale(0.7)',
+              opacity: earned || certView === tk ? 1 : 0.6,
+              transition: 'all 0.15s',
+            }}>
+              {td.short}{isCurrent ? ' ◆' : ''}
+            </button>
+          );
         })}
+      </div>
+
+      {/* Full cert display */}
+      <div style={{ marginBottom: 40 }}>
+        {(() => {
+          const td = TIERS[certView];
+          const earned = td.min != null ? currentPts >= td.min : false;
+          return window.TierCertificate
+            ? <TierCertificate
+                tierKey={certView} tierData={td} earned={earned}
+                name={ME.name}
+                cohort={myCohort.code}
+                cohortName={myCohort.name}
+              />
+            : <TierCard tierKey={certView} tierData={td} earned={earned} currentPts={currentPts} isCurrentTier={certView === tierKey} />;
+        })()}
       </div>
 
       {/* Badge categories */}
