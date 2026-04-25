@@ -1,6 +1,6 @@
 // Shell: sidebar, topbar, app frame
 
-function Sidebar({ current, onNavigate, onSignOut }) {
+function Sidebar({ current, onNavigate, onSignOut, mobileOpen, onMobileClose }) {
   const userId = typeof ME_ID !== 'undefined' ? ME_ID : null;
   const notifs = userId && window.useNotifications ? window.useNotifications(userId) : { hasUnread: false };
   const me = [
@@ -21,7 +21,9 @@ function Sidebar({ current, onNavigate, onSignOut }) {
   ];
 
   return (
-    <aside className="sidebar">
+    <>
+      {mobileOpen && <div className="sidebar-overlay" onClick={onMobileClose} />}
+    <aside className={'sidebar' + (mobileOpen ? ' sidebar-mobile-open' : '')}>
       <div className="sidebar-brand">
         <div className="sidebar-logo">EXOASIA</div>
         <div className="sidebar-tag">EXONAUT PORTAL · v2.0</div>
@@ -77,10 +79,11 @@ function Sidebar({ current, onNavigate, onSignOut }) {
         <button title="Log out" onClick={onSignOut}><i className="fa-solid fa-right-from-bracket" /></button>
       </div>
     </aside>
+    </>
   );
 }
 
-function Topbar({ crumbs, onNavigate }) {
+function Topbar({ crumbs, onNavigate, onMenuToggle }) {
   const userId = typeof ME_ID !== 'undefined' ? ME_ID : null;
   const notifs = userId && window.useNotifications ? window.useNotifications(userId) : { hasUnread: false };
   const [time, setTime] = React.useState('');
@@ -97,6 +100,9 @@ function Topbar({ crumbs, onNavigate }) {
   }, []);
   return (
     <div className="topbar">
+      <button className="hamburger-btn" onClick={onMenuToggle} title="Menu">
+        <i className="fa-solid fa-bars" />
+      </button>
       <div className="topbar-breadcrumb">
         <i className="fa-solid fa-angles-right" style={{ color: 'var(--ink)', opacity: 0.6 }} />
         {crumbs.map((c, i) => (

@@ -9,6 +9,7 @@ function App() {
   const [tweaksOpen, setTweaksOpen] = React.useState(false);
   const [celebration, setCelebration] = React.useState(null);
   const [kudosOpen, setKudosOpen] = React.useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = React.useState(false);
   const [toasts, setToasts] = React.useState([]);
   const [tweaks, setTweaks] = React.useState(() => {
     try { return JSON.parse(localStorage.getItem('exo:tweaks')) || {}; } catch { return {}; }
@@ -40,8 +41,10 @@ function App() {
 
   const navigate = (id) => {
     setRoute(id);
+    setMobileSidebarOpen(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+  const toggleMobileSidebar = () => setMobileSidebarOpen(v => !v);
 
   const openMission = (id) => {
     setMissionId(id);
@@ -128,7 +131,7 @@ function App() {
   let page, sidebar;
 
   if (roleView === 'exonaut') {
-    sidebar = <Sidebar current={route} onNavigate={navigate} onSignOut={handleSignOut} />;
+    sidebar = <Sidebar current={route} onNavigate={navigate} onSignOut={handleSignOut} mobileOpen={mobileSidebarOpen} onMobileClose={() => setMobileSidebarOpen(false)} />;
     if (route === 'dashboard')        page = <Dashboard onNavigate={navigate} onOpenMission={openMission} />;
     else if (route === 'leaderboard') page = <Leaderboard onBack={() => navigate('dashboard')} />;
     else if (route === 'profile')     page = <Profile onOpenMission={openMission} onTriggerBadge={(b) => onCelebrate('badge', { badge: b })} />;
@@ -194,7 +197,7 @@ function App() {
     <div className="app-shell hud-bg">
       {sidebar}
       <main className="main">
-        <Topbar crumbs={crumbMap[route] || ['EXONAUT']} onNavigate={navigate} />
+        <Topbar crumbs={crumbMap[route] || ['EXONAUT']} onNavigate={navigate} onMenuToggle={toggleMobileSidebar} />
         <RoleSwitcher current={roleView} onChange={switchRole} userRole={authRole} />
         <div className="content" style={{ paddingTop: 48 }}>{page}</div>
       </main>

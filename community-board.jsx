@@ -88,10 +88,10 @@ function CommunityBoard() {
   }
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: 18 }}>
+    <div className="board-shell" style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: 18 }}>
 
       {/* Channels sidebar */}
-      <div>
+      <div className="board-sidebar">
         <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.12em', marginBottom: 10, paddingLeft: 4 }}>
           CHANNELS
         </div>
@@ -532,15 +532,57 @@ function ThreadCompose({ open, onClose, defaultChannel, me }) {
   const [channel, setChannel] = React.useState(defaultChannel || 'general');
   const [title, setTitle] = React.useState('');
   const [body, setBody] = React.useState('');
+  const [mentionQuery, setMentionQuery] = React.useState(null);
+  const bodyRef = React.useRef(null);
+  const registeredUsers = window.useRegisteredUsers ? window.useRegisteredUsers() : [];
+
+  const memberPool = React.useMemo(() =>
+    registeredUsers.filter(u => u.userId !== me?.id).map(u => ({ id: u.userId, name: u.name })),
+    [registeredUsers, me?.id]
+  );
+  const mentionMatches = React.useMemo(() => {
+    if (mentionQuery === null) return [];
+    return memberPool.filter(m => m.name.toLowerCase().includes(mentionQuery.toLowerCase())).slice(0, 6);
+  }, [mentionQuery, memberPool]);
 
   if (!open) return null;
   const canPost = title.trim().length >= 2;
+
+  function handleBodyChange(e) {
+    const val = e.target.value;
+    const cursor = e.target.selectionStart;
+    setBody(val);
+    const textBefore = val.slice(0, cursor);
+    const match = textBefore.match(/@([^@\n]{0,30})$/);
+    setMentionQuery(match ? match[1] : null);
+  }
+
+  function insertMention(member) {
+    const ta = bodyRef.current;
+    const cursor = ta ? ta.selectionStart : body.length;
+    const textBefore = body.slice(0, cursor);
+    const textAfter = body.slice(cursor);
+    const lastAt = textBefore.lastIndexOf('@');
+    setBody(textBefore.slice(0, lastAt) + '@' + member.name + ' ' + textAfter);
+    setMentionQuery(null);
+    setTimeout(() => ta?.focus(), 0);
+  }
 
   function submit() {
     if (!canPost) return;
     board.createThread({
       channel, title: title.trim(), body: body.trim(),
       authorId: me.id, authorName: me.role === 'exonaut' ? null : me.name, authorRole: me.role,
+    });
+    // Notify @mentioned users
+    memberPool.forEach(m => {
+      if (body.includes('@' + m.name)) {
+        window.__notifStore?.add({
+          toUserId: m.id, type: 'mention',
+          title: `${me.name} mentioned you in a post`,
+          sub: `"${title.trim()}"`, icon: 'fa-at',
+        });
+      }
     });
     onClose?.();
   }
@@ -593,15 +635,42 @@ function ThreadCompose({ open, onClose, defaultChannel, me }) {
               }} />
           </div>
 
-          <div>
-            <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.1em', marginBottom: 5 }}>BODY <span style={{ opacity: 0.5 }}>· OPTIONAL</span></div>
-            <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={6} placeholder="Context, details, what you need from the cohort."
+          <div style={{ position: 'relative' }}>
+            <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.1em', marginBottom: 5 }}>
+              BODY <span style={{ opacity: 0.5 }}>· OPTIONAL</span>
+              <span style={{ marginLeft: 8, opacity: 0.5 }}>· type @ to mention someone</span>
+            </div>
+            <textarea ref={bodyRef} value={body} onChange={handleBodyChange} rows={6}
+              placeholder="Context, details, what you need from the cohort."
               style={{
                 width: '100%', padding: '10px 12px', resize: 'vertical',
                 background: 'var(--deep-black)', color: 'var(--off-white)',
                 border: '1px solid var(--off-white-15)', borderRadius: 2,
                 fontFamily: 'var(--font-display)', fontSize: 13, outline: 'none', lineHeight: 1.5,
               }} />
+            {mentionMatches.length > 0 && (
+              <div style={{
+                position: 'absolute', left: 0, right: 0, top: '100%', zIndex: 20,
+                background: 'var(--card-base)', border: '1px solid var(--hairline)',
+                borderRadius: 6, boxShadow: 'var(--shadow-lg)', overflow: 'hidden', marginTop: 2,
+              }}>
+                <div style={{ padding: '6px 12px 4px', fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--ink-muted)', letterSpacing: '0.08em' }}>
+                  MENTION A MEMBER
+                </div>
+                {mentionMatches.map(m => (
+                  <div key={m.id} onClick={() => insertMention(m)} style={{
+                    padding: '8px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10,
+                    fontFamily: 'var(--font-display)', fontSize: 13, color: 'var(--ink)',
+                    borderTop: '1px solid var(--hairline)',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-maroon)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                    <i className="fa-solid fa-at" style={{ fontSize: 11, color: 'var(--lime-deep)' }} />
+                    {m.name}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 

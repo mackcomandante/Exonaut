@@ -214,22 +214,53 @@ function KudosModal({ onClose, onSent }) {
         </div>
 
         <label className="t-label-muted" style={{ display: 'block', marginBottom: 6 }}>RECIPIENT</label>
-        <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search anyone in the community (active or alumni)…"
-          style={{
-            width: '100%', padding: '9px 12px', marginBottom: 8,
-            background: 'var(--deep-black)', color: 'var(--off-white)',
-            border: '1px solid var(--off-white-15)', borderRadius: 2,
-            fontFamily: 'var(--font-display)', fontSize: 13, outline: 'none',
-          }} />
-        <select className="select" value={recipient} onChange={(e) => setRecipient(e.target.value)} style={{ marginBottom: 14 }} size={filteredPool.length > 0 ? Math.min(6, filteredPool.length + 1) : 1}>
-          <option value="">Select a community member…</option>
-          {filteredPool.map(u => {
-            const trackShort = (typeof TRACKS !== 'undefined') ? TRACKS.find(t => t.code === u.track)?.short : u.track;
-            const label = [u.name, trackShort, u.status === 'alumni' ? 'ALUMNI · ' + u.cohort : null].filter(Boolean).join(' · ');
-            return <option key={u.id} value={u.id}>{label}</option>;
-          })}
-        </select>
+        {recipient ? (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8,
+            padding: '9px 12px', background: 'var(--lime-wash)',
+            border: '1px solid var(--lime-border)', borderRadius: 2,
+          }}>
+            <i className="fa-solid fa-user-check" style={{ color: 'var(--lime-deep)', fontSize: 12 }} />
+            <span style={{ flex: 1, fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>
+              {pool.find(u => u.id === recipient)?.name || 'Selected'}
+            </span>
+            <button onClick={() => { setRecipient(''); setSearch(''); }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-muted)', fontSize: 12, padding: 2 }}>
+              <i className="fa-solid fa-xmark" />
+            </button>
+          </div>
+        ) : (
+          <>
+            <input type="text" value={search}
+              onChange={(e) => { setSearch(e.target.value); setRecipient(''); }}
+              placeholder="Search anyone in the community (active or alumni)…"
+              autoFocus
+              style={{
+                width: '100%', padding: '9px 12px', marginBottom: 8,
+                background: 'var(--deep-black)', color: 'var(--off-white)',
+                border: '1px solid var(--off-white-15)', borderRadius: 2,
+                fontFamily: 'var(--font-display)', fontSize: 13, outline: 'none',
+              }} />
+            <select className="select" value={recipient}
+              onChange={(e) => {
+                const id = e.target.value;
+                setRecipient(id);
+                if (id) {
+                  const m = pool.find(u => u.id === id);
+                  if (m) setSearch(m.name);
+                }
+              }}
+              style={{ marginBottom: 14 }}
+              size={filteredPool.length > 0 ? Math.min(6, filteredPool.length + 1) : 1}>
+              <option value="">Select a community member…</option>
+              {filteredPool.map(u => {
+                const trackShort = (typeof TRACKS !== 'undefined') ? TRACKS.find(t => t.code === u.track)?.short : u.track;
+                const label = [u.name, trackShort, u.status === 'alumni' ? 'ALUMNI · ' + u.cohort : null].filter(Boolean).join(' · ');
+                return <option key={u.id} value={u.id}>{label}</option>;
+              })}
+            </select>
+          </>
+        )}
 
         <label className="t-label-muted" style={{ display: 'block', marginBottom: 6 }}>MESSAGE</label>
         <textarea className="textarea" rows={3} maxLength={200}
