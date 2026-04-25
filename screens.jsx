@@ -1466,7 +1466,7 @@ function TierCard({ tierKey, tierData, earned, currentPts, isCurrentTier }) {
   );
 }
 
-function BadgeCard({ badge, earned, currentPts }) {
+function BadgeCard({ badge, earned, currentPts, cohortName }) {
   const ptsNeeded = (() => {
     if (badge.code.startsWith('MIL-')) {
       const map = { 'MIL-BRZ': 100, 'MIL-SLV': 300, 'MIL-GLD': 600, 'MIL-PLT': 900 };
@@ -1476,6 +1476,7 @@ function BadgeCard({ badge, earned, currentPts }) {
   })();
   const remaining = ptsNeeded != null ? Math.max(0, ptsNeeded - currentPts) : null;
   const linkedInUrl = `https://www.linkedin.com/sharing/share-offsite/?url=https://exoasia.hub&title=${encodeURIComponent(`I earned the "${badge.name}" badge on the Exoasia Exonaut Portal!`)}`;
+  const [showCert, setShowCert] = React.useState(false);
 
   return (
     <div style={{
@@ -1507,15 +1508,42 @@ function BadgeCard({ badge, earned, currentPts }) {
             : (remaining != null ? `${remaining} pts to go · ${badge.subtitle}` : badge.subtitle)}
         </div>
         {earned && (
-          <a href={linkedInUrl} target="_blank" rel="noreferrer"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 8,
-                     padding: '4px 10px', background: '#0A66C2', borderRadius: 3,
-                     color: '#fff', fontFamily: 'var(--font-mono)', fontSize: 9,
-                     fontWeight: 700, textDecoration: 'none', letterSpacing: '0.06em' }}>
-            <i className="fa-brands fa-linkedin"/>SHARE
-          </a>
+          <div style={{ display:'flex', gap:8, marginTop:8, flexWrap:'wrap' }}>
+            <button onClick={() => setShowCert(true)}
+              style={{ display:'inline-flex', alignItems:'center', gap:5, padding:'4px 10px',
+                       background:'rgba(255,255,255,0.07)', border:'1px solid rgba(255,255,255,0.15)',
+                       borderRadius:3, color:'rgba(255,255,255,0.8)', fontFamily:'var(--font-mono)',
+                       fontSize:9, fontWeight:700, cursor:'pointer', letterSpacing:'0.06em' }}>
+              <i className="fa-solid fa-certificate"/>VIEW CERT
+            </button>
+            <a href={linkedInUrl} target="_blank" rel="noreferrer"
+              style={{ display:'inline-flex', alignItems:'center', gap:5,
+                       padding:'4px 10px', background:'#0A66C2', borderRadius:3,
+                       color:'#fff', fontFamily:'var(--font-mono)', fontSize:9,
+                       fontWeight:700, textDecoration:'none', letterSpacing:'0.06em' }}>
+              <i className="fa-brands fa-linkedin"/>SHARE
+            </a>
+          </div>
         )}
       </div>
+
+      {/* ── Full badge certificate modal ── */}
+      {showCert && earned && (
+        <div onClick={e => { if (e.target===e.currentTarget) setShowCert(false); }}
+          style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.8)',
+                   display:'flex', alignItems:'center', justifyContent:'center',
+                   zIndex:9999, padding:20 }}>
+          <div style={{ width:'100%', maxWidth:760, position:'relative' }}>
+            <button onClick={() => setShowCert(false)}
+              style={{ position:'absolute', top:-36, right:0, background:'none', border:'none',
+                       color:'rgba(255,255,255,0.5)', cursor:'pointer', fontSize:22 }}>✕</button>
+            {window.BadgeCertificate
+              ? <window.BadgeCertificate badge={badge} name={typeof ME !== 'undefined' ? ME?.name : undefined}
+                  cohortName={cohortName} issueDate={badge.date}/>
+              : <div style={{ color:'#fff', padding:20 }}>Certificate component not loaded.</div>}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1618,7 +1646,7 @@ function CertsBadgesPage() {
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 10 }}>
               {catBadges.map(b => (
-                <BadgeCard key={b.code} badge={b} earned={b.earned} currentPts={currentPts} />
+                <BadgeCard key={b.code} badge={b} earned={b.earned} currentPts={currentPts} cohortName={myCohort?.name} />
               ))}
             </div>
           </div>

@@ -462,11 +462,19 @@ function Onboarding({ onComplete }) {
 
   const canAdvance = { 1: pledgeAccepted, 2: bio.length > 0, 3: true, 4: liPosted }[step];
   const next = () => {
+    const uid = localStorage.getItem('exo:userId') || ME_ID;
+    // Step 1 → 2: pledge signed → +50 pts (one-time)
+    if (step === 1 && window.__pointsStore && uid) {
+      window.__pointsStore.add(uid, { source: 'onboarding.pledge', note: 'Exonaut Pledge signed at onboarding' });
+    }
     if (step === 2) {
-      const uid = localStorage.getItem('exo:userId') || ME_ID;
       if (avatarUrl) localStorage.setItem('exo:avatar:' + uid, avatarUrl);
       if (bio.trim()) localStorage.setItem('exo:bio:' + uid, bio.trim());
       if (liUrl.trim()) localStorage.setItem('exo:linkedin:' + uid, liUrl.trim());
+    }
+    // Step 4 → complete: LinkedIn post confirmed → +20 pts (one-time)
+    if (step === 4 && window.__pointsStore && uid && liPosted) {
+      window.__pointsStore.add(uid, { source: 'onboarding.linkedin', note: 'LinkedIn post published at onboarding' });
     }
     step < 4 ? setStep(step + 1) : onComplete();
   };

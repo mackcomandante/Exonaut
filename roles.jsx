@@ -8,11 +8,19 @@ function getMyLead() {
   return LEADS.find(l => l.id === myId) || LEADS[0];
 }
 
+// Ritual id → points-store source key + pts (mirrors POINTS_RUBRIC)
+const RITUAL_SOURCE = {
+  'mon-ign': { source: 'ritual.mon_ign', pts: 5 },
+  'mid-pls': { source: 'ritual.mid_pls', pts: 3 },
+  'fri-win': { source: 'ritual.fri_win', pts: 5 },
+};
+
 function LeadHome({ onNavigate }) {
   const lead = getMyLead();
   const track = TRACKS.find(t => t.code === lead.track);
   const myExonauts = USERS.filter(u => lead.reports.includes(u.id));
   const sortedByPoints = [...myExonauts].sort((a,b) => b.points - a.points);
+  const [ritualTick, setRitualTick] = React.useState(0);
   const trackAvg = Math.round(myExonauts.reduce((s,u) => s + u.points, 0) / myExonauts.length);
   const allSubs = useSubs();
   const myPending = allSubs.filter(s => s.state === 'pending' && lead.reports.includes(s.exonautId));
@@ -100,6 +108,73 @@ function LeadHome({ onNavigate }) {
           <ChainNode role={`${myExonauts.length} INTERNS`} name={track.short + ' cohort'} sub="Active Exonauts" accent="lime" />
         </div>
       </div>
+
+      {/* ── Ritual Confirmation Panel ── */}
+      {(() => {
+        if (!window.__ritualStore) return null;
+        const myExonautIds = new Set(myExonauts.map(u => u.id));
+        const pending = (window.__ritualStore.getAllSubmitted() || [])
+          .filter(r => myExonautIds.has(r.userId));
+
+        function confirmRitual(entry) {
+          window.__ritualStore.confirm(entry.userId, entry.ritualId, entry.weekNum);
+          // Award points to the Exonaut
+          const cfg = RITUAL_SOURCE[entry.ritualId];
+          if (cfg && window.__pointsStore) {
+            const ritual = RITUALS.find(r => r.id === entry.ritualId);
+            window.__pointsStore.add(entry.userId, {
+              source: cfg.source,
+              note: `${ritual?.name || entry.ritualId} · Week ${entry.weekNum} — confirmed by Lead`,
+            });
+          }
+          setRitualTick(t => t + 1);
+        }
+
+        return (
+          <div className="card-panel" style={{ marginTop: 18 }}>
+            <div className="section-head" style={{ marginBottom: 14 }}>
+              <h2 style={{ fontSize: 15 }}>
+                <i className="fa-solid fa-circle-check" style={{ marginRight: 8, color: 'var(--lime)' }}/>
+                Ritual Confirmations
+              </h2>
+              <span className="section-meta">{pending.length} AWAITING CONFIRM</span>
+            </div>
+
+            {pending.length === 0 ? (
+              <div className="t-body" style={{ color: 'var(--off-white-40)', padding: '10px 0' }}>
+                No pending ritual submissions from your Exonauts.
+              </div>
+            ) : pending.map((entry, i) => {
+              const exonaut = myExonauts.find(u => u.id === entry.userId);
+              const ritual  = RITUALS.find(r => r.id === entry.ritualId);
+              const cfg     = RITUAL_SOURCE[entry.ritualId];
+              const timeAgo = entry.ts ? new Date(entry.ts).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+              return (
+                <div key={i} style={{
+                  display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 14,
+                  alignItems: 'center', padding: '12px 0',
+                  borderTop: '1px solid var(--off-white-07)',
+                }}>
+                  <div>
+                    <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13, color: 'var(--off-white)' }}>
+                      {exonaut?.name || entry.userId}
+                    </div>
+                    <div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)', marginTop: 3 }}>
+                      {ritual?.name?.toUpperCase() || entry.ritualId}  ·  WK {entry.weekNum}  ·  {timeAgo}
+                    </div>
+                  </div>
+                  <span className="t-mono" style={{ fontSize: 11, color: 'var(--lime)', fontWeight: 700 }}>
+                    +{cfg?.pts || '?'} PTS
+                  </span>
+                  <button className="btn btn-primary btn-sm" onClick={() => confirmRitual(entry)}>
+                    <i className="fa-solid fa-check" style={{ marginRight: 5 }}/>CONFIRM
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
     </div>
   );
 }

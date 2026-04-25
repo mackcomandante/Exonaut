@@ -767,6 +767,280 @@ function SpecialBadge({ badge, earned }) {
 }
 
 // ─────────────────────────────────────────────
+// BADGE FULL-PAGE CERTIFICATE  (720 × 440 SVG)
+// ─────────────────────────────────────────────
+function BadgeCertificate({ badge, name, cohortName, issueDate }) {
+  const { code, color, category, subtitle } = badge;
+  const badgeName   = badge.name;
+  const id          = code.replace(/[^A-Z0-9]/g, '');
+  const certCode    = `EXO-BADGE-${id}`;
+  const displayName = name || (typeof ME !== 'undefined' ? ME?.name : null) || 'Exonaut';
+  const displayDate = issueDate || new Date().toLocaleDateString('en-US',{ month:'short', day:'numeric', year:'numeric' }).toUpperCase();
+  const CX = 152, CY = 220; // left-panel center
+
+  // ── Badge shape inside the cert left panel ─────────────────────
+  function ShapeLeft() {
+    const R = 90, r = 40;
+    if (category === 'milestone') {
+      const outer = hexPoints(CX, CY, R);
+      const inner = hexPoints(CX, CY, R - 14);
+      return <>
+        <polygon points={outer} fill={`url(#bc-bg-${id})`}/>
+        <polygon points={outer} fill="none" stroke={color} strokeWidth="2" strokeOpacity="0.8" filter={`url(#bc-glow-${id})`}/>
+        <polygon points={inner} fill="none" stroke={color} strokeWidth="0.7" strokeOpacity="0.3"/>
+      </>;
+    }
+    if (category === 'track') {
+      const ticks = Array.from({ length: 12 }, (_, i) => {
+        const a = Math.PI / 6 * i - Math.PI / 2;
+        return { x1:(CX+(R-4)*Math.cos(a)).toFixed(1), y1:(CY+(R-4)*Math.sin(a)).toFixed(1),
+                 x2:(CX+(R+5)*Math.cos(a)).toFixed(1), y2:(CY+(R+5)*Math.sin(a)).toFixed(1), long: i%3===0 };
+      });
+      return <>
+        <circle cx={CX} cy={CY} r={R} fill={`url(#bc-bg-${id})`}/>
+        <circle cx={CX} cy={CY} r={R} fill="none" stroke={color} strokeWidth="2.2" strokeOpacity="0.8" filter={`url(#bc-glow-${id})`}/>
+        <circle cx={CX} cy={CY} r={R-14} fill="none" stroke={color} strokeWidth="0.6" strokeOpacity="0.2"/>
+        {ticks.map((t,i) => <line key={i} x1={t.x1} y1={t.y1} x2={t.x2} y2={t.y2} stroke={color} strokeWidth={t.long?1.6:0.8} strokeOpacity={t.long?0.7:0.3}/>)}
+      </>;
+    }
+    if (category === 'pillar') {
+      const od = `${CX},${CY-R} ${CX+R*0.86},${CY} ${CX},${CY+R} ${CX-R*0.86},${CY}`;
+      const id2 = `${CX},${CY-R+14} ${CX+(R-14)*0.86},${CY} ${CX},${CY+R-14} ${CX-(R-14)*0.86},${CY}`;
+      return <>
+        <polygon points={od} fill={`url(#bc-bg-${id})`}/>
+        <polygon points={od} fill="none" stroke={color} strokeWidth="2" strokeOpacity="0.8" filter={`url(#bc-glow-${id})`}/>
+        <polygon points={id2} fill="none" stroke={color} strokeWidth="0.6" strokeOpacity="0.25"/>
+      </>;
+    }
+    // special — starburst
+    const star  = starPoints(CX, CY, R, r);
+    const star2 = starPoints(CX, CY, R-12, r-4);
+    return <>
+      <polygon points={star} fill={`url(#bc-bg-${id})`}/>
+      <polygon points={star} fill="none" stroke={color} strokeWidth="2" strokeOpacity="0.8" filter={`url(#bc-glow-${id})`}/>
+      <polygon points={star2} fill="none" stroke={color} strokeWidth="0.5" strokeOpacity="0.2"/>
+    </>;
+  }
+
+  // ── Central label inside shape ─────────────────────────────────
+  function ShapeLabel() {
+    const ROMAN = {'MILBRZ':'I','MILSLV':'II','MILGLD':'III','MILPLT':'IV'};
+    const TRACK_SYM = {'TRKAIS':'AIS','TRKVB':'VB','TRKLD':'L&D','TRKXM':'XM','TRKAID':'DEV','TRKPOL':'POL','TRKCC':'SMM'};
+    const PILLAR_SYM = {'PILDLV':'DLV','PILINN':'INN','PILCLT':'CLT','PILTAL':'TAL'};
+    const SPL_SYM = {'SPLTRI':'TRI','SPLMVP':'MVP','SPLIOW':'IOW','SPLDIS':'DIS','SPLCLT':'CLT','SPLFUL':'FCL','SPLPIP':'PIP'};
+    let sym = ROMAN[id] || TRACK_SYM[id] || PILLAR_SYM[id] || SPL_SYM[id] || id.slice(-3);
+    const fs = sym.length <= 2 ? 44 : sym.length <= 3 ? 36 : 28;
+    return <>
+      <text x={CX} y={CY + fs*0.38} textAnchor="middle"
+        fontFamily="Montserrat, sans-serif" fontSize={fs} fontWeight="900"
+        fill={color} letterSpacing="2" filter={`url(#bc-glow-${id})`}>{sym}</text>
+      <text x={CX} y={CY + fs*0.38 + 18} textAnchor="middle"
+        fontFamily="JetBrains Mono, monospace" fontSize="7" fontWeight="700"
+        fill={color} fillOpacity="0.5" letterSpacing="3">{category.toUpperCase()}</text>
+    </>;
+  }
+
+  const [showShareModal, setShowShareModal] = React.useState(false);
+  const [copied, setCopied]                 = React.useState(false);
+  const [downloading, setDownloading]       = React.useState(false);
+  const svgRef = React.useRef(null);
+
+  const linkedInCaption = [
+    `🏅 Just earned the "${badgeName}" badge at Exoasia Innovation Hub!`,
+    '',
+    `The Exonaut Program is a 12-week internship with real world experience — no simulations, just actual client work across AI strategy, venture building, L&D, and more.`,
+    '',
+    `${cohortName || 'Batch 2026–2027'} · Exoasia Innovation Hub · Philippines 🇵🇭`,
+    '',
+    '#Exonaut #ExoasiaHub #Innovation #Philippines #AITransformation',
+  ].join('\n');
+  const linkedInUrl = `https://www.linkedin.com/sharing/share-offsite/?url=https%3A%2F%2Fexoasia.hub%2Fbadges%2F${encodeURIComponent(certCode)}`;
+
+  function copyCaption() {
+    navigator.clipboard.writeText(linkedInCaption).catch(() => {});
+    setCopied(true); setTimeout(() => setCopied(false), 2200);
+  }
+  function downloadPng() {
+    const svg = svgRef.current; if (!svg || downloading) return;
+    setDownloading(true);
+    const clone = svg.cloneNode(true);
+    clone.setAttribute('width','720'); clone.setAttribute('height','440');
+    const blob = new Blob([new XMLSerializer().serializeToString(clone)], { type:'image/svg+xml;charset=utf-8' });
+    const url  = URL.createObjectURL(blob);
+    const img  = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas'); canvas.width=1440; canvas.height=880;
+      const ctx = canvas.getContext('2d'); ctx.scale(2,2); ctx.drawImage(img,0,0);
+      URL.revokeObjectURL(url);
+      const a = document.createElement('a'); a.download=`${certCode}.png`; a.href=canvas.toDataURL('image/png');
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setDownloading(false);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); setDownloading(false); };
+    img.src = url;
+  }
+
+  return (
+    <div style={{ width:'100%' }}>
+      <svg ref={svgRef} viewBox="0 0 720 440" xmlns="http://www.w3.org/2000/svg"
+        style={{ width:'100%', display:'block', borderRadius:8 }}>
+        <defs>
+          <radialGradient id={`bc-bg-${id}`} cx="50%" cy="40%" r="65%">
+            <stop offset="0%" stopColor={color} stopOpacity="0.18"/>
+            <stop offset="100%" stopColor={BG}  stopOpacity="1"/>
+          </radialGradient>
+          <radialGradient id={`bc-full-${id}`} cx="22%" cy="50%" r="70%">
+            <stop offset="0%" stopColor={color} stopOpacity="0.10"/>
+            <stop offset="100%" stopColor={BG}  stopOpacity="1"/>
+          </radialGradient>
+          <filter id={`bc-glow-${id}`}>
+            <feGaussianBlur stdDeviation="3" result="b"/>
+            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+
+        {/* Background */}
+        <rect width="720" height="440" fill={BG} rx="8"/>
+        <rect width="720" height="440" fill={`url(#bc-full-${id})`} rx="8"/>
+
+        {/* Borders */}
+        <rect x="10" y="10" width="700" height="420" fill="none" stroke={color} strokeWidth="1.2" strokeOpacity="0.35" rx="5"/>
+        <rect x="18" y="18" width="684" height="404" fill="none" stroke={color} strokeWidth="0.4" strokeOpacity="0.18" rx="3"/>
+
+        {/* Corner brackets */}
+        {[[10,10,55,10,10,55],[665,10,710,10,710,55],[10,385,10,430,55,430],[665,430,710,430,710,385]].map(([x1,y1,x2,y2,x3,y3],i) => (
+          <polyline key={i} points={`${x1},${y1} ${x2},${y2} ${x3},${y3}`}
+            fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="square" filter={`url(#bc-glow-${id})`}/>
+        ))}
+
+        {/* Header */}
+        <text x="360" y="50" textAnchor="middle" fontFamily="Montserrat, sans-serif" fontSize="9" fontWeight="800"
+          fill={color} fillOpacity="0.9" letterSpacing="5">EXOASIA INNOVATION HUB</text>
+        <line x1="100" y1="58" x2="280" y2="58" stroke={color} strokeWidth="0.5" strokeOpacity="0.3"/>
+        <text x="360" y="66" textAnchor="middle" fontFamily="JetBrains Mono, monospace" fontSize="7.5"
+          fill={color} fillOpacity="0.45" letterSpacing="2.5">
+          {cohortName ? cohortName.toUpperCase() : 'EXONAUT PROGRAM'}  ·  BADGE OF ACHIEVEMENT
+        </text>
+        <line x1="440" y1="58" x2="620" y2="58" stroke={color} strokeWidth="0.5" strokeOpacity="0.3"/>
+
+        {/* Left panel: badge shape */}
+        <ShapeLeft/>
+        <ShapeLabel/>
+
+        {/* Vertical divider */}
+        <line x1="255" y1="90" x2="255" y2="370" stroke={color} strokeWidth="0.5" strokeOpacity="0.2"/>
+
+        {/* Right panel */}
+        <text x="298" y="118" fontFamily="EB Garamond, serif" fontSize="15" fontStyle="italic"
+          fill="rgba(255,255,255,0.38)">This certifies that</text>
+        <text x="298" y="170" fontFamily="Montserrat, sans-serif" fontSize="34" fontWeight="800"
+          fill="rgba(255,255,255,0.95)" letterSpacing="0.5">{displayName}</text>
+        <line x1="298" y1="182" x2="690" y2="182" stroke="rgba(255,255,255,0.08)" strokeWidth="1"/>
+        <text x="298" y="208" fontFamily="EB Garamond, serif" fontSize="13" fontStyle="italic"
+          fill="rgba(255,255,255,0.35)">has been awarded the</text>
+
+        {/* Badge name — scale font to fit */}
+        <text x="298" y="258" fontFamily="Montserrat, sans-serif"
+          fontSize={badgeName.length <= 14 ? 34 : badgeName.length <= 20 ? 26 : 20}
+          fontWeight="900" fill={color} letterSpacing="1" filter={`url(#bc-glow-${id})`}>
+          {badgeName.toUpperCase()}
+        </text>
+        <text x="298" y="278" fontFamily="JetBrains Mono, monospace" fontSize="9"
+          fill={color} fillOpacity="0.5" letterSpacing="2.5">{subtitle.toUpperCase()}</text>
+
+        <line x1="298" y1="310" x2="690" y2="310" stroke={color} strokeWidth="0.4" strokeOpacity="0.25"/>
+
+        {/* Footer */}
+        <text x="298" y="336" fontFamily="JetBrains Mono, monospace" fontSize="8.5"
+          fill="rgba(255,255,255,0.25)" letterSpacing="1.5">ISSUED · {displayDate}</text>
+        <text x="298" y="352" fontFamily="JetBrains Mono, monospace" fontSize="8"
+          fill="rgba(255,255,255,0.18)" letterSpacing="1">{certCode}</text>
+
+        {/* Signature */}
+        <text x="570" y="330" textAnchor="middle" fontFamily="Montserrat, sans-serif" fontSize="12" fontWeight="600"
+          fill="rgba(255,255,255,0.38)" letterSpacing="0.5">Mack Comandante</text>
+        <line x1="510" y1="318" x2="630" y2="318" stroke="rgba(255,255,255,0.12)" strokeWidth="1"/>
+        <text x="570" y="348" textAnchor="middle" fontFamily="JetBrains Mono, monospace" fontSize="7.5"
+          fill="rgba(255,255,255,0.2)" letterSpacing="1">MISSION COMMANDER</text>
+
+        {/* Bottom strip */}
+        <rect x="10" y="408" width="700" height="22" fill={color} fillOpacity="0.06"/>
+        <text x="360" y="422" textAnchor="middle" fontFamily="JetBrains Mono, monospace" fontSize="7"
+          fill={color} fillOpacity="0.3" letterSpacing="3">
+          {(cohortName || 'BATCH 2026–2027').toUpperCase()}  ·  EXONAUT PROGRAM  ·  EXOASIA INNOVATION HUB  ·  PHILIPPINES
+        </text>
+      </svg>
+
+      {/* Actions */}
+      <div style={{ display:'flex', gap:10, marginTop:14 }}>
+        <button onClick={() => setShowShareModal(true)}
+          style={{ display:'inline-flex', alignItems:'center', gap:7, padding:'9px 18px',
+                   background:'#0A66C2', borderRadius:4, color:'#fff', fontFamily:'var(--font-mono)',
+                   fontSize:11, fontWeight:700, border:'none', cursor:'pointer', letterSpacing:'0.06em' }}>
+          <i className="fa-brands fa-linkedin"/>SHARE ON LINKEDIN
+        </button>
+        <button onClick={downloadPng} disabled={downloading}
+          style={{ display:'inline-flex', alignItems:'center', gap:7, padding:'9px 18px',
+                   background:'transparent', border:'1px solid var(--off-white-15)', borderRadius:4,
+                   color: downloading ? 'rgba(255,255,255,0.35)' : 'var(--off-white-68)',
+                   fontFamily:'var(--font-mono)', fontSize:11,
+                   cursor: downloading ? 'default' : 'pointer', letterSpacing:'0.06em' }}>
+          <i className={downloading ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-download'}/>
+          {downloading ? 'EXPORTING…' : 'DOWNLOAD PNG'}
+        </button>
+      </div>
+
+      {/* Share modal */}
+      {showShareModal && (
+        <div onClick={e => { if (e.target===e.currentTarget) setShowShareModal(false); }}
+          style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.72)',
+                   display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999 }}>
+          <div style={{ background:'#1A1929', border:'1px solid rgba(255,255,255,0.1)',
+                        borderRadius:12, padding:28, width:500, maxWidth:'92vw' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
+              <span style={{ fontFamily:'var(--font-mono)', fontSize:11, letterSpacing:'0.1em',
+                             color:'rgba(255,255,255,0.7)', fontWeight:700 }}>SHARE ON LINKEDIN</span>
+              <button onClick={() => setShowShareModal(false)}
+                style={{ background:'none', border:'none', color:'rgba(255,255,255,0.35)',
+                         cursor:'pointer', fontSize:20 }}>×</button>
+            </div>
+            <p style={{ margin:'0 0 10px', fontFamily:'var(--font-mono)', fontSize:10,
+                        color:'rgba(255,255,255,0.4)', lineHeight:1.6 }}>
+              Copy the caption, then paste it into your LinkedIn post after the share dialog opens.
+            </p>
+            <textarea readOnly value={linkedInCaption} onClick={e => e.target.select()}
+              style={{ width:'100%', minHeight:172, background:'rgba(255,255,255,0.04)',
+                       border:'1px solid rgba(255,255,255,0.1)', borderRadius:6,
+                       color:'rgba(255,255,255,0.82)', fontFamily:'var(--font-mono)',
+                       fontSize:12, lineHeight:1.65, padding:'12px 14px', resize:'none',
+                       boxSizing:'border-box', outline:'none' }}/>
+            <div style={{ display:'flex', gap:10, marginTop:14 }}>
+              <button onClick={copyCaption}
+                style={{ flex:1, padding:'11px 0',
+                         background: copied ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.07)',
+                         border: copied ? '1px solid rgba(34,197,94,0.5)' : '1px solid rgba(255,255,255,0.12)',
+                         borderRadius:6, color: copied ? '#22C55E' : 'rgba(255,255,255,0.8)',
+                         fontFamily:'var(--font-mono)', fontSize:11, fontWeight:700,
+                         cursor:'pointer', letterSpacing:'0.08em' }}>
+                {copied ? <><i className="fa-solid fa-check" style={{ marginRight:6 }}/>COPIED!</> : <><i className="fa-regular fa-copy" style={{ marginRight:6 }}/>COPY CAPTION</>}
+              </button>
+              <a href={linkedInUrl} target="_blank" rel="noreferrer"
+                onClick={() => setTimeout(() => setShowShareModal(false), 600)}
+                style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:8,
+                         padding:'11px 0', background:'#0A66C2', borderRadius:6, color:'#fff',
+                         fontFamily:'var(--font-mono)', fontSize:11, fontWeight:700,
+                         textDecoration:'none', letterSpacing:'0.08em' }}>
+                <i className="fa-brands fa-linkedin"/>OPEN LINKEDIN →
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
 // BADGE SVG DISPATCHER
 // ─────────────────────────────────────────────
 function BadgeSVG({ badge, earned }) {
@@ -779,4 +1053,4 @@ function BadgeSVG({ badge, earned }) {
   return null;
 }
 
-Object.assign(window, { TierCertificate, BadgeSVG });
+Object.assign(window, { TierCertificate, BadgeSVG, BadgeCertificate });

@@ -33,6 +33,22 @@
     getState(userId, ritualId, weekNum) {
       return load()[userId]?.[weekNum]?.[ritualId]?.state || 'not-started';
     },
+    // Returns all entries with state === 'submitted' across every user/week
+    getAllSubmitted() {
+      const data = load();
+      const result = [];
+      for (const userId of Object.keys(data)) {
+        for (const weekNum of Object.keys(data[userId])) {
+          for (const ritualId of Object.keys(data[userId][weekNum])) {
+            const entry = data[userId][weekNum][ritualId];
+            if (entry.state === 'submitted') {
+              result.push({ userId, weekNum: Number(weekNum), ritualId, ts: entry.ts, postId: entry.postId });
+            }
+          }
+        }
+      }
+      return result.sort((a, b) => a.ts - b.ts); // oldest first
+    },
   };
 
   function useRituals(userId, weekNum) {
