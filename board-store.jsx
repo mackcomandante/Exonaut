@@ -7,111 +7,11 @@
 // ============================================================================
 
 (function () {
-  const STORE_KEY = 'exo:board:v1';
+  const STORE_KEY = 'exo:board:v2';
 
   // ---- Seed content -------------------------------------------------------
   function seedThreads() {
-    // Pull a handful of users for authorship if USERS is available.
-    const U = (typeof USERS !== 'undefined') ? USERS : [];
-    const U_IDS = U.map(u => u.id);
-    const pick = (i) => U_IDS[i % U_IDS.length] || 'u01';
-
-    const H = 3600 * 1000, D = 86400 * 1000;
-
-    const T = [
-      {
-        id: 'th-welcome',
-        channel: 'general',
-        pinned: true,
-        title: 'Welcome to the Exonaut message board',
-        body: 'This is where the cohort talks — open questions, gear recs, shipping wins, missed-ritual apologies, and the occasional gif. Be direct. Lift before you climb. No karma farming; we already track points.\n\nUse channels to target your post (track channels are for track-specific chatter, #general for everything else, #alumni for cross-batch).',
-        authorId: 'u14', authorRole: 'commander', authorName: 'Mack Comandante',
-        ts: Date.now() - 10 * D,
-        votes: { u01: 1, u02: 1, u03: 1, u04: 1, u05: 1, u06: 1, u07: 1 },
-        comments: [
-          { id: 'c-welc-1', authorId: pick(1), ts: Date.now() - 9 * D, body: 'First 👋', votes: { u01: 1, u05: 1 }, replies: [] },
-          { id: 'c-welc-2', authorId: pick(3), ts: Date.now() - 8 * D, body: 'Can we pin a channel index post? Hard to keep track of where things go.', votes: { u02: 1 }, replies: [
-            { id: 'c-welc-2a', authorId: 'u14', authorName: 'Mack Comandante', ts: Date.now() - 7.5 * D, body: "Good call — I'll pin one this week.", votes: {}, replies: [] },
-          ] },
-        ],
-      },
-      {
-        id: 'th-ais-prompt',
-        channel: 'ais',
-        title: 'Prompt chain I stole from the AI Strategy brief — saved me 2 hours on Monday',
-        body: 'For the competitive landscape mission, chaining:\n1) "List 6 competitors of X with one-sentence positioning each"\n2) "Score each on [criteria] from 1–5 with justification"\n3) "Rewrite as a slide title + 2 supporting bullets, Exoasia tone"\n\nEach step gets its own chat window so context stays clean. Works better than asking all at once.',
-        authorId: 'u05', authorRole: 'exonaut',
-        ts: Date.now() - 3 * D - 4 * H,
-        votes: { u01: 1, u02: 1, u03: 1, u07: 1, u14: 1, u06: 1 },
-        comments: [
-          { id: 'c-ais-1', authorId: 'u06', ts: Date.now() - 2.5 * D, body: 'Stealing this. Have you tried a 4th step that asks it to critique its own bullets? Rescued two decks last week.', votes: { u05: 1, u03: 1 }, replies: [
-            { id: 'c-ais-1a', authorId: 'u05', ts: Date.now() - 2 * D, body: "I have — it's like a 15-sec peer review.", votes: { u06: 1 }, replies: [] },
-          ] },
-          { id: 'c-ais-2', authorId: 'u03', ts: Date.now() - 2 * D, body: 'Does this fit the word limit for Mission P1? I keep blowing past.', votes: {}, replies: [] },
-        ],
-      },
-      {
-        id: 'th-rituals',
-        channel: 'general',
-        title: 'Anyone else feel Monday Ignition has gotten sharper over the last 3 weeks?',
-        body: "Genuinely the best hour of my Monday. Whoever's been prepping the prompts — thank you. Culture move.",
-        authorId: 'u07', authorRole: 'exonaut',
-        ts: Date.now() - 1 * D - 6 * H,
-        votes: { u01: 1, u02: 1, u03: 1, u04: 1, u05: 1, u06: 1, u08: 1, u09: 1, u14: 1, u11: 1 },
-        comments: [
-          { id: 'c-rit-1', authorId: 'u11', ts: Date.now() - 1 * D, body: 'Agreed. The "what did you ship that you forgot to be proud of" prompt last week wrecked me in the best way.', votes: { u07: 1, u05: 1 }, replies: [] },
-          { id: 'c-rit-2', authorId: 'u02', ts: Date.now() - 22 * H, body: 'It really helps when people come with receipts instead of vibes.', votes: { u07: 1 }, replies: [] },
-        ],
-      },
-      {
-        id: 'th-client',
-        channel: 'ais',
-        title: 'Kestrel client call tomorrow — anyone free to pressure-test my deck at 20:00 SGT?',
-        body: 'Going in with the competitive map + 3-option recommendation. Want a skeptical eye, especially on slide 6 (market sizing). 15 mins on Meet. Will trade: kudos and a coffee at next Friday Win Wall.',
-        authorId: 'u14', authorRole: 'exonaut', authorName: null,
-        ts: Date.now() - 5 * H,
-        votes: { u05: 1, u06: 1, u07: 1 },
-        comments: [
-          { id: 'c-cli-1', authorId: 'u06', ts: Date.now() - 4 * H, body: "I'm in. Drop the link.", votes: { u14: 1 }, replies: [] },
-          { id: 'c-cli-2', authorId: 'u05', ts: Date.now() - 3 * H, body: 'Same — can join 20:15 onwards if you need a second pair of eyes.', votes: {}, replies: [] },
-        ],
-      },
-      {
-        id: 'th-alumni',
-        channel: 'alumni',
-        title: '[2025-26 cohort] Hiring: Senior AI Consultant at Exoasia, referrals get priority',
-        body: 'We just opened a role on my team. Looking for someone who can own a client workstream end-to-end. If anyone in the current batch is thinking about full-time post-program, ping me — happy to chat even if you\'re not sure yet.',
-        authorId: 'a01', authorName: 'Zara Okonkwo', authorRole: 'alumni',
-        ts: Date.now() - 2 * D,
-        votes: { u01: 1, u02: 1, u05: 1, u06: 1, u07: 1, u11: 1, u14: 1 },
-        comments: [
-          { id: 'c-alu-1', authorId: 'u14', ts: Date.now() - 1.5 * D, body: "Messaged. Thanks for opening this up.", votes: {}, replies: [] },
-        ],
-      },
-      {
-        id: 'th-vb',
-        channel: 'vb',
-        title: 'Venture Builder track — who is using cap tables in the diligence mission?',
-        body: 'Mission 2 specifically asks for a "simple cap table pre/post". Is that just pre-seed dilution math or full waterfall? The brief is a little vague and I don\'t want to over-build.',
-        authorId: 'u02', authorRole: 'exonaut',
-        ts: Date.now() - 18 * H,
-        votes: { u04: 1, u09: 1 },
-        comments: [],
-      },
-      {
-        id: 'th-pol',
-        channel: 'pol',
-        title: 'Policy research — stop pasting 40 tabs of MAS pages into one doc',
-        body: "Friendly reminder the grading rubric rewards a sharp 2-page memo over a 20-page dump. Spend the last 25% of your time cutting, not researching.",
-        authorId: 'u03', authorRole: 'exonaut',
-        ts: Date.now() - 9 * H,
-        votes: { u11: 1, u14: 1 },
-        comments: [
-          { id: 'c-pol-1', authorId: 'u11', ts: Date.now() - 8 * H, body: 'This is the reminder I needed. Two-page rule > all.', votes: {}, replies: [] },
-        ],
-      },
-    ];
-    return T;
+    return [];
   }
 
   function load() {
