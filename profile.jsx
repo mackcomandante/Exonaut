@@ -2,6 +2,59 @@
 
 function Profile({ onOpenMission, onTriggerBadge }) {
   const [tab, setTab] = React.useState('overview');
+  const [editing, setEditing]       = React.useState(false);
+  const [saving,  setSaving]        = React.useState(false);
+  const [editErr, setEditErr]       = React.useState('');
+
+  const storedName     = localStorage.getItem('exo:userName') || ME.name;
+  const storedBio      = localStorage.getItem('exo:bio:'      + ME_ID) || '"Trying to build the bridge while crossing it. Most days it holds."';
+  const storedLinkedin = localStorage.getItem('exo:linkedin:' + ME_ID) || '';
+  const storedSchool   = localStorage.getItem('exo:school:'   + ME_ID) || 'NUS · Computer Science';
+
+  const [displayName, setDisplayName] = React.useState(storedName);
+  const [displayBio,  setDisplayBio]  = React.useState(storedBio);
+  const [displayLI,   setDisplayLI]   = React.useState(storedLinkedin);
+  const [displaySchool, setDisplaySchool] = React.useState(storedSchool);
+
+  const [editName,   setEditName]   = React.useState(storedName);
+  const [editBio,    setEditBio]    = React.useState(storedBio);
+  const [editLI,     setEditLI]     = React.useState(storedLinkedin);
+  const [editSchool, setEditSchool] = React.useState(storedSchool);
+
+  function openEdit() {
+    setEditName(displayName);
+    setEditBio(displayBio);
+    setEditLI(displayLI);
+    setEditSchool(displaySchool);
+    setEditErr('');
+    setEditing(true);
+  }
+
+  async function saveEdit() {
+    if (!editName.trim()) { setEditErr('Name cannot be blank.'); return; }
+    setSaving(true);
+    setEditErr('');
+    try {
+      const { error } = await window.__db
+        .from('registered_users')
+        .update({ name: editName.trim() })
+        .eq('user_id', ME_ID);
+      if (error) throw error;
+      localStorage.setItem('exo:userName',          editName.trim());
+      localStorage.setItem('exo:bio:'      + ME_ID, editBio.trim());
+      localStorage.setItem('exo:linkedin:' + ME_ID, editLI.trim());
+      localStorage.setItem('exo:school:'   + ME_ID, editSchool.trim());
+      setDisplayName(editName.trim());
+      setDisplayBio(editBio.trim());
+      setDisplayLI(editLI.trim());
+      setDisplaySchool(editSchool.trim());
+      setEditing(false);
+    } catch (err) {
+      setEditErr(err?.message || 'Save failed. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  }
 
   const { total: livePoints, delta: liveDelta } = useComputedPoints(ME_ID);
   const liveBadges = useLiveBadges();
@@ -13,29 +66,71 @@ function Profile({ onOpenMission, onTriggerBadge }) {
 
   return (
     <div className="enter">
+      {/* EDIT MODAL */}
+      {editing && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.72)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onClick={e => { if (e.target === e.currentTarget) setEditing(false); }}>
+          <div className="card" style={{ width: 480, maxWidth: '94vw', padding: 32 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+              <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 18, margin: 0 }}>Edit Profile</h2>
+              <button className="btn btn-ghost btn-sm" onClick={() => setEditing(false)}>✕</button>
+            </div>
+
+            <label className="t-label-muted" style={{ display: 'block', marginBottom: 4 }}>Display Name</label>
+            <input className="field" value={editName} onChange={e => setEditName(e.target.value)}
+              style={{ width: '100%', marginBottom: 16, boxSizing: 'border-box' }} />
+
+            <label className="t-label-muted" style={{ display: 'block', marginBottom: 4 }}>Bio / Quote</label>
+            <textarea className="field" rows={3} value={editBio} onChange={e => setEditBio(e.target.value)}
+              style={{ width: '100%', marginBottom: 16, boxSizing: 'border-box', resize: 'vertical' }} />
+
+            <label className="t-label-muted" style={{ display: 'block', marginBottom: 4 }}>School</label>
+            <input className="field" value={editSchool} onChange={e => setEditSchool(e.target.value)}
+              style={{ width: '100%', marginBottom: 16, boxSizing: 'border-box' }} />
+
+            <label className="t-label-muted" style={{ display: 'block', marginBottom: 4 }}>LinkedIn URL</label>
+            <input className="field" type="url" placeholder="https://linkedin.com/in/yourname"
+              value={editLI} onChange={e => setEditLI(e.target.value)}
+              style={{ width: '100%', marginBottom: 24, boxSizing: 'border-box' }} />
+
+            {editErr && <div style={{ color: 'var(--red, #ff4d4d)', fontSize: 13, marginBottom: 16 }}>{editErr}</div>}
+
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button className="btn btn-ghost btn-sm" onClick={() => setEditing(false)} disabled={saving}>CANCEL</button>
+              <button className="btn btn-primary" onClick={saveEdit} disabled={saving}>
+                {saving ? 'SAVING…' : 'SAVE CHANGES'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* HERO */}
       <div className="profile-hero">
         <div>
-          <AvatarWithRing name={ME.name} size={140} tier={ME.tier} />
+          <AvatarWithRing name={displayName} size={140} tier={ME.tier} />
         </div>
         <div>
           <div className="t-label" style={{ marginBottom: 10 }}>EXONAUT · #14 / 30 · {TIERS[ME.tier].short}</div>
-          <h1 className="profile-name">{ME.name}</h1>
+          <h1 className="profile-name">{displayName}</h1>
           <div className="profile-meta-row">
             <span><span className="meta-k">TRACK</span>AI Strategy & Advisory</span>
             <span><span className="meta-k">CLIENT</span>Kestrel Biotics</span>
             <span><span className="meta-k">COHORT</span>{COHORT.name}</span>
-            <span><span className="meta-k">SCHOOL</span>NUS · Computer Science</span>
+            <span><span className="meta-k">SCHOOL</span>{displaySchool}</span>
           </div>
-          <div className="profile-bio">
-            "Trying to build the bridge while crossing it. Most days it holds."
-          </div>
+          <div className="profile-bio">{displayBio}</div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
-          <button className="btn btn-primary">
-            <i className="fa-brands fa-linkedin" /> LINKEDIN
-          </button>
-          <button className="btn btn-ghost btn-sm">
+          {displayLI
+            ? <a href={displayLI} target="_blank" rel="noopener noreferrer" className="btn btn-primary">
+                <i className="fa-brands fa-linkedin" /> LINKEDIN
+              </a>
+            : <button className="btn btn-primary" onClick={openEdit}>
+                <i className="fa-brands fa-linkedin" /> LINKEDIN
+              </button>
+          }
+          <button className="btn btn-ghost btn-sm" onClick={openEdit}>
             <i className="fa-solid fa-pen" /> EDIT
           </button>
           <div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)', letterSpacing: '0.1em', marginTop: 8 }}>
