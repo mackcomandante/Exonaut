@@ -31,12 +31,12 @@ function LoginScreen({ onSignIn }) {
   }
 
   // ── Login submit ──────────────────────────────────────────────────────────
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
     if (!email || !password) return;
     setError('');
     setLoading(true);
-    setTimeout(() => {
+    try {
       // 1. Check seed credentials
       const seed = CREDENTIALS[email.trim().toLowerCase()];
       if (seed && seed.password === password) {
@@ -44,21 +44,26 @@ function LoginScreen({ onSignIn }) {
         applySession(seed.userId, seed.role, seed.homeRoute, firstTime);
         return;
       }
-      // 2. Check registered users
-      const reg = window.__userRegistry.find(email);
+      // 2. Check Supabase registered users
+      const reg = await window.__userRegistry.find(email);
       if (reg && reg.password === password) {
         const loginId = reg.role === 'lead' && reg.leadId ? reg.leadId : reg.userId;
         const firstTime = reg.role === 'exonaut' && !localStorage.getItem('exo:onboarded:' + reg.userId);
+        localStorage.setItem('exo:userName', reg.name);
+        localStorage.setItem('exo:userTrack', reg.track || 'AIS');
         applySession(loginId, reg.role, reg.homeRoute, firstTime);
         return;
       }
-      setLoading(false);
       setError('Invalid email or password.');
-    }, 650);
+    } catch (err) {
+      setError('Connection error. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // ── Sign-up submit ────────────────────────────────────────────────────────
-  const handleSignUp = (e) => {
+  const handleSignUp = async (e) => {
     e.preventDefault();
     setError('');
     if (!suName.trim() || !suEmail || !suPass || !suConfirm) {
@@ -73,15 +78,22 @@ function LoginScreen({ onSignIn }) {
       setError('Passwords do not match.');
       return;
     }
-    if (window.__userRegistry.emailTaken(suEmail)) {
-      setError('An account with this email already exists.');
-      return;
-    }
     setLoading(true);
-    setTimeout(() => {
-      const reg = window.__userRegistry.register({ name: suName, email: suEmail, password: suPass });
+    try {
+      const taken = await window.__userRegistry.emailTaken(suEmail);
+      if (taken) {
+        setError('An account with this email already exists.');
+        return;
+      }
+      const reg = await window.__userRegistry.register({ name: suName, email: suEmail, password: suPass });
+      localStorage.setItem('exo:userName', reg.name);
+      localStorage.setItem('exo:userTrack', 'AIS');
       applySession(reg.userId, 'exonaut', 'dashboard', true);
-    }, 650);
+    } catch (err) {
+      setError('Registration failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // ── Shared error / action bar ─────────────────────────────────────────────
