@@ -4,9 +4,10 @@ function Sidebar({ current, onNavigate, onSignOut, mobileOpen, onMobileClose }) 
   const userId = typeof ME_ID !== 'undefined' ? ME_ID : null;
   const notifs = userId && window.useNotifications ? window.useNotifications(userId) : { hasUnread: false };
   const me = [
-    { id: 'profile',       label: 'My Profile',    icon: 'fa-id-badge' },
-    { id: 'community',     label: 'Community',     icon: 'fa-users' },
-    { id: 'message-board', label: 'Message Board', icon: 'fa-comments' },
+    { id: 'profile',       label: 'My Profile',       icon: 'fa-id-badge' },
+    { id: 'certs',         label: 'Certs & Badges',   icon: 'fa-medal' },
+    { id: 'community',     label: 'Community',         icon: 'fa-users' },
+    { id: 'message-board', label: 'Message Board',     icon: 'fa-comments' },
   ];
   const links = [
     { id: 'dashboard',   label: 'Dashboard',   icon: 'fa-gauge-high' },

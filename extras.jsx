@@ -192,6 +192,14 @@ function KudosModal({ onClose, onSent }) {
       sub: `"${message.length > 80 ? message.slice(0, 80) + '…' : message}"`,
       icon: 'fa-hand-sparkles',
     });
+    // Award points: +2 to giver (max 3/week), +3 to receiver
+    if (window.__pointsStore) {
+      const givenThisWeek = window.__pointsStore.countSourceThisWeek(me.id, 'culture.kudos_given');
+      if (givenThisWeek < 3) {
+        window.__pointsStore.add(me.id, { source: 'culture.kudos_given', note: `Kudos to ${recipientName}` });
+      }
+      window.__pointsStore.add(recipient, { source: 'culture.kudos_received', note: `Kudos from ${me.name}` });
+    }
     onSent?.({ recipient, message, pillar, recipientName });
     onClose();
   };

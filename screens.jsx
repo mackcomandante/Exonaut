@@ -1414,4 +1414,249 @@ function CommunityProfileSheet({ m, onClose }) {
   );
 }
 
-Object.assign(window, { MissionsList, KudosFeed, RitualsPage, AnnouncementsPage, NotificationsPage, AdminPanel, AlumniPage, SettingsPage, CommunityPage });
+// ========== CERTIFICATES & BADGES ==========
+const TIER_ORDER = ['entry', 'builder', 'prime', 'elite', 'apex'];
+
+function TierCard({ tierKey, tierData, earned, currentPts, isCurrentTier }) {
+  const remaining = tierData.min != null ? Math.max(0, tierData.min - currentPts) : 0;
+  const linkedInUrl = `https://www.linkedin.com/sharing/share-offsite/?url=https://exoasia.hub&title=${encodeURIComponent(`I earned the ${tierData.label} tier on the Exoasia Exonaut Portal!`)}`;
+
+  return (
+    <div style={{
+      padding: '20px 24px',
+      border: `1px solid ${earned ? tierData.color + '60' : 'var(--off-white-15)'}`,
+      borderRadius: 6,
+      background: earned ? `${tierData.color}08` : 'transparent',
+      display: 'flex', flexDirection: 'column', gap: 10,
+      filter: earned ? 'none' : 'grayscale(1)',
+      opacity: earned ? 1 : 0.6,
+      position: 'relative',
+      transition: 'all 0.2s',
+    }}>
+      {isCurrentTier && (
+        <div style={{ position: 'absolute', top: 10, right: 12, fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--ink)', letterSpacing: '0.12em', fontWeight: 700 }}>
+          ◆ CURRENT
+        </div>
+      )}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ width: 42, height: 42, borderRadius: 4, background: tierData.color + '20', border: `1.5px solid ${tierData.color}50`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <i className="fa-solid fa-shield-halved" style={{ color: tierData.color, fontSize: 18 }} />
+        </div>
+        <div>
+          <div className="t-mono" style={{ fontSize: 10, color: earned ? tierData.color : 'var(--off-white-40)', letterSpacing: '0.12em', fontWeight: 700 }}>{tierData.short}</div>
+          <div className="t-heading" style={{ fontSize: 15, textTransform: 'none', letterSpacing: 0, margin: 0 }}>{tierData.label}</div>
+        </div>
+      </div>
+      {earned ? (
+        <div>
+          <div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)', marginBottom: 8 }}>
+            {tierData.min != null ? `UNLOCKED AT ${tierData.min} PTS` : 'ALUMNI ONLY'}
+          </div>
+          <a href={linkedInUrl} target="_blank" rel="noreferrer"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px', background: '#0A66C2', borderRadius: 3, color: '#fff', fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700, textDecoration: 'none', letterSpacing: '0.06em' }}>
+            <i className="fa-brands fa-linkedin" />SHARE ON LINKEDIN
+          </a>
+        </div>
+      ) : (
+        <div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)' }}>
+          {tierData.min != null ? `${remaining} PTS REMAINING TO UNLOCK` : 'AWARDED BY COMMANDER ONLY'}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BadgeCard({ badge, earned, currentPts }) {
+  const ptsNeeded = (() => {
+    if (badge.code.startsWith('MIL-')) {
+      const map = { 'MIL-BRZ': 100, 'MIL-SLV': 300, 'MIL-GLD': 600, 'MIL-PLT': 900 };
+      return map[badge.code];
+    }
+    return null;
+  })();
+  const remaining = ptsNeeded != null ? Math.max(0, ptsNeeded - currentPts) : null;
+  const linkedInUrl = `https://www.linkedin.com/sharing/share-offsite/?url=https://exoasia.hub&title=${encodeURIComponent(`I earned the "${badge.name}" badge on the Exoasia Exonaut Portal!`)}`;
+
+  return (
+    <div style={{
+      padding: '16px 18px',
+      border: `1px solid ${earned ? badge.color + '55' : 'var(--off-white-15)'}`,
+      borderRadius: 5,
+      background: earned ? `${badge.color}07` : 'transparent',
+      display: 'flex', alignItems: 'flex-start', gap: 12,
+      filter: earned ? 'none' : 'grayscale(1)',
+      opacity: earned ? 1 : 0.55,
+      transition: 'all 0.2s',
+    }}>
+      <div style={{ width: 36, height: 36, borderRadius: 4, background: badge.color + '20', border: `1.5px solid ${badge.color}40`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <i className="fa-solid fa-medal" style={{ color: badge.color, fontSize: 15 }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="t-mono" style={{ fontSize: 9, color: earned ? badge.color : 'var(--off-white-40)', letterSpacing: '0.1em', fontWeight: 700, marginBottom: 3 }}>
+          {badge.category?.toUpperCase()}
+        </div>
+        <div className="t-heading" style={{ fontSize: 13, textTransform: 'none', letterSpacing: 0, margin: '0 0 4px 0' }}>{badge.name}</div>
+        <div className="t-body" style={{ fontSize: 11, color: 'var(--off-white-40)' }}>
+          {earned ? (badge.date ? `Earned ${badge.date}` : badge.subtitle) : (remaining != null ? `${remaining} pts remaining · ${badge.subtitle}` : badge.subtitle)}
+        </div>
+        {earned && (
+          <a href={linkedInUrl} target="_blank" rel="noreferrer"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 8, padding: '4px 10px', background: '#0A66C2', borderRadius: 3, color: '#fff', fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 700, textDecoration: 'none', letterSpacing: '0.06em' }}>
+            <i className="fa-brands fa-linkedin" />SHARE
+          </a>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function CertsBadgesPage() {
+  const liveBadges = window.useLiveBadges ? window.useLiveBadges() : BADGES;
+  const { total: currentPts } = window.useComputedPoints ? window.useComputedPoints(ME_ID) : { total: 0 };
+  const tierKey = window.getTierFromPts ? window.getTierFromPts(currentPts) : 'entry';
+
+  const badgeCategories = [
+    { key: 'milestone', label: 'Milestone Badges', icon: 'fa-star', desc: 'Earned by hitting point thresholds' },
+    { key: 'track',     label: 'Track Badges',     icon: 'fa-route', desc: 'Awarded for completing your track' },
+    { key: 'pillar',    label: 'Pillar Badges',    icon: 'fa-layer-group', desc: 'Maxing out individual pillars' },
+    { key: 'special',   label: 'Special Awards',   icon: 'fa-trophy', desc: 'Rare achievements and program awards' },
+  ];
+
+  return (
+    <div className="enter">
+      <div className="section-head">
+        <div>
+          <div className="t-label" style={{ marginBottom: 8 }}>YOUR ACHIEVEMENTS</div>
+          <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>Certs & Badges</h1>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <div className="t-mono" style={{ fontSize: 18, fontWeight: 700, color: 'var(--ink)' }}>{currentPts} PTS</div>
+          <div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)', letterSpacing: '0.1em' }}>{TIERS[tierKey]?.short} TIER</div>
+        </div>
+      </div>
+
+      {/* Tier Certifications */}
+      <div className="section-head" style={{ marginBottom: 14 }}>
+        <h2 style={{ fontSize: 16 }}>Tier Certifications</h2>
+        <span className="section-meta">5 TIERS · POINTS-BASED PROGRESSION</span>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12, marginBottom: 36 }}>
+        {TIER_ORDER.map(tk => {
+          const td = TIERS[tk];
+          const earned = td.min != null ? currentPts >= td.min : false;
+          const isCurrent = tk === tierKey;
+          return <TierCard key={tk} tierKey={tk} tierData={td} earned={earned} currentPts={currentPts} isCurrentTier={isCurrent} />;
+        })}
+      </div>
+
+      {/* Badge categories */}
+      {badgeCategories.map(cat => {
+        const catBadges = liveBadges.filter(b => b.category === cat.key);
+        if (!catBadges.length) return null;
+        const earnedCount = catBadges.filter(b => b.earned).length;
+        return (
+          <div key={cat.key} style={{ marginBottom: 32 }}>
+            <div className="section-head" style={{ marginBottom: 14 }}>
+              <div>
+                <h2 style={{ fontSize: 16 }}><i className={'fa-solid ' + cat.icon} style={{ marginRight: 8, color: 'var(--ink)' }} />{cat.label}</h2>
+                <div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)', marginTop: 2 }}>{cat.desc}</div>
+              </div>
+              <span className="section-meta">{earnedCount}/{catBadges.length} EARNED</span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 10 }}>
+              {catBadges.map(b => (
+                <BadgeCard key={b.code} badge={b} earned={b.earned} currentPts={currentPts} />
+              ))}
+            </div>
+          </div>
+        );
+      })}
+
+      {/* Points Breakdown */}
+      <div className="section-head" style={{ marginBottom: 14 }}>
+        <h2 style={{ fontSize: 16 }}>Points Ledger</h2>
+        <span className="section-meta">ALL SOURCES</span>
+      </div>
+      <PointsLedger userId={ME_ID} />
+    </div>
+  );
+}
+
+function PointsLedger({ userId }) {
+  const { total: liveTotal } = window.useComputedPoints ? window.useComputedPoints(userId) : { total: 0 };
+  const events = window.__pointsStore ? window.__pointsStore.getAll(userId) : [];
+  const [expanded, setExpanded] = React.useState({});
+
+  // Group by source group prefix
+  const groups = React.useMemo(() => {
+    const g = {};
+    events.forEach(e => {
+      const grp = (e.source || '').split('.')[0] || 'other';
+      if (!g[grp]) g[grp] = { total: 0, items: [] };
+      g[grp].total += Number(e.pts) || 0;
+      g[grp].items.push(e);
+    });
+    return g;
+  }, [events]);
+
+  const groupMeta = {
+    onboarding: { label: 'Onboarding', icon: 'fa-flag-checkered' },
+    mission:    { label: 'Missions',   icon: 'fa-bullseye' },
+    client:     { label: 'Client',     icon: 'fa-handshake' },
+    recruit:    { label: 'Recruitment',icon: 'fa-user-plus' },
+    ritual:     { label: 'Rituals',    icon: 'fa-calendar-check' },
+    culture:    { label: 'Culture',    icon: 'fa-hand-sparkles' },
+    milestone:  { label: 'Milestones', icon: 'fa-trophy' },
+    other:      { label: 'Other',      icon: 'fa-circle-dot' },
+  };
+
+  if (events.length === 0) {
+    return (
+      <div className="card-panel" style={{ textAlign: 'center', padding: 40 }}>
+        <i className="fa-solid fa-bolt" style={{ fontSize: 24, color: 'var(--off-white-40)', marginBottom: 12 }} />
+        <div className="t-body" style={{ color: 'var(--off-white-68)' }}>No points logged yet. Give kudos, complete rituals, and submit missions to earn points.</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="card-panel" style={{ padding: 0 }}>
+      <div style={{ padding: '14px 22px', borderBottom: '1px solid var(--off-white-07)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)', letterSpacing: '0.08em' }}>{events.length} EVENTS · RUNNING TOTAL</div>
+        <div className="t-mono" style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)' }}>+{liveTotal} PTS</div>
+      </div>
+      {Object.entries(groups).map(([grp, { total, items }]) => {
+        const meta = groupMeta[grp] || groupMeta.other;
+        const open = !!expanded[grp];
+        return (
+          <div key={grp} style={{ borderBottom: '1px solid var(--off-white-07)' }}>
+            <div onClick={() => setExpanded(e => ({ ...e, [grp]: !e[grp] }))}
+              style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 22px', cursor: 'pointer', userSelect: 'none' }}>
+              <i className={'fa-solid ' + meta.icon} style={{ color: 'var(--off-white-40)', width: 16, textAlign: 'center' }} />
+              <div className="t-heading" style={{ fontSize: 13, textTransform: 'none', letterSpacing: 0, flex: 1 }}>{meta.label}</div>
+              <div className="t-mono" style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink)' }}>+{total}</div>
+              <i className={'fa-solid ' + (open ? 'fa-chevron-up' : 'fa-chevron-down')} style={{ color: 'var(--off-white-40)', fontSize: 11 }} />
+            </div>
+            {open && (
+              <div style={{ background: 'rgba(0,0,0,0.15)', padding: '0 22px 12px 50px' }}>
+                {items.sort((a, b) => b.ts - a.ts).map((e, i) => (
+                  <div key={e.id || i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: i < items.length - 1 ? '1px solid var(--off-white-07)' : 'none' }}>
+                    <div>
+                      <div className="t-body" style={{ fontSize: 12 }}>{e.note}</div>
+                      <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', marginTop: 2 }}>
+                        WK {e.weekNum} · {new Date(e.ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </div>
+                    </div>
+                    <div className="t-mono" style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink)' }}>+{e.pts}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+Object.assign(window, { MissionsList, KudosFeed, RitualsPage, AnnouncementsPage, NotificationsPage, AdminPanel, AlumniPage, SettingsPage, CommunityPage, CertsBadgesPage });

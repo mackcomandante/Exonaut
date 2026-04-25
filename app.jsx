@@ -96,6 +96,7 @@ function App() {
     missions:    ['EXONAUT', 'Missions'],
     community:   ['EXONAUT', 'Community'],
     'message-board': ['EXONAUT', 'Message Board'],
+    certs:       ['EXONAUT', 'Certs & Badges'],
     kudos:       ['EXONAUT', 'Kudos'],
     rituals:     ['EXONAUT', 'Rituals'],
     announce:    ['EXONAUT', 'Announcements'],
@@ -137,6 +138,7 @@ function App() {
     else if (route === 'profile')     page = <Profile onOpenMission={openMission} onTriggerBadge={(b) => onCelebrate('badge', { badge: b })} />;
     else if (route === 'mission')     page = <MissionDetail missionId={missionId} onBack={() => navigate('missions')} onSubmitted={() => pushToast({ title: 'SUBMISSION RECEIVED', sub: 'Mission Lead has 48h to review', icon: 'fa-paper-plane' })} />;
     else if (route === 'missions')    page = <MissionsList onOpenMission={openMission} />;
+    else if (route === 'certs')           page = <CertsBadgesPage />;
     else if (route === 'community')      page = <CommunityPage />;
     else if (route === 'message-board')  page = <CommunityBoard />;
     else if (route === 'kudos')          page = <KudosFeed onGive={() => setKudosOpen(true)} />;

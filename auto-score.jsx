@@ -30,23 +30,40 @@
   // For others: baseline only (no live subs in this prototype).
   function computeTotal(userId, subs) {
     const user = USERS.find(u => u.id === userId);
-    if (!user) return 0;
-    const baseline = user.points || 0;
-    if (!subs || userId !== ME_ID) return baseline;
-    const delta = subs
-      .filter(s => s.exonautId === userId && s.state === 'approved' && s.pointsAwarded)
-      .reduce((sum, s) => sum + s.pointsAwarded, 0);
-    return baseline + delta;
+    const baseline = (user?.points) || 0;
+    // Approved mission submissions
+    const subDelta = subs
+      ? subs.filter(s => s.exonautId === userId && s.state === 'approved' && s.pointsAwarded)
+            .reduce((sum, s) => sum + s.pointsAwarded, 0)
+      : 0;
+    // Points ledger (kudos, rituals, onboarding, manual entries)
+    const ledger = window.__pointsStore ? window.__pointsStore.getTotal(userId) : 0;
+    return baseline + subDelta + ledger;
   }
 
   // ---- Live hook: returns { total, delta, baseline } ----
   function useComputedPoints(userId = ME_ID) {
     const subs = useSubs();
+    // Re-render when pointsStore changes (tick from usePointsLedger if mounted, or manual)
+    const [ledgerTick, setLedgerTick] = React.useState(0);
+    React.useEffect(() => {
+      function onStorage(e) {
+        if (e.key === 'exo:points:v1') setLedgerTick(t => t + 1);
+      }
+      window.addEventListener('storage', onStorage);
+      return () => window.removeEventListener('storage', onStorage);
+    }, []);
+
     return React.useMemo(() => {
       const baseline = (USERS.find(u => u.id === userId) || {}).points || 0;
       const total = computeTotal(userId, subs);
-      return { total, baseline, delta: total - baseline };
-    }, [subs, userId]);
+      const subDelta = subs
+        ? subs.filter(s => s.exonautId === userId && s.state === 'approved' && s.pointsAwarded)
+              .reduce((sum, s) => sum + s.pointsAwarded, 0)
+        : 0;
+      const ledger = window.__pointsStore ? window.__pointsStore.getTotal(userId) : 0;
+      return { total, baseline, delta: subDelta + ledger };
+    }, [subs, userId, ledgerTick]);
   }
 
   // ---- Live hook: which milestone badges are earned ----
@@ -61,24 +78,38 @@
     }, [total]);
   }
 
-  // ---- Auto-celebrate: fires onCelebrate('badge', …) when total crosses
-  // a threshold that hasn't been celebrated yet. Mount this once at the
-  // app root.
+  // Tier upgrade thresholds
+  const TIER_THRESHOLDS = [
+    { at: 100, key: 'builder', label: 'Exonaut Builder' },
+    { at: 300, key: 'prime',   label: 'Exonaut Prime'   },
+    { at: 600, key: 'elite',   label: 'Exonaut Elite'   },
+    { at: 900, key: 'apex',    label: 'Exonaut Apex'    },
+  ];
+  if (!window.__autoTiers) window.__autoTiers = { celebratedKeys: new Set() };
+
+  // ---- Auto-celebrate: fires onCelebrate('badge', …) for milestone badges
+  // and onCelebrate('tier', …) for tier upgrades when total crosses thresholds.
   function useAutoBadgeFire(onCelebrate) {
     const { total } = useComputedPoints(ME_ID);
     React.useEffect(() => {
       if (!onCelebrate) return;
+      // Badge milestones
       for (const m of MILESTONES) {
         if (total >= m.at && !window.__autoBadges.celebratedCodes.has(m.code)) {
           window.__autoBadges.celebratedCodes.add(m.code);
           const badge = BADGES.find(b => b.code === m.code);
           if (badge) {
-            // mark earned in the source so Profile Badges tab updates
             badge.earned = true;
             badge.date = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toUpperCase();
-            // Slight delay so it fires after the toast from grading lands.
             setTimeout(() => onCelebrate('badge', { badge }), 900);
           }
+        }
+      }
+      // Tier upgrades — payload.tier must be the tier key string (e.g. 'builder')
+      for (const t of TIER_THRESHOLDS) {
+        if (total >= t.at && !window.__autoTiers.celebratedKeys.has(t.key)) {
+          window.__autoTiers.celebratedKeys.add(t.key);
+          setTimeout(() => onCelebrate('tier', { tier: t.key }), 1400);
         }
       }
     }, [total, onCelebrate]);
