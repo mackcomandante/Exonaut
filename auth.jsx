@@ -165,15 +165,13 @@ function LoginScreen({ onSignIn }) {
                     ? <><i className="fa-solid fa-circle-notch fa-spin" /> AUTHENTICATING…</>
                     : <><i className="fa-solid fa-arrow-right-to-bracket" /> SIGN IN</>}
                 </button>
-                <button type="button" className="btn btn-ghost" style={{ width: '100%', justifyContent: 'center' }}>
-                  FORGOT PASSWORD?
-                </button>
+                <div style={{ textAlign: 'center', marginTop: 4 }}>
+                  <span className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)', letterSpacing: '0.08em' }}>
+                    Forgot your password? Email{' '}
+                    <span style={{ color: 'var(--lavender)' }}>admin@exoasia.hub</span>
+                  </span>
+                </div>
               </form>
-
-              <div style={{ marginTop: 22, paddingTop: 18, borderTop: '1px solid var(--off-white-07)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)', letterSpacing: '0.08em' }}>OR</span>
-                <button className="btn btn-ghost btn-sm"><i className="fa-brands fa-google" /> GOOGLE OAUTH</button>
-              </div>
             </>
           )}
 

@@ -68,144 +68,25 @@ const TIERS = {
 
 // Full cohort of 30 — realistic Week 2 distribution
 const USERS = [
-  { id: 'u01', name: 'Kai Nakamura',      track: 'AID', points: 512, tier: 'prime',   change: +2, badges: 4, p1: 240, p2: 170, p3: 102 , cohort: 'c2627' },
-  { id: 'u02', name: 'Sade Obanjo',       track: 'AIS', points: 498, tier: 'prime',   change: +5, badges: 4, p1: 235, p2: 165, p3: 98 , cohort: 'c2627' },
-  { id: 'u03', name: 'Mira Kovač',        track: 'VB',  points: 471, tier: 'prime',   change: -1, badges: 3, p1: 220, p2: 161, p3: 90 , cohort: 'c2627' },
-  { id: 'u04', name: 'Jonas Reichel',     track: 'POL', points: 455, tier: 'prime',   change: +1, badges: 3, p1: 215, p2: 150, p3: 90 , cohort: 'c2627' },
-  { id: 'u05', name: 'Priya Ravindran',   track: 'AIS', points: 432, tier: 'prime',   change: +4, badges: 3, p1: 198, p2: 148, p3: 86 , cohort: 'c2627' },
-  { id: 'u06', name: 'Theo Marchetti',    track: 'XM',  points: 418, tier: 'prime',   change: 0,  badges: 3, p1: 188, p2: 152, p3: 78 , cohort: 'c2627' },
-  { id: 'u07', name: 'Amani Djeredou',    track: 'LD',  points: 401, tier: 'prime',   change: +3, badges: 3, p1: 182, p2: 148, p3: 71 , cohort: 'c2627' },
-  { id: 'u08', name: 'Isra Halabi',       track: 'CC',  points: 389, tier: 'prime',   change: -2, badges: 2, p1: 174, p2: 140, p3: 75 , cohort: 'c2627' },
-  { id: 'u09', name: 'Dmitri Laskaris',   track: 'AID', points: 377, tier: 'prime',   change: +1, badges: 2, p1: 172, p2: 138, p3: 67 , cohort: 'c2627' },
-  { id: 'u10', name: 'Fernanda Quispe',   track: 'VB',  points: 368, tier: 'prime',   change: +2, badges: 2, p1: 168, p2: 130, p3: 70 , cohort: 'c2627' },
-  { id: 'u11', name: 'Wren Abernathy',    track: 'POL', points: 361, tier: 'prime',   change: -3, badges: 2, p1: 160, p2: 132, p3: 69 , cohort: 'c2627' },
-  { id: 'u12', name: 'Yuki Tomlinson',    track: 'XM',  points: 358, tier: 'prime',   change: 0,  badges: 2, p1: 158, p2: 128, p3: 72 , cohort: 'c2627' },
-  { id: 'u13', name: 'Bastien Okafor',    track: 'AIS', points: 352, tier: 'prime',   change: +4, badges: 2, p1: 165, p2: 122, p3: 65 , cohort: 'c2627' },
-  { id: 'u14', name: 'Maya Chen',         track: 'AIS', points: 347, tier: 'prime',   change: +3, badges: 3, p1: 162, p2: 125, p3: 60, me: true , cohort: 'c2627' },
-  { id: 'u15', name: 'Rafaela Quattro',   track: 'LD',  points: 338, tier: 'prime',   change: -1, badges: 2, p1: 155, p2: 120, p3: 63 , cohort: 'c2627' },
-  { id: 'u16', name: 'Hadrien Solace',    track: 'AID', points: 312, tier: 'prime',   change: +2, badges: 2, p1: 148, p2: 108, p3: 56 , cohort: 'c2627' },
-  { id: 'u17', name: 'Noor Bashir',       track: 'CC',  points: 298, tier: 'builder', change: +1, badges: 2, p1: 136, p2: 102, p3: 60 , cohort: 'c2627' },
-  { id: 'u18', name: 'Cass Verwoerd',     track: 'VB',  points: 284, tier: 'builder', change: 0,  badges: 2, p1: 128, p2: 100, p3: 56 , cohort: 'c2627' },
-  { id: 'u19', name: 'Oriana Bellucci',   track: 'XM',  points: 271, tier: 'builder', change: -2, badges: 1, p1: 120, p2: 96,  p3: 55, cohort: 'c2627' },
-  { id: 'u20', name: 'Torin Macallister', track: 'POL', points: 258, tier: 'builder', change: +5, badges: 2, p1: 118, p2: 90,  p3: 50, cohort: 'c2627' },
-  { id: 'u21', name: 'Elspeth Varga',     track: 'AIS', points: 244, tier: 'builder', change: +1, badges: 1, p1: 108, p2: 86,  p3: 50, cohort: 'c2627' },
-  { id: 'u22', name: 'Kenji Balogun',     track: 'LD',  points: 231, tier: 'builder', change: 0,  badges: 1, p1: 100, p2: 84,  p3: 47, cohort: 'c2627' },
-  { id: 'u23', name: 'Seren Aldaine',     track: 'CC',  points: 218, tier: 'builder', change: +2, badges: 1, p1: 98,  p2: 76,  p3: 44, cohort: 'c2627' },
-  { id: 'u24', name: 'Rhea Pemberton',    track: 'AID', points: 202, tier: 'builder', change: -1, badges: 1, p1: 92,  p2: 68,  p3: 42, cohort: 'c2627' },
-  { id: 'u25', name: 'Casimir Drosos',    track: 'VB',  points: 187, tier: 'builder', change: +3, badges: 1, p1: 86,  p2: 62,  p3: 39, cohort: 'c2627' },
-  { id: 'u26', name: 'Ingrid Lundqvist',  track: 'POL', points: 172, tier: 'builder', change: 0,  badges: 1, p1: 78,  p2: 58,  p3: 36, cohort: 'c2627' },
-  { id: 'u27', name: 'Solange Ngata',     track: 'XM',  points: 148, tier: 'builder', change: -4, badges: 0, p1: 68,  p2: 48,  p3: 32, cohort: 'c2627' },
-  { id: 'u28', name: 'Tobi Ashworth',     track: 'AIS', points: 124, tier: 'builder', change: +1, badges: 0, p1: 58,  p2: 40,  p3: 26, cohort: 'c2627' },
-  { id: 'u29', name: 'Halyard Beaumont',  track: 'LD',  points: 98,  tier: 'entry',   change: 0,  badges: 0, p1: 42,  p2: 36,  p3: 20, cohort: 'c2627' },
-  { id: 'u30', name: 'Vivien Sorrento',   track: 'CC',  points: 76,  tier: 'entry',   change: -2, badges: 0, p1: 36,  p2: 24,  p3: 16, cohort: 'c2627' },
+  // Populated via sign-up. Exonauts register through the portal.
 ];
 
-const ME_ID = localStorage.getItem('exo:userId') || 'u14';
+const ME_ID = localStorage.getItem('exo:userId') || null;
 
-// Missions for Maya — AIS track, Week 2 mid-flight
-// Aligned to Exonaut Mission Briefs: Universal Wk1-2 (Pipeline, Discovery, Concept Paper)
-// then Track 01 Week 3+ (AI Readiness Diagnostic, Landscape, Use Cases, Roadmap…)
-const MISSIONS = [
-  // ===== ACTIVE (Week 2, mid-flight) =====
-  {
-    id: 'EXO-MSN-ALL-2026-010',
-    title: 'Concept Papers · 10 Prospects, 10 Papers',
-    track: null, pillar: 'client', week: 2,
-    points: 300, dueIn: 2, dueDate: 'OCT 23', dueTime: '23:59 SGT',
-    status: 'in-progress',
-    deliverable: 'document',
-    description: `Write a <strong>1–2 page concept paper</strong> for <strong>EACH</strong> of your 10 prospects.\n\nProgress: <strong>6 of 10 drafted</strong>. Kestrel Biotics, Nuvo Genomics, Sereno Labs, Arc Mobility, Luzon Power, Paragon Retail. Four to go: Meridian Finance, Delta Logistics, Nexa Health, Ortus Insurance.\n\nEach paper must include:\n• Executive summary\n• Problem statement\n• Proposed solution\n• Scope\n• Timeline\n• Expected outcomes\n• Investment range\n\nAll 10 must be ML-approved before sending. <strong>+30 per paper</strong>, up to +20 Excellent bonus each.`,
-    criteria: ['10 papers, 1 per prospect', 'All ML-approved before send', 'Tailored to each prospect’s pain point'],
-  },
-  {
-    id: 'EXO-MSN-ALL-2026-011',
-    title: 'Discovery Meetings · Book & Run — Target GREAT (4–6) or AWESOME (7+)',
-    track: null, pillar: 'client', week: 2,
-    points: 175, dueIn: 3, dueDate: 'OCT 24',
-    status: 'in-progress',
-    deliverable: 'document',
-    description: `Book and run structured 30–45 min discovery sessions with as many of your 10 prospects as possible.\n\n<strong>Current: 2 meetings completed, 3 booked.</strong> One more confirmed meeting this week hits GOOD (+75). Four to six = GREAT (+150). Seven or more = AWESOME (+250) and unlocks an Intern of the Week nomination.\n\nBase: +25 per verified meeting. Outcome bonus stacks on top.`,
-    criteria: ['Use the Exoasia Discovery Framework', 'Document pains, outcomes, decision process, budget signals', 'ML verifies each meeting'],
-  },
-  {
-    id: 'EXO-MSN-ALL-2026-012',
-    title: 'Friday Win Wall — Post Your Discovery Tier',
-    track: null, pillar: 'project', week: 2,
-    points: 5, dueIn: 3, dueDate: 'OCT 24', dueTime: '21:00 SGT',
-    status: 'not-started',
-    deliverable: 'link',
-  },
-  {
-    id: 'EXO-MSN-AIS-2026-003',
-    title: 'Mission 1 · AI Readiness Diagnostic (signed client)',
-    track: 'AIS', pillar: 'project', week: 3,
-    points: 30, dueIn: 9, dueDate: 'OCT 30', dueTime: '23:59 SGT',
-    status: 'not-started',
-    deliverable: 'document',
-    description: `Administer the <strong>Exoasia AI Readiness Framework</strong> to whichever prospect signed your engagement letter / MOU. Interview 2–3 internal stakeholders.\n\nScore across <strong>6 dimensions</strong>:\n• Data Maturity\n• Process Automation Potential\n• AI Awareness\n• Leadership Buy-In\n• Technical Infrastructure\n• Budget Readiness\n\nGated on signed engagement letter / MOU from Week 2.`,
-    criteria: ['All 6 dimensions scored with evidence', '2+ stakeholder interviews', 'Findings memo attached'],
-  },
+const MISSIONS = [];
 
-  // ===== APPROVED (earlier this cohort) =====
-  {
-    id: 'EXO-MSN-ALL-2026-009',
-    title: 'First Discovery Meeting — Kestrel Biotics',
-    track: null, pillar: 'client', week: 2,
-    points: 25, dueIn: -3, dueDate: 'OCT 17',
-    status: 'approved', grade: 'excellent', pointsAwarded: 45,
-    deliverable: 'document',
-    feedback: 'Sharp questions. Kestrel flagged your client-centric tone in our debrief. +20 excellent bonus. This is meeting 1 of your discovery tier run — keep booking.',
-  },
-  {
-    id: 'EXO-MSN-ALL-2026-008',
-    title: 'Prospecting — 10 Qualified Prospects',
-    track: null, pillar: 'client', week: 1,
-    points: 20, dueIn: -6, dueDate: 'OCT 14',
-    status: 'approved', grade: 'excellent', pointsAwarded: 40,
-    deliverable: 'document',
-    feedback: '11 prospects — named contacts, specific pain points. Kestrel, Nuvo Genomics, and Sereno Labs are the three to prioritize for papers. Excellent.',
-  },
-  {
-    id: 'EXO-MSN-ALL-2026-001',
-    title: 'Exonaut Pledge & LinkedIn Announcement',
-    track: null, pillar: 'project', week: 1,
-    points: 70, dueIn: -10, dueDate: 'OCT 10',
-    status: 'approved', grade: 'good', pointsAwarded: 70,
-    deliverable: 'link',
-  },
-  {
-    id: 'EXO-MSN-ALL-2026-002',
-    title: 'Platform Onboarding & Track Confirmation',
-    track: null, pillar: 'project', week: 1,
-    points: 10, dueIn: -10, dueDate: 'OCT 10',
-    status: 'approved', grade: 'good', pointsAwarded: 10,
-    deliverable: 'document',
-  },
-
-  // ===== LOOKING AHEAD =====
-  {
-    id: 'EXO-MSN-ALL-2026-013',
-    title: 'Recruit Scout — Submit First Candidate',
-    track: null, pillar: 'recruitment', week: 7,
-    points: 30, dueIn: 35, dueDate: 'DEC 01',
-    status: 'not-started',
-    deliverable: 'link',
-  },
-];
-
-// Rituals for current week
 const RITUALS = [
-  { id: 'mon-ign',  name: 'Monday Ignition', points: 5,  state: 'done'    },
-  { id: 'mid-pls',  name: 'Mid-Week Pulse',  points: 3,  state: 'done'    },
-  { id: 'fri-win',  name: 'Friday Win Wall', points: 5,  state: 'pending' },
-  { id: 'iotw',     name: 'Intern of Week',  points: 25, state: 'missed'  },
-  { id: 'teach-bk', name: 'Teach-Back',      points: 15, state: 'pending' },
+  { id: 'mon-ign',  name: 'Monday Ignition', points: 5,  state: 'not-started' },
+  { id: 'mid-pls',  name: 'Mid-Week Pulse',  points: 3,  state: 'not-started' },
+  { id: 'fri-win',  name: 'Friday Win Wall', points: 5,  state: 'not-started' },
+  { id: 'iotw',     name: 'Intern of Week',  points: 25, state: 'not-started' },
+  { id: 'teach-bk', name: 'Teach-Back',      points: 15, state: 'not-started' },
 ];
 
 const BADGES = [
   // Milestone
-  { code: 'MIL-BRZ', name: 'Bronze Builder',   subtitle: '100 points',  category: 'milestone', color: '#CD7F32', earned: true,  date: 'OCT 14 2026' },
-  { code: 'MIL-SLV', name: 'Silver Strategist', subtitle: '300 points', category: 'milestone', color: '#A8B4BE', earned: true,  date: 'OCT 19 2026' },
+  { code: 'MIL-BRZ', name: 'Bronze Builder',   subtitle: '100 points',  category: 'milestone', color: '#CD7F32', earned: false },
+  { code: 'MIL-SLV', name: 'Silver Strategist', subtitle: '300 points', category: 'milestone', color: '#A8B4BE', earned: false },
   { code: 'MIL-GLD', name: 'Gold Innovator',    subtitle: '600 points', category: 'milestone', color: '#C9A000', earned: false },
   { code: 'MIL-PLT', name: 'Platinum Disruptor',subtitle: '900 points', category: 'milestone', color: '#7FE3FF', earned: false },
   // Track (only the user's own track shown earned-possible)
@@ -224,23 +105,14 @@ const BADGES = [
   // Special
   { code: 'SPL-TRI', name: 'Perfect Trifecta', subtitle: 'All three pillars maxed', category: 'special', color: '#F4C542', earned: false },
   { code: 'SPL-MVP', name: 'Track MVP',        subtitle: 'Top of your track',  category: 'special', color: '#C9F24A', earned: false },
-  { code: 'SPL-IOW', name: 'Intern of Week',   subtitle: 'Weekly award',      category: 'special', color: '#FFB020', earned: true, date: 'OCT 11 2026' },
+  { code: 'SPL-IOW', name: 'Intern of Week',   subtitle: 'Weekly award',      category: 'special', color: '#FFB020', earned: false },
   { code: 'SPL-DIS', name: 'Most Likely to Disrupt', subtitle: 'Program-end award', category: 'special', color: '#FF5B5B', earned: false },
   { code: 'SPL-CLT', name: 'Culture Carrier',  subtitle: 'Most kudos received', category: 'special', color: '#B095C5', earned: false },
   { code: 'SPL-FUL', name: 'Full Cycle',       subtitle: 'All rituals attended', category: 'special', color: '#22C55E', earned: false },
   { code: 'SPL-PIP', name: 'Pipeline Builder', subtitle: '3+ recruits placed', category: 'special', color: '#8BE8FF', earned: false },
 ];
 
-const ACTIVITY = [
-  { type: 'badge',    body: 'Earned <span class="emph">SILVER STRATEGIST</span> badge', time: '2h ago', icon: 'fa-medal' },
-  { type: 'kudos',    body: '<span class="emph">Priya</span> gave you kudos', sub: '"Your Kestrel discovery notes were absurdly clean — I stole your framing."', time: '4h ago', icon: 'fa-hand-sparkles' },
-  { type: 'rank',     body: 'Rank moved <span class="emph">#17 → #14</span>', time: '8h ago', icon: 'fa-arrow-trend-up' },
-  { type: 'points',   body: '<span class="emph">+45 pts</span> · Discovery Session approved EXCELLENT', sub: 'Kestrel Biotics — 60-min discovery call', time: 'Yesterday', icon: 'fa-bolt' },
-  { type: 'announce', body: 'Mack posted: <span class="emph">Midpoint Fire Check scheduled</span>', time: 'Yesterday', icon: 'fa-bullhorn' },
-  { type: 'kudos',    body: '<span class="emph">Theo</span> gave you kudos', sub: '"You shared your pipeline sheet as a template — huge time-saver."', time: '2d ago', icon: 'fa-hand-sparkles' },
-  { type: 'badge',    body: 'Earned <span class="emph">BRONZE BUILDER</span> badge', time: '6d ago', icon: 'fa-medal' },
-  { type: 'points',   body: '<span class="emph">+40 pts</span> · Customer Pipeline approved', time: '6d ago', icon: 'fa-bolt' },
-];
+const ACTIVITY = [];
 
 // Resolve ME: check USERS first, then registered-user registry, then fallback to u14.
 // (user-store.jsx hasn't loaded yet so read the registry key directly.)
@@ -251,7 +123,7 @@ if (!ME) {
     ME = { id: ME_ID, name: _cachedName, track: localStorage.getItem('exo:userTrack') || 'AIS', tier: 'entry', points: 0, badges: 0, p1: 0, p2: 0, p3: 0 };
   }
 }
-if (!ME) ME = USERS.find(u => u.id === 'u14');
+if (!ME) ME = { id: 'guest', name: 'Exonaut', track: 'AIS', tier: 'entry', points: 0, badges: 0, p1: 0, p2: 0, p3: 0 };
 const ME_RANK = USERS.sort((a,b) => b.points - a.points).findIndex(u => u.id === ME.id) + 1;
 
 // ==== ORG HIERARCHY ====
@@ -263,43 +135,20 @@ const COMMANDER = {
 };
 
 const LEADS = [
-  { id: 'lead-ais', name: 'Dr. Nadia Oyelaran',  role: 'manager', track: 'AIS', reports: ['u02','u05','u13','u14','u21','u28'], reviewQueue: 4, avgSubmitRate: 92, satisfaction: 4.7 },
-  { id: 'lead-vb',  name: 'Kofi Ansong',         role: 'manager', track: 'VB',  reports: ['u03','u10','u18','u25'], reviewQueue: 2, avgSubmitRate: 88, satisfaction: 4.5 },
-  { id: 'lead-ld',  name: 'Saoirse Flanagan',    role: 'manager', track: 'LD',  reports: ['u07','u15','u22','u29'], reviewQueue: 3, avgSubmitRate: 80, satisfaction: 4.2 },
-  { id: 'lead-xm',  name: 'Rin Tachibana',       role: 'manager', track: 'XM',  reports: ['u06','u12','u19','u27'], reviewQueue: 1, avgSubmitRate: 94, satisfaction: 4.8 },
-  { id: 'lead-aid', name: 'Anders Vogt',         role: 'manager', track: 'AID', reports: ['u01','u09','u16','u24'], reviewQueue: 5, avgSubmitRate: 96, satisfaction: 4.9 },
-  { id: 'lead-pol', name: 'Mariela Escárcega',   role: 'manager', track: 'POL', reports: ['u04','u11','u20','u26'], reviewQueue: 2, avgSubmitRate: 85, satisfaction: 4.4 },
-  { id: 'lead-cc',  name: 'Beatrix Hollander',   role: 'manager', track: 'CC',  reports: ['u08','u17','u23','u30'], reviewQueue: 6, avgSubmitRate: 72, satisfaction: 3.9 },
+  { id: 'lead-ais', name: 'Lead · AI Strategy',   role: 'manager', track: 'AIS', reports: [], reviewQueue: 0, avgSubmitRate: 0, satisfaction: 0 },
+  { id: 'lead-vb',  name: 'Lead · Venture Build', role: 'manager', track: 'VB',  reports: [], reviewQueue: 0, avgSubmitRate: 0, satisfaction: 0 },
+  { id: 'lead-ld',  name: 'Lead · L&D',           role: 'manager', track: 'LD',  reports: [], reviewQueue: 0, avgSubmitRate: 0, satisfaction: 0 },
+  { id: 'lead-xm',  name: 'Lead · Experience',    role: 'manager', track: 'XM',  reports: [], reviewQueue: 0, avgSubmitRate: 0, satisfaction: 0 },
+  { id: 'lead-aid', name: 'Lead · AI Dev',        role: 'manager', track: 'AID', reports: [], reviewQueue: 0, avgSubmitRate: 0, satisfaction: 0 },
+  { id: 'lead-pol', name: 'Lead · Policy',        role: 'manager', track: 'POL', reports: [], reviewQueue: 0, avgSubmitRate: 0, satisfaction: 0 },
+  { id: 'lead-cc',  name: 'Lead · Content',       role: 'manager', track: 'CC',  reports: [], reviewQueue: 0, avgSubmitRate: 0, satisfaction: 0 },
 ];
 
-// Pending submissions awaiting grade (lead view)
-const PENDING_SUBS = [
-  { id: 'sub-01', missionId: 'EXO-MSN-AIS-2026-003', missionTitle: 'Competitive Landscape Analysis', exonautId: 'u02', submittedAt: '2h ago', deliverable: 'document', wordCount: 2140, isLate: false },
-  { id: 'sub-02', missionId: 'EXO-MSN-AIS-2026-003', missionTitle: 'Competitive Landscape Analysis', exonautId: 'u05', submittedAt: '5h ago', deliverable: 'document', wordCount: 2380, isLate: false },
-  { id: 'sub-03', missionId: 'EXO-MSN-AIS-2026-003', missionTitle: 'Competitive Landscape Analysis', exonautId: 'u13', submittedAt: '14h ago', deliverable: 'document', wordCount: 1620, isLate: false },
-  { id: 'sub-04', missionId: 'EXO-MSN-AIS-2026-002', missionTitle: 'Client Discovery', exonautId: 'u21', submittedAt: '1d ago', deliverable: 'document', wordCount: 890, isLate: true },
-];
+const PENDING_SUBS = [];
 
-// Pending directives issued BY leads TO exonauts, awaiting acceptance
-const DIRECTIVES = [
-  {
-    id: 'DIR-AIS-2026-007',
-    from: 'lead-ais', to: 'u14',
-    title: 'Kestrel Series A Pitch Memo — Draft by Friday',
-    brief: 'Mack is briefing Kestrel\'s board Monday. Draft a 3-page strategic memo framing our positioning thesis. Lean on your competitive landscape work. I trust your instincts — if you disagree with the thesis, say so in the memo.',
-    pillar: 'project', points: 35, dueDate: 'OCT 24', dueTime: '17:00 SGT',
-    deliverable: 'document',
-    issuedAt: '1h ago',
-    status: 'pending', // pending | accepted | clarification
-  },
-];
+const DIRECTIVES = [];
 
-const ESCALATIONS = [
-  { id: 'esc-01', type: 'at-risk', severity: 'high',   body: 'Vivien Sorrento (u30) — no submissions in 8 days. Last ritual miss: 3. Flag for Fire Check.',    leadId: 'lead-cc',  time: '2h ago' },
-  { id: 'esc-02', type: 'client',  severity: 'med',    body: 'Kestrel Biotics requested time with Nadia (AIS lead) re: deliverable cadence. Non-blocking.',    leadId: 'lead-ais', time: 'Yesterday' },
-  { id: 'esc-03', type: 'grading', severity: 'med',    body: 'CC track grading queue stale — 6 subs waiting >48h. SLA breached.',                                leadId: 'lead-cc',  time: 'Yesterday' },
-  { id: 'esc-04', type: 'conflict',severity: 'low',    body: 'Theo (u06) requested mentor change. Culture carrier, low risk. Rin has context.',                 leadId: 'lead-xm',  time: '3d ago' },
-];
+const ESCALATIONS = [];
 
 const ROLE_IDENTITIES = {
   exonaut:   { id: ME_ID,          name: ME.name,             role: 'intern',    label: 'Exonaut',          home: 'dashboard' },
@@ -338,10 +187,9 @@ const POINTS_RUBRIC = [
   { group: 'Milestones',       label: 'Demo Day presentation',                pts: '+50', note: 'All presenters' },
 ];
 
-// ==== UNIVERSAL WEEK 1 & 2 (applies to all tracks) ====
-// Flow: 10 prospects → 10 concept papers (1 per prospect) → discovery meetings.
 const PROSPECTS = [
-  {
+  // Exonauts add their own prospects once enrolled.
+  /*{
     id: 'P01', company: 'Kestrel Biotics', status: 'paper-drafted', paperStatus: 'ML Review',
     contact: 'Dr. Ana Reyes', position: 'Head of R&D Operations',
     linkedin: 'linkedin.com/in/anareyes', email: 'a.reyes@kestrelbio.com', mobile: '+65 9128 4410',
@@ -490,7 +338,7 @@ const PROSPECTS = [
     nextStep: 'Draft paper Thu (last of 10)',
     notes: 'Adaeze is a connector — if she likes it, she forwards to CFO + Chief Claims.',
     meetingStatus: 'none', investmentRange: '$60–90K',
-  },
+  },*/
 ];
 
 const DISCOVERY_TIERS = [
@@ -639,48 +487,17 @@ const TRACK_BRIEFS = {
 // Credential lookup: email → { password, role, userId, homeRoute }
 // Passwords: {FirstName}2026 for everyone; role determines the view they land in.
 const CREDENTIALS = {
-  // ── Exonauts ──────────────────────────────────────────────────────────────
-  'kai.nakamura@exoasia.hub':      { password: 'Kai2026',      role: 'exonaut',   userId: 'u01', homeRoute: 'dashboard' },
-  'sade.obanjo@exoasia.hub':       { password: 'Sade2026',     role: 'exonaut',   userId: 'u02', homeRoute: 'dashboard' },
-  'mira.kovac@exoasia.hub':        { password: 'Mira2026',     role: 'exonaut',   userId: 'u03', homeRoute: 'dashboard' },
-  'jonas.reichel@exoasia.hub':     { password: 'Jonas2026',    role: 'exonaut',   userId: 'u04', homeRoute: 'dashboard' },
-  'priya.ravindran@exoasia.hub':   { password: 'Priya2026',    role: 'exonaut',   userId: 'u05', homeRoute: 'dashboard' },
-  'theo.marchetti@exoasia.hub':    { password: 'Theo2026',     role: 'exonaut',   userId: 'u06', homeRoute: 'dashboard' },
-  'amani.djeredou@exoasia.hub':    { password: 'Amani2026',    role: 'exonaut',   userId: 'u07', homeRoute: 'dashboard' },
-  'isra.halabi@exoasia.hub':       { password: 'Isra2026',     role: 'exonaut',   userId: 'u08', homeRoute: 'dashboard' },
-  'dmitri.laskaris@exoasia.hub':   { password: 'Dmitri2026',   role: 'exonaut',   userId: 'u09', homeRoute: 'dashboard' },
-  'fernanda.quispe@exoasia.hub':   { password: 'Fernanda2026', role: 'exonaut',   userId: 'u10', homeRoute: 'dashboard' },
-  'wren.abernathy@exoasia.hub':    { password: 'Wren2026',     role: 'exonaut',   userId: 'u11', homeRoute: 'dashboard' },
-  'yuki.tomlinson@exoasia.hub':    { password: 'Yuki2026',     role: 'exonaut',   userId: 'u12', homeRoute: 'dashboard' },
-  'bastien.okafor@exoasia.hub':    { password: 'Bastien2026',  role: 'exonaut',   userId: 'u13', homeRoute: 'dashboard' },
-  'maya.chen@exoasia.hub':         { password: 'Maya2026',     role: 'exonaut',   userId: 'u14', homeRoute: 'dashboard' },
-  'rafaela.quattro@exoasia.hub':   { password: 'Rafaela2026',  role: 'exonaut',   userId: 'u15', homeRoute: 'dashboard' },
-  'hadrien.solace@exoasia.hub':    { password: 'Hadrien2026',  role: 'exonaut',   userId: 'u16', homeRoute: 'dashboard' },
-  'noor.bashir@exoasia.hub':       { password: 'Noor2026',     role: 'exonaut',   userId: 'u17', homeRoute: 'dashboard' },
-  'cass.verwoerd@exoasia.hub':     { password: 'Cass2026',     role: 'exonaut',   userId: 'u18', homeRoute: 'dashboard' },
-  'oriana.bellucci@exoasia.hub':   { password: 'Oriana2026',   role: 'exonaut',   userId: 'u19', homeRoute: 'dashboard' },
-  'torin.macallister@exoasia.hub': { password: 'Torin2026',    role: 'exonaut',   userId: 'u20', homeRoute: 'dashboard' },
-  'elspeth.varga@exoasia.hub':     { password: 'Elspeth2026',  role: 'exonaut',   userId: 'u21', homeRoute: 'dashboard' },
-  'kenji.balogun@exoasia.hub':     { password: 'Kenji2026',    role: 'exonaut',   userId: 'u22', homeRoute: 'dashboard' },
-  'seren.aldaine@exoasia.hub':     { password: 'Seren2026',    role: 'exonaut',   userId: 'u23', homeRoute: 'dashboard' },
-  'rhea.pemberton@exoasia.hub':    { password: 'Rhea2026',     role: 'exonaut',   userId: 'u24', homeRoute: 'dashboard' },
-  'casimir.drosos@exoasia.hub':    { password: 'Casimir2026',  role: 'exonaut',   userId: 'u25', homeRoute: 'dashboard' },
-  'ingrid.lundqvist@exoasia.hub':  { password: 'Ingrid2026',   role: 'exonaut',   userId: 'u26', homeRoute: 'dashboard' },
-  'solange.ngata@exoasia.hub':     { password: 'Solange2026',  role: 'exonaut',   userId: 'u27', homeRoute: 'dashboard' },
-  'tobi.ashworth@exoasia.hub':     { password: 'Tobi2026',     role: 'exonaut',   userId: 'u28', homeRoute: 'dashboard' },
-  'halyard.beaumont@exoasia.hub':  { password: 'Halyard2026',  role: 'exonaut',   userId: 'u29', homeRoute: 'dashboard' },
-  'vivien.sorrento@exoasia.hub':   { password: 'Vivien2026',   role: 'exonaut',   userId: 'u30', homeRoute: 'dashboard' },
-  // ── Mission Leads ─────────────────────────────────────────────────────────
-  'nadia.oyelaran@exoasia.hub':    { password: 'Nadia2026',    role: 'lead',      userId: 'lead-ais', homeRoute: 'lead-home' },
-  'kofi.ansong@exoasia.hub':       { password: 'Kofi2026',     role: 'lead',      userId: 'lead-vb',  homeRoute: 'lead-home' },
-  'saoirse.flanagan@exoasia.hub':  { password: 'Saoirse2026',  role: 'lead',      userId: 'lead-ld',  homeRoute: 'lead-home' },
-  'rin.tachibana@exoasia.hub':     { password: 'Rin2026',      role: 'lead',      userId: 'lead-xm',  homeRoute: 'lead-home' },
-  'anders.vogt@exoasia.hub':       { password: 'Anders2026',   role: 'lead',      userId: 'lead-aid', homeRoute: 'lead-home' },
-  'mariela.escarcega@exoasia.hub': { password: 'Mariela2026',  role: 'lead',      userId: 'lead-pol', homeRoute: 'lead-home' },
-  'beatrix.hollander@exoasia.hub': { password: 'Beatrix2026',  role: 'lead',      userId: 'lead-cc',  homeRoute: 'lead-home' },
+  // ── Mission Leads (placeholder slots — update names/passwords when assigned) ──
+  'lead.ais@exoasia.hub':   { password: 'LeadAIS2026',  role: 'lead',      userId: 'lead-ais', homeRoute: 'lead-home' },
+  'lead.vb@exoasia.hub':    { password: 'LeadVB2026',   role: 'lead',      userId: 'lead-vb',  homeRoute: 'lead-home' },
+  'lead.ld@exoasia.hub':    { password: 'LeadLD2026',   role: 'lead',      userId: 'lead-ld',  homeRoute: 'lead-home' },
+  'lead.xm@exoasia.hub':    { password: 'LeadXM2026',   role: 'lead',      userId: 'lead-xm',  homeRoute: 'lead-home' },
+  'lead.aid@exoasia.hub':   { password: 'LeadAID2026',  role: 'lead',      userId: 'lead-aid', homeRoute: 'lead-home' },
+  'lead.pol@exoasia.hub':   { password: 'LeadPOL2026',  role: 'lead',      userId: 'lead-pol', homeRoute: 'lead-home' },
+  'lead.cc@exoasia.hub':    { password: 'LeadCC2026',   role: 'lead',      userId: 'lead-cc',  homeRoute: 'lead-home' },
   // ── Commander & Admin ─────────────────────────────────────────────────────
-  'mack.comandante@exoasia.hub':   { password: 'Mack2026',     role: 'commander', userId: 'cmdr-01',  homeRoute: 'cmdr-home' },
-  'admin@exoasia.hub':             { password: 'Admin2026',    role: 'admin',     userId: 'admin-01', homeRoute: 'pa-cohorts' },
+  'mack.comandante@exoasia.hub': { password: 'Mack2026', role: 'commander', userId: 'cmdr-01',  homeRoute: 'cmdr-home' },
+  'admin@exoasia.hub':           { password: 'Admin2026', role: 'admin',    userId: 'admin-01', homeRoute: 'pa-cohorts' },
 };
 
 Object.assign(window, {
