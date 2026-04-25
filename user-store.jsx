@@ -1,22 +1,10 @@
 // ============================================================================
-// User Registry — stores all self-registered users in localStorage.
-// Seed CREDENTIALS (data.js) remain read-only; this store handles everyone
-// who signs up through the UI. Admin can promote roles here.
+// User Registry — stores self-registered users in Supabase (registered_users).
+// Seed CREDENTIALS (data.js) remain read-only; this store handles sign-ups.
+// Admin can promote roles here.
 // ============================================================================
 
 (function () {
-  const KEY = 'exo:registered-users:v1';
-  const listeners = new Set();
-
-  function load() {
-    try { return JSON.parse(localStorage.getItem(KEY)) || []; } catch { return []; }
-  }
-
-  function save(users) {
-    try { localStorage.setItem(KEY, JSON.stringify(users)); } catch {}
-    listeners.forEach(fn => fn());
-  }
-
   const ROLE_ROUTES = {
     exonaut:   'dashboard',
     lead:      'lead-home',
@@ -24,65 +12,99 @@
     admin:     'pa-cohorts',
   };
 
+  function toClient(row) {
+    if (!row) return null;
+    return {
+      userId:    row.user_id,
+      name:      row.name,
+      email:     row.email,
+      password:  row.password,
+      role:      row.role,
+      leadId:    row.lead_id,
+      homeRoute: row.home_route,
+      createdAt: row.created_at,
+    };
+  }
+
   window.__userRegistry = {
-    getAll() { return load(); },
-
-    find(email) {
-      return load().find(u => u.email === email.trim().toLowerCase()) || null;
+    async getAll() {
+      const { data, error } = await window.__db
+        .from('registered_users')
+        .select('*')
+        .order('created_at', { ascending: true });
+      if (error) { console.error('getAll:', error); return []; }
+      return (data || []).map(toClient);
     },
 
-    emailTaken(email) {
+    async find(email) {
+      const { data } = await window.__db
+        .from('registered_users')
+        .select('*')
+        .eq('email', email.trim().toLowerCase())
+        .maybeSingle();
+      return toClient(data);
+    },
+
+    async emailTaken(email) {
       const e = email.trim().toLowerCase();
-      return !!(CREDENTIALS[e] || this.find(e));
+      if (CREDENTIALS[e]) return true;
+      const { data } = await window.__db
+        .from('registered_users')
+        .select('user_id')
+        .eq('email', e)
+        .maybeSingle();
+      return !!data;
     },
 
-    register({ name, email, password }) {
-      const users = load();
+    async register({ name, email, password }) {
       const userId = 'reg-' + Date.now();
-      const entry = {
-        userId,
-        name: name.trim(),
-        email: email.trim().toLowerCase(),
+      const row = {
+        user_id:    userId,
+        name:       name.trim(),
+        email:      email.trim().toLowerCase(),
         password,
-        role: 'exonaut',
-        leadId: null,
-        homeRoute: 'dashboard',
-        createdAt: new Date().toISOString(),
+        role:       'exonaut',
+        lead_id:    null,
+        home_route: 'dashboard',
       };
-      users.push(entry);
-      save(users);
-      return entry;
+      const { error } = await window.__db.from('registered_users').insert(row);
+      if (error) throw error;
+      return toClient({ ...row, created_at: new Date().toISOString() });
     },
 
-    // role: 'exonaut' | 'lead' | 'commander' | 'admin'
-    // leadId: LEADS entry id — required when role === 'lead'
-    updateRole(userId, role, leadId) {
-      const users = load();
-      const idx = users.findIndex(u => u.userId === userId);
-      if (idx < 0) return;
-      users[idx].role = role;
-      users[idx].leadId = leadId || null;
-      users[idx].homeRoute = ROLE_ROUTES[role] || 'dashboard';
-      save(users);
+    async updateRole(userId, role, leadId) {
+      const { error } = await window.__db
+        .from('registered_users')
+        .update({
+          role,
+          lead_id:    leadId || null,
+          home_route: ROLE_ROUTES[role] || 'dashboard',
+        })
+        .eq('user_id', userId);
+      if (error) console.error('updateRole:', error);
     },
 
-    remove(userId) {
-      save(load().filter(u => u.userId !== userId));
-    },
-
-    subscribe(fn) {
-      listeners.add(fn);
-      return () => listeners.delete(fn);
+    async remove(userId) {
+      const { error } = await window.__db
+        .from('registered_users')
+        .delete()
+        .eq('user_id', userId);
+      if (error) console.error('remove:', error);
     },
   };
 
-  // React hook — re-renders whenever registry changes
   window.useRegisteredUsers = function useRegisteredUsers() {
-    const [users, setUsers] = React.useState(() => window.__userRegistry.getAll());
-    React.useEffect(
-      () => window.__userRegistry.subscribe(() => setUsers(window.__userRegistry.getAll())),
-      []
-    );
+    const [users, setUsers] = React.useState([]);
+    React.useEffect(() => {
+      window.__userRegistry.getAll().then(setUsers);
+      const channel = window.__db
+        .channel('registered_users_realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'registered_users' }, () => {
+          window.__userRegistry.getAll().then(setUsers);
+        })
+        .subscribe();
+      return () => window.__db.removeChannel(channel);
+    }, []);
     return users;
   };
 })();

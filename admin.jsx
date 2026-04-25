@@ -401,14 +401,12 @@ function AdminUserRoleRow({ user, onRoleChange, onDelete }) {
   const ROLE_COLORS = { exonaut: 'var(--lime)', lead: 'var(--platinum)', commander: 'var(--amber)', admin: 'var(--sky)' };
   const ROLE_ICONS  = { exonaut: 'fa-user-astronaut', lead: 'fa-user-shield', commander: 'fa-star', admin: 'fa-shield-halved' };
 
-  function save() {
+  async function save() {
     if (newRole === 'lead' && !leadId) return;
     setSaving(true);
-    setTimeout(() => {
-      onRoleChange(user.userId, newRole, newRole === 'lead' ? leadId : null);
-      setEditing(false);
-      setSaving(false);
-    }, 400);
+    await onRoleChange(user.userId, newRole, newRole === 'lead' ? leadId : null);
+    setEditing(false);
+    setSaving(false);
   }
 
   const createdDate = user.createdAt ? new Date(user.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' }) : '—';
@@ -503,12 +501,12 @@ function AdminUsers() {
   const scopedSeedUsers = scope === 'all' ? USERS : USERS.filter(u => getUserCohort(u.id) === scope);
   const scopeLabel = scope === 'all' ? 'All Cohorts' : (all.find(c => c.id === scope)?.name || '—');
 
-  function handleRoleChange(userId, role, leadId) {
-    window.__userRegistry.updateRole(userId, role, leadId);
+  async function handleRoleChange(userId, role, leadId) {
+    await window.__userRegistry.updateRole(userId, role, leadId);
   }
 
-  function handleDelete(userId) {
-    window.__userRegistry.remove(userId);
+  async function handleDelete(userId) {
+    await window.__userRegistry.remove(userId);
   }
 
   return (

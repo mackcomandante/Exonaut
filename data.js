@@ -246,11 +246,10 @@ const ACTIVITY = [
 // (user-store.jsx hasn't loaded yet so read the registry key directly.)
 let ME = USERS.find(u => u.id === ME_ID);
 if (!ME) {
-  try {
-    const _reg = JSON.parse(localStorage.getItem('exo:registered-users:v1') || '[]');
-    const _ru  = _reg.find(u => u.userId === ME_ID);
-    if (_ru) ME = { id: ME_ID, name: _ru.name, track: _ru.track || 'AIS', tier: 'entry', points: 0, badges: 0, p1: 0, p2: 0, p3: 0 };
-  } catch {}
+  const _cachedName = localStorage.getItem('exo:userName');
+  if (_cachedName) {
+    ME = { id: ME_ID, name: _cachedName, track: localStorage.getItem('exo:userTrack') || 'AIS', tier: 'entry', points: 0, badges: 0, p1: 0, p2: 0, p3: 0 };
+  }
 }
 if (!ME) ME = USERS.find(u => u.id === 'u14');
 const ME_RANK = USERS.sort((a,b) => b.points - a.points).findIndex(u => u.id === ME.id) + 1;
