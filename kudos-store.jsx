@@ -4,7 +4,7 @@
 // ============================================================================
 
 (function () {
-  const STORE_KEY = 'exo:kudos:v1';
+  const STORE_KEY = 'exo:kudos:v2';
 
   function seed() {
     if (typeof KUDOS_FEED === 'undefined' || !Array.isArray(KUDOS_FEED)) return [];

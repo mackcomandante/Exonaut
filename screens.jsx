@@ -290,16 +290,7 @@ function MissionsList({ onOpenMission }) {
 }
 
 // ========== KUDOS FEED ==========
-const KUDOS_FEED = [
-  { from: 'u05', to: 'u14', msg: 'Your Kestrel brief was absurdly clean — I stole your framing.', pillar: 'project', time: '4h ago' },
-  { from: 'u06', to: 'u14', msg: 'Bailed me out on the competitive research — appreciate you.', pillar: 'project', time: '2d ago' },
-  { from: 'u02', to: 'u01', msg: 'The demo you shipped in 6 hours would have taken me a week.', pillar: 'project', time: '6h ago' },
-  { from: 'u14', to: 'u07', msg: 'Your Monday Ignition question reframed the whole room.', pillar: 'project', time: '1d ago' },
-  { from: 'u11', to: 'u03', msg: 'Saw you grab coffee for Mack before the meeting. I notice.', pillar: 'recruitment', time: '1d ago' },
-  { from: 'u14', to: 'u09', msg: 'Your client prep doc is now my template. Thanks for the shortcut.', pillar: 'client', time: '3d ago' },
-  { from: 'u08', to: 'u14', msg: 'Respected how you gave Priya the credit on Friday. Culture move.', pillar: 'project', time: '5d ago' },
-  { from: 'u04', to: 'u02', msg: 'Your policy angle on the AI memo — chef\'s kiss.', pillar: 'project', time: '2h ago' },
-];
+const KUDOS_FEED = [];
 
 function KudosFeed({ onGive }) {
   const [filter, setFilter] = React.useState('all');
