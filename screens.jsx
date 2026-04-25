@@ -877,8 +877,6 @@ function getCommunityMembers() {
 }
 
 function CommunityPage() {
-  const [tab, setTab] = React.useState(() => localStorage.getItem('exo:community:tab') || 'directory');
-  React.useEffect(() => { localStorage.setItem('exo:community:tab', tab); }, [tab]);
   const [filter, setFilter] = React.useState('all');     // all | active | alumni
   const [trackFilter, setTrackFilter] = React.useState('all');
   const [batchFilter, setBatchFilter] = React.useState('all');   // alumni cohort year
@@ -933,9 +931,7 @@ function CommunityPage() {
           <div className="t-label" style={{ marginBottom: 8, color: 'var(--lavender)' }}>CULTURE · COMMUNITY</div>
           <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>Community</h1>
           <div className="t-body" style={{ marginTop: 6, color: 'var(--off-white-68)' }}>
-            {tab === 'directory'
-              ? 'Every Exonaut — active and alumni. Browse profiles to see badges, credentials, and projects.'
-              : 'Message board for the cohort. Post, vote, and comment.'}
+            Every Exonaut — active and alumni. Browse profiles to see badges, credentials, and projects.
           </div>
         </div>
         <div className="t-mono" style={{ fontSize: 11, color: 'var(--off-white-68)', letterSpacing: '0.08em' }}>
@@ -943,24 +939,6 @@ function CommunityPage() {
         </div>
       </div>
 
-      {/* Top-level tab switcher */}
-      <div style={{ display: 'flex', gap: 2, padding: 2, background: 'var(--off-white-07)', borderRadius: 2, marginBottom: 20, width: 'fit-content' }}>
-        {[
-          { id: 'directory', label: 'Directory', icon: 'fa-id-card' },
-          { id: 'board',     label: 'Message Board', icon: 'fa-comments' },
-        ].map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)} style={{
-            padding: '8px 16px', background: tab === t.id ? 'var(--ink)' : 'transparent',
-            color: tab === t.id ? 'var(--deep-black)' : 'var(--off-white-68)',
-            border: 'none', borderRadius: 2, fontFamily: 'var(--font-mono)', fontSize: 10,
-            fontWeight: 700, letterSpacing: '0.1em', cursor: 'pointer', textTransform: 'uppercase',
-            display: 'flex', alignItems: 'center', gap: 6,
-          }}><i className={'fa-solid ' + t.icon} />{t.label}</button>
-        ))}
-      </div>
-
-      {tab === 'board' ? <CommunityBoard /> : (
-        <React.Fragment>
       {/* Filter bar */}
       <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 20, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', gap: 2, padding: 2, background: 'var(--off-white-07)', borderRadius: 2 }}>
@@ -1024,8 +1002,6 @@ function CommunityPage() {
       )}
 
       {selected && <CommunityProfileSheet m={selected} onClose={() => setSelected(null)} />}
-        </React.Fragment>
-      )}
     </div>
   );
 }

@@ -2,8 +2,9 @@
 
 function Sidebar({ current, onNavigate, onSignOut }) {
   const me = [
-    { id: 'profile',     label: 'My Profile',  icon: 'fa-id-badge' },
-    { id: 'community',   label: 'Community',   icon: 'fa-users' },
+    { id: 'profile',       label: 'My Profile',    icon: 'fa-id-badge' },
+    { id: 'community',     label: 'Community',     icon: 'fa-users' },
+    { id: 'message-board', label: 'Message Board', icon: 'fa-comments' },
   ];
   const links = [
     { id: 'dashboard',   label: 'Dashboard',   icon: 'fa-gauge-high' },
