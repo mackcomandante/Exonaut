@@ -5,18 +5,102 @@
 // TIER CERTIFICATION TEMPLATE
 // ─────────────────────────────────────────────
 function TierCertificate({ tierKey, tierData, earned, name, cohort, cohortName, issueDate }) {
-  const color    = tierData.color;
-  const bg       = '#0E0D1B';
-  const tierNum  = ['entry','builder','prime','elite','apex'].indexOf(tierKey) + 1;
-  const certCode = `EXO-TIER-${tierData.short}-${(cohort || COHORT.code).replace(/[^A-Z0-9]/gi,'').toUpperCase()}`;
-  const displayName = name || ME.name || 'Exonaut';
+  const color       = tierData.color;
+  const bg          = '#0E0D1B';
+  const tierNum     = ['entry','builder','prime','elite','apex'].indexOf(tierKey) + 1;
+  const certCode    = `EXO-TIER-${tierData.short}-${(cohort || COHORT.code).replace(/[^A-Z0-9]/gi,'').toUpperCase()}`;
+  const displayName = name || (typeof ME !== 'undefined' ? ME.name : null) || 'Exonaut';
   const displayDate = issueDate || (earned ? new Date().toLocaleDateString('en-US',{ month:'short', day:'numeric', year:'numeric' }).toUpperCase() : null);
-  const linkedInUrl = `https://www.linkedin.com/sharing/share-offsite/?url=https%3A%2F%2Fexoasia.hub%2Fcerts%2F${encodeURIComponent(certCode)}&title=${encodeURIComponent(`I earned the ${tierData.label} tier on the Exoasia Exonaut Program!`)}`;
+
+  // ── LinkedIn share caption ──────────────────────────────────────────────
+  const linkedInCaption = [
+    `🎖️ Just earned the ${tierData.label} tier at Exoasia Innovation Hub!`,
+    '',
+    `The Exonaut Program is a 12-week internship with real world experience — no simulations, just actual client work across AI strategy, venture building, L&D, and more.`,
+    '',
+    `${cohortName || 'Batch 2026–2027'} · Exoasia Innovation Hub · Philippines 🇵🇭`,
+    '',
+    '#Exonaut #ExoasiaHub #Innovation #Philippines #AITransformation',
+  ].join('\n');
+
+  const linkedInUrl = `https://www.linkedin.com/sharing/share-offsite/?url=https%3A%2F%2Fexoasia.hub%2Fcerts%2F${encodeURIComponent(certCode)}`;
+
+  // ── State ───────────────────────────────────────────────────────────────
+  const [showShareModal, setShowShareModal] = React.useState(false);
+  const [copied, setCopied]                 = React.useState(false);
+  const [downloading, setDownloading]       = React.useState(false);
+  const svgRef = React.useRef(null);
+
+  // ── Copy caption ─────────────────────────────────────────────────────────
+  function copyCaption() {
+    navigator.clipboard.writeText(linkedInCaption).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2200);
+    }).catch(() => {
+      // Fallback for browsers without clipboard API
+      const ta = document.createElement('textarea');
+      ta.value = linkedInCaption;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2200);
+    });
+  }
+
+  // ── Download PNG ─────────────────────────────────────────────────────────
+  // Serialises the SVG → Blob URL → Image → Canvas (2×) → PNG download.
+  function downloadPng() {
+    const svg = svgRef.current;
+    if (!svg || downloading) return;
+    setDownloading(true);
+
+    // Clone the SVG so we can embed an explicit width/height (required by some browsers)
+    const clone = svg.cloneNode(true);
+    clone.setAttribute('width', '720');
+    clone.setAttribute('height', '440');
+    clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+
+    const svgString = new XMLSerializer().serializeToString(clone);
+    const blob      = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+    const url       = URL.createObjectURL(blob);
+    const img       = new Image();
+    const scale     = 2; // retina
+
+    img.onload = () => {
+      const canvas  = document.createElement('canvas');
+      canvas.width  = 720 * scale;
+      canvas.height = 440 * scale;
+      const ctx     = canvas.getContext('2d');
+      ctx.scale(scale, scale);
+      ctx.drawImage(img, 0, 0);
+      URL.revokeObjectURL(url);
+
+      const a    = document.createElement('a');
+      a.download = `${certCode}.png`;
+      a.href     = canvas.toDataURL('image/png');
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setDownloading(false);
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      setDownloading(false);
+      alert('PNG export failed — please try again or screenshot the certificate directly.');
+    };
+
+    img.src = url;
+  }
 
   return (
     <div style={{ width: '100%' }}>
       {/* Certificate SVG */}
-      <svg viewBox="0 0 720 440" xmlns="http://www.w3.org/2000/svg"
+      <svg ref={svgRef} viewBox="0 0 720 440" xmlns="http://www.w3.org/2000/svg"
         style={{ width:'100%', display:'block', borderRadius:8,
                  filter: earned ? 'none' : 'grayscale(0.85)', opacity: earned ? 1 : 0.55 }}>
 
@@ -67,39 +151,29 @@ function TierCertificate({ tierKey, tierData, earned, name, cohort, cohortName, 
         <line x1="436" y1="58" x2="620" y2="58" stroke={color} strokeWidth="0.5" strokeOpacity="0.3"/>
 
         {/* ── Left panel: Shield emblem ── */}
-        {/* Shield outer */}
         <g transform="translate(62, 110)">
-          {/* Outer glow ring */}
           <circle cx="90" cy="110" r="88" fill="none" stroke={color} strokeWidth="0.5" strokeOpacity="0.15"/>
           <circle cx="90" cy="110" r="78" fill="none" stroke={color} strokeWidth="0.5" strokeOpacity="0.1"/>
 
-          {/* Shield path */}
           <path d="M90,8 L165,32 L165,110 Q165,168 90,190 Q15,168 15,110 L15,32 Z"
             fill={`url(#seal-grad-${tierKey})`}/>
           <path d="M90,8 L165,32 L165,110 Q165,168 90,190 Q15,168 15,110 L15,32 Z"
             fill="none" stroke={color} strokeWidth="1.8" strokeLinejoin="round" filter={`url(#glow-${tierKey})`}/>
-
-          {/* Inner shield */}
           <path d="M90,24 L150,44 L150,108 Q150,156 90,174 Q30,156 30,108 L30,44 Z"
             fill="none" stroke={color} strokeWidth="0.5" strokeOpacity="0.35"/>
 
-          {/* Tier short label */}
           <text x="90" y="108" textAnchor="middle"
             fontFamily="Montserrat, sans-serif" fontSize="26" fontWeight="900"
             fill={color} letterSpacing="3" filter={`url(#glow-${tierKey})`}>{tierData.short}</text>
-
-          {/* Tier fraction */}
           <text x="90" y="130" textAnchor="middle"
             fontFamily="JetBrains Mono, monospace" fontSize="8"
             fill={color} fillOpacity="0.55" letterSpacing="2">TIER {tierNum} / 5</text>
 
-          {/* Bottom dot-row ornament */}
           {[0,1,2,3,4].map(i => (
             <circle key={i} cx={65 + i*13} cy="153" r="2"
               fill={color} fillOpacity={i === 2 ? 0.9 : i === 1 || i === 3 ? 0.5 : 0.2}/>
           ))}
 
-          {/* Seal ring bottom text */}
           <text x="90" y="196" textAnchor="middle"
             fontFamily="JetBrains Mono, monospace" fontSize="7"
             fill={color} fillOpacity="0.3" letterSpacing="2">{certCode}</text>
@@ -110,21 +184,16 @@ function TierCertificate({ tierKey, tierData, earned, name, cohort, cohortName, 
           stroke={color} strokeWidth="0.5" strokeOpacity="0.2"/>
 
         {/* ── Right panel: Certificate text ── */}
-        {/* "This certifies that" */}
         <text x="298" y="118"
           fontFamily="EB Garamond, serif" fontSize="15" fontStyle="italic"
           fill="rgba(255,255,255,0.38)">This certifies that</text>
 
-        {/* Name */}
         <text x="298" y="170"
           fontFamily="Montserrat, sans-serif" fontSize="34" fontWeight="800"
           fill="rgba(255,255,255,0.95)" letterSpacing="0.5">{displayName}</text>
-
-        {/* Underline */}
         <line x1="298" y1="182" x2="690" y2="182"
           stroke="rgba(255,255,255,0.08)" strokeWidth="1"/>
 
-        {/* "has achieved the rank of" */}
         <text x="298" y="208"
           fontFamily="EB Garamond, serif" fontSize="13" fontStyle="italic"
           fill="rgba(255,255,255,0.35)">has achieved the rank of</text>
@@ -133,7 +202,6 @@ function TierCertificate({ tierKey, tierData, earned, name, cohort, cohortName, 
         {(() => {
           const parts = tierData.label.toUpperCase().split(' ');
           if (parts.length === 1) {
-            // Single word (Entry: "EXONAUT")
             return (
               <>
                 <text x="298" y="268"
@@ -149,7 +217,6 @@ function TierCertificate({ tierKey, tierData, earned, name, cohort, cohortName, 
               </>
             );
           }
-          // Multi-word: "EXONAUT BUILDER" → small qualifier + large rank word
           return (
             <>
               <text x="298" y="242"
@@ -176,7 +243,6 @@ function TierCertificate({ tierKey, tierData, earned, name, cohort, cohortName, 
           stroke={color} strokeWidth="0.4" strokeOpacity="0.25"/>
 
         {/* ── Footer: date + signature ── */}
-        {/* Date */}
         <text x="298" y="346"
           fontFamily="JetBrains Mono, monospace" fontSize="8.5"
           fill="rgba(255,255,255,0.25)" letterSpacing="1.5">
@@ -186,7 +252,6 @@ function TierCertificate({ tierKey, tierData, earned, name, cohort, cohortName, 
           fontFamily="JetBrains Mono, monospace" fontSize="8"
           fill="rgba(255,255,255,0.18)" letterSpacing="1">{certCode}</text>
 
-        {/* Signature block */}
         <text x="570" y="340" textAnchor="middle"
           fontFamily="Montserrat, sans-serif" fontSize="12" fontWeight="600"
           fill="rgba(255,255,255,0.38)" letterSpacing="0.5">Mack Comandante</text>
@@ -216,20 +281,103 @@ function TierCertificate({ tierKey, tierData, earned, name, cohort, cohortName, 
       {/* ── Actions (below cert) ── */}
       {earned && (
         <div style={{ display:'flex', gap:10, marginTop:14 }}>
-          <a href={linkedInUrl} target="_blank" rel="noreferrer"
+          {/* Share on LinkedIn → opens caption modal */}
+          <button
+            onClick={() => setShowShareModal(true)}
             style={{ display:'inline-flex', alignItems:'center', gap:7, padding:'9px 18px',
                      background:'#0A66C2', borderRadius:4, color:'#fff',
                      fontFamily:'var(--font-mono)', fontSize:11, fontWeight:700,
-                     textDecoration:'none', letterSpacing:'0.06em' }}>
+                     border:'none', cursor:'pointer', letterSpacing:'0.06em' }}>
             <i className="fa-brands fa-linkedin"/>SHARE ON LINKEDIN
-          </a>
-          <button
-            style={{ padding:'9px 18px', background:'transparent',
-                     border:'1px solid var(--off-white-15)', borderRadius:4,
-                     color:'var(--off-white-68)', fontFamily:'var(--font-mono)',
-                     fontSize:11, cursor:'pointer', letterSpacing:'0.06em' }}>
-            <i className="fa-solid fa-download" style={{ marginRight:6 }}/>DOWNLOAD PNG
           </button>
+
+          {/* Download PNG */}
+          <button
+            onClick={downloadPng}
+            disabled={downloading}
+            style={{ display:'inline-flex', alignItems:'center', gap:7,
+                     padding:'9px 18px', background:'transparent',
+                     border:'1px solid var(--off-white-15)', borderRadius:4,
+                     color: downloading ? 'rgba(255,255,255,0.35)' : 'var(--off-white-68)',
+                     fontFamily:'var(--font-mono)', fontSize:11,
+                     cursor: downloading ? 'default' : 'pointer', letterSpacing:'0.06em' }}>
+            <i className={downloading ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-download'}/>
+            {downloading ? 'EXPORTING…' : 'DOWNLOAD PNG'}
+          </button>
+        </div>
+      )}
+
+      {/* ── LinkedIn share modal ── */}
+      {showShareModal && (
+        <div
+          onClick={e => { if (e.target === e.currentTarget) setShowShareModal(false); }}
+          style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.72)',
+                   display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999 }}>
+          <div style={{ background:'#1A1929', border:'1px solid rgba(255,255,255,0.1)',
+                        borderRadius:12, padding:28, width:500, maxWidth:'92vw',
+                        boxShadow:'0 24px 64px rgba(0,0,0,0.6)' }}>
+
+            {/* Modal header */}
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                <i className="fa-brands fa-linkedin" style={{ color:'#0A66C2', fontSize:18 }}/>
+                <span style={{ fontFamily:'var(--font-mono)', fontSize:11,
+                               letterSpacing:'0.1em', color:'rgba(255,255,255,0.7)',
+                               fontWeight:700 }}>SHARE ON LINKEDIN</span>
+              </div>
+              <button
+                onClick={() => setShowShareModal(false)}
+                style={{ background:'none', border:'none', color:'rgba(255,255,255,0.35)',
+                         cursor:'pointer', fontSize:20, lineHeight:1, padding:'0 4px' }}>×</button>
+            </div>
+
+            {/* Instruction */}
+            <p style={{ margin:'0 0 10px', fontFamily:'var(--font-mono)', fontSize:10,
+                        color:'rgba(255,255,255,0.4)', lineHeight:1.6 }}>
+              Copy the caption below, then paste it into your LinkedIn post after the share dialog opens.
+            </p>
+
+            {/* Caption textarea */}
+            <textarea
+              readOnly
+              value={linkedInCaption}
+              onClick={e => e.target.select()}
+              style={{ width:'100%', minHeight:172, background:'rgba(255,255,255,0.04)',
+                       border:'1px solid rgba(255,255,255,0.1)', borderRadius:6,
+                       color:'rgba(255,255,255,0.82)', fontFamily:'var(--font-mono)',
+                       fontSize:12, lineHeight:1.65, padding:'12px 14px',
+                       resize:'none', boxSizing:'border-box', outline:'none' }}
+            />
+
+            {/* Action buttons */}
+            <div style={{ display:'flex', gap:10, marginTop:14 }}>
+              <button
+                onClick={copyCaption}
+                style={{ flex:1, padding:'11px 0',
+                         background: copied ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.07)',
+                         border: copied ? '1px solid rgba(34,197,94,0.5)' : '1px solid rgba(255,255,255,0.12)',
+                         borderRadius:6, color: copied ? '#22C55E' : 'rgba(255,255,255,0.8)',
+                         fontFamily:'var(--font-mono)', fontSize:11, fontWeight:700,
+                         cursor:'pointer', letterSpacing:'0.08em',
+                         transition:'all 0.2s' }}>
+                {copied
+                  ? <><i className="fa-solid fa-check" style={{ marginRight:6 }}/>COPIED!</>
+                  : <><i className="fa-regular fa-copy" style={{ marginRight:6 }}/>COPY CAPTION</>}
+              </button>
+
+              <a
+                href={linkedInUrl}
+                target="_blank"
+                rel="noreferrer"
+                onClick={() => setTimeout(() => setShowShareModal(false), 600)}
+                style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center',
+                         gap:8, padding:'11px 0', background:'#0A66C2', borderRadius:6,
+                         color:'#fff', fontFamily:'var(--font-mono)', fontSize:11,
+                         fontWeight:700, textDecoration:'none', letterSpacing:'0.08em' }}>
+                <i className="fa-brands fa-linkedin"/>OPEN LINKEDIN →
+              </a>
+            </div>
+          </div>
         </div>
       )}
     </div>
