@@ -1,7 +1,10 @@
 // Login + Sign-up + Onboarding — first-time Exonaut flow
 
 function LoginScreen({ onSignIn }) {
-  const [mode, setMode] = React.useState('login'); // 'login' | 'signup'
+  // 'login' | 'signup' | 'forgotpw' | 'resetpw'
+  const [mode, setMode] = React.useState(() =>
+    location.hash.includes('type=recovery') ? 'resetpw' : 'login'
+  );
 
   // ── Login state ──────────────────────────────────────────────────────────
   const [email, setEmail]       = React.useState('');
@@ -16,18 +19,28 @@ function LoginScreen({ onSignIn }) {
   const [suConfirm, setSuConfirm]   = React.useState('');
   const [showSuPw, setShowSuPw]     = React.useState(false);
 
+  // ── Forgot / Reset password state ────────────────────────────────────────
+  const [fpEmail, setFpEmail]       = React.useState('');
+  const [fpSent, setFpSent]         = React.useState(false);
+  const [rpPass, setRpPass]         = React.useState('');
+  const [rpConfirm, setRpConfirm]   = React.useState('');
+  const [rpDone, setRpDone]         = React.useState(false);
+  const [showRpPw, setShowRpPw]     = React.useState(false);
+
   // ── Shared ────────────────────────────────────────────────────────────────
   const [loading, setLoading]               = React.useState(false);
   const [error, setError]                   = React.useState('');
   const [verificationSent, setVerificationSent] = React.useState(false);
 
-  const switchMode = (m) => { setMode(m); setError(''); setVerificationSent(false); };
+  const switchMode = (m) => { setMode(m); setError(''); setVerificationSent(false); setFpSent(false); };
 
   // ── Auto-login ONLY when returning from email verification link ──────────
-  // Guard: only run if Supabase put a verification token in the URL.
+  // Guard: skip for password-reset redirects (type=recovery) — those stay on resetpw mode.
   React.useEffect(() => {
+    const hash = location.hash;
+    if (hash.includes('type=recovery')) return; // handled by resetpw mode
     const isVerificationRedirect =
-      location.hash.includes('access_token') || location.search.includes('code=');
+      hash.includes('access_token') || location.search.includes('code=');
     if (!isVerificationRedirect) return;
 
     async function checkVerifiedSession() {
@@ -139,6 +152,44 @@ function LoginScreen({ onSignIn }) {
     }
   };
 
+  // ── Forgot password submit ────────────────────────────────────────────────
+  const handleForgotPw = async (e) => {
+    e.preventDefault();
+    if (!fpEmail.trim()) { setError('Please enter your email.'); return; }
+    setError(''); setLoading(true);
+    try {
+      const { error: fpErr } = await window.__db.auth.resetPasswordForEmail(
+        fpEmail.trim().toLowerCase(),
+        { redirectTo: 'https://exonaut.exoasia.org' }
+      );
+      if (fpErr) throw fpErr;
+      setFpSent(true);
+    } catch (err) {
+      setError(err?.message || 'Could not send reset email. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ── Reset password submit (user returned from link) ───────────────────────
+  const handleResetPw = async (e) => {
+    e.preventDefault();
+    if (rpPass.length < 8) { setError('Password must be at least 8 characters.'); return; }
+    if (rpPass !== rpConfirm) { setError('Passwords do not match.'); return; }
+    setError(''); setLoading(true);
+    try {
+      const { error: rpErr } = await window.__db.auth.updateUser({ password: rpPass });
+      if (rpErr) throw rpErr;
+      setRpDone(true);
+      // Clear the recovery hash from URL
+      history.replaceState(null, '', location.pathname);
+    } catch (err) {
+      setError(err?.message || 'Failed to update password. The reset link may have expired.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // ── Shared error / action bar ─────────────────────────────────────────────
   const ErrorBanner = () => error ? (
     <div style={{ marginBottom: 14, padding: '10px 14px', background: 'rgba(255,80,80,0.08)', border: '1px solid rgba(255,80,80,0.3)', borderRadius: 4, color: 'var(--red)', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.05em' }}>
@@ -208,10 +259,11 @@ function LoginScreen({ onSignIn }) {
                     : <><i className="fa-solid fa-arrow-right-to-bracket" /> SIGN IN</>}
                 </button>
                 <div style={{ textAlign: 'center', marginTop: 4 }}>
-                  <span className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)', letterSpacing: '0.08em' }}>
-                    Forgot your password? Email{' '}
-                    <span style={{ color: 'var(--lavender)' }}>admin@exoasia.hub</span>
-                  </span>
+                  <button type="button" onClick={() => switchMode('forgotpw')} style={{
+                    background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                    fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--lavender)',
+                    letterSpacing: '0.08em', textDecoration: 'underline',
+                  }}>Forgot your password?</button>
                 </div>
               </form>
             </>
@@ -291,6 +343,96 @@ function LoginScreen({ onSignIn }) {
                 </button>
               </form>
             </>
+          )}
+
+          {/* ── FORGOT PASSWORD ── */}
+          {mode === 'forgotpw' && !fpSent && (
+            <>
+              <button type="button" onClick={() => switchMode('login')} style={{
+                background: 'none', border: 'none', cursor: 'pointer', padding: '0 0 20px 0',
+                fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--off-white-40)',
+                letterSpacing: '0.08em', display: 'flex', alignItems: 'center', gap: 6,
+              }}><i className="fa-solid fa-arrow-left" /> BACK TO SIGN IN</button>
+
+              <div className="t-label" style={{ marginBottom: 10 }}>ACCOUNT RECOVERY</div>
+              <h1 className="t-title" style={{ fontSize: 28, margin: '0 0 8px 0' }}>Reset your password</h1>
+              <div className="t-body" style={{ fontSize: 13, color: 'var(--off-white-60)', marginBottom: 24, lineHeight: 1.6 }}>
+                Enter the email you registered with. We'll send you a link to set a new password.
+              </div>
+
+              <form onSubmit={handleForgotPw}>
+                <label className="t-label-muted" style={{ display: 'block', marginBottom: 6 }}>EMAIL</label>
+                <input className="input" type="email" value={fpEmail} onChange={e => setFpEmail(e.target.value)}
+                  placeholder="you@exoasia.hub" autoFocus style={{ marginBottom: 20 }} />
+                <ErrorBanner />
+                <button type="submit" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '14px' }}>
+                  {loading
+                    ? <><i className="fa-solid fa-circle-notch fa-spin" /> SENDING…</>
+                    : <><i className="fa-solid fa-paper-plane" /> SEND RESET LINK</>}
+                </button>
+              </form>
+            </>
+          )}
+
+          {mode === 'forgotpw' && fpSent && (
+            <div style={{ textAlign: 'center', padding: '12px 0' }}>
+              <i className="fa-solid fa-envelope-circle-check" style={{ fontSize: 40, color: 'var(--lime)', marginBottom: 20, display: 'block' }} />
+              <div className="t-label" style={{ marginBottom: 8 }}>CHECK YOUR INBOX</div>
+              <h2 className="t-title" style={{ fontSize: 24, margin: '0 0 12px 0' }}>Reset link sent</h2>
+              <div className="t-body" style={{ color: 'var(--off-white-60)', fontSize: 13, lineHeight: 1.6, marginBottom: 24 }}>
+                We sent a password reset link to <strong style={{ color: 'var(--off-white)' }}>{fpEmail}</strong>.<br />
+                Click the link in the email to set a new password.
+              </div>
+              <button type="button" className="btn btn-ghost" style={{ width: '100%', justifyContent: 'center' }}
+                onClick={() => switchMode('login')}>
+                <i className="fa-solid fa-arrow-right-to-bracket" /> BACK TO SIGN IN
+              </button>
+            </div>
+          )}
+
+          {/* ── RESET PASSWORD (returned from email link) ── */}
+          {mode === 'resetpw' && !rpDone && (
+            <>
+              <div className="t-label" style={{ marginBottom: 10 }}>SET NEW PASSWORD</div>
+              <h1 className="t-title" style={{ fontSize: 28, margin: '0 0 8px 0' }}>Choose a new password</h1>
+              <div className="t-body" style={{ fontSize: 13, color: 'var(--off-white-60)', marginBottom: 24, lineHeight: 1.6 }}>
+                Pick something strong — at least 8 characters.
+              </div>
+              <form onSubmit={handleResetPw}>
+                <label className="t-label-muted" style={{ display: 'block', marginBottom: 6 }}>NEW PASSWORD</label>
+                <div style={{ position: 'relative', marginBottom: 16 }}>
+                  <input className="input" type={showRpPw ? 'text' : 'password'} value={rpPass}
+                    onChange={e => setRpPass(e.target.value)} placeholder="••••••••" autoFocus />
+                  <PwToggle show={showRpPw} onToggle={() => setShowRpPw(v => !v)} />
+                </div>
+                <label className="t-label-muted" style={{ display: 'block', marginBottom: 6 }}>CONFIRM PASSWORD</label>
+                <div style={{ position: 'relative', marginBottom: 22 }}>
+                  <input className="input" type={showRpPw ? 'text' : 'password'} value={rpConfirm}
+                    onChange={e => setRpConfirm(e.target.value)} placeholder="••••••••" />
+                </div>
+                <ErrorBanner />
+                <button type="submit" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '14px' }}>
+                  {loading
+                    ? <><i className="fa-solid fa-circle-notch fa-spin" /> UPDATING…</>
+                    : <><i className="fa-solid fa-lock" /> SET NEW PASSWORD</>}
+                </button>
+              </form>
+            </>
+          )}
+
+          {mode === 'resetpw' && rpDone && (
+            <div style={{ textAlign: 'center', padding: '12px 0' }}>
+              <i className="fa-solid fa-circle-check" style={{ fontSize: 40, color: 'var(--lime)', marginBottom: 20, display: 'block' }} />
+              <div className="t-label" style={{ marginBottom: 8 }}>PASSWORD UPDATED</div>
+              <h2 className="t-title" style={{ fontSize: 24, margin: '0 0 12px 0' }}>You're all set</h2>
+              <div className="t-body" style={{ color: 'var(--off-white-60)', fontSize: 13, lineHeight: 1.6, marginBottom: 24 }}>
+                Your password has been changed. Sign in with your new password.
+              </div>
+              <button type="button" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '14px' }}
+                onClick={() => switchMode('login')}>
+                <i className="fa-solid fa-arrow-right-to-bracket" /> SIGN IN
+              </button>
+            </div>
           )}
         </div>
 
