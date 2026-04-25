@@ -16,13 +16,21 @@ function Profile({ onOpenMission, onTriggerBadge }) {
   const [displayLI,   setDisplayLI]   = React.useState(storedLinkedin);
   const [displaySchool, setDisplaySchool] = React.useState(storedSchool);
 
-  const [editName,   setEditName]   = React.useState(storedName);
+  function splitName(full) {
+    const parts = (full || '').trim().split(' ');
+    return { first: parts[0] || '', last: parts.slice(1).join(' ') };
+  }
+
+  const [editFirst,  setEditFirst]  = React.useState(() => splitName(storedName).first);
+  const [editLast,   setEditLast]   = React.useState(() => splitName(storedName).last);
   const [editBio,    setEditBio]    = React.useState(storedBio);
   const [editLI,     setEditLI]     = React.useState(storedLinkedin);
   const [editSchool, setEditSchool] = React.useState(storedSchool);
 
   function openEdit() {
-    setEditName(displayName);
+    const { first, last } = splitName(displayName);
+    setEditFirst(first);
+    setEditLast(last);
     setEditBio(displayBio);
     setEditLI(displayLI);
     setEditSchool(displaySchool);
@@ -31,20 +39,21 @@ function Profile({ onOpenMission, onTriggerBadge }) {
   }
 
   async function saveEdit() {
-    if (!editName.trim()) { setEditErr('Name cannot be blank.'); return; }
+    const fullName = (editFirst.trim() + ' ' + editLast.trim()).trim();
+    if (!fullName) { setEditErr('Name cannot be blank.'); return; }
     setSaving(true);
     setEditErr('');
     try {
       const { error } = await window.__db
         .from('registered_users')
-        .update({ name: editName.trim() })
+        .update({ name: fullName })
         .eq('user_id', ME_ID);
       if (error) throw error;
-      localStorage.setItem('exo:userName',          editName.trim());
+      localStorage.setItem('exo:userName',          fullName);
       localStorage.setItem('exo:bio:'      + ME_ID, editBio.trim());
       localStorage.setItem('exo:linkedin:' + ME_ID, editLI.trim());
       localStorage.setItem('exo:school:'   + ME_ID, editSchool.trim());
-      setDisplayName(editName.trim());
+      setDisplayName(fullName);
       setDisplayBio(editBio.trim());
       setDisplayLI(editLI.trim());
       setDisplaySchool(editSchool.trim());
@@ -76,9 +85,18 @@ function Profile({ onOpenMission, onTriggerBadge }) {
               <button className="btn btn-ghost btn-sm" onClick={() => setEditing(false)}>✕</button>
             </div>
 
-            <label className="t-label-muted" style={{ display: 'block', marginBottom: 4 }}>Display Name</label>
-            <input className="field" value={editName} onChange={e => setEditName(e.target.value)}
-              style={{ width: '100%', marginBottom: 16, boxSizing: 'border-box' }} />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+              <div>
+                <label className="t-label-muted" style={{ display: 'block', marginBottom: 4 }}>FIRST NAME</label>
+                <input className="field" value={editFirst} onChange={e => setEditFirst(e.target.value)}
+                  placeholder="First" style={{ width: '100%', boxSizing: 'border-box' }} />
+              </div>
+              <div>
+                <label className="t-label-muted" style={{ display: 'block', marginBottom: 4 }}>LAST NAME</label>
+                <input className="field" value={editLast} onChange={e => setEditLast(e.target.value)}
+                  placeholder="Last" style={{ width: '100%', boxSizing: 'border-box' }} />
+              </div>
+            </div>
 
             <label className="t-label-muted" style={{ display: 'block', marginBottom: 4 }}>Bio / Quote</label>
             <textarea className="field" rows={3} value={editBio} onChange={e => setEditBio(e.target.value)}

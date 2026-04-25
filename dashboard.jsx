@@ -270,7 +270,7 @@ function Dashboard({ onNavigate, onOpenMission }) {
       <div className="section-head enter">
         <div>
           <div className="t-label" style={{ marginBottom: 8 }}>Welcome back, Exonaut</div>
-          <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>{ME.name.split(' ')[0]} Chen</h1>
+          <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>{ME.name}</h1>
           <div className="t-body" style={{ marginTop: 8, color: 'var(--lavender)', fontStyle: 'italic' }}>
             "We don't wait for the map. We build it."
           </div>

@@ -9,7 +9,8 @@ function LoginScreen({ onSignIn }) {
   const [showPw, setShowPw]     = React.useState(false);
 
   // ── Sign-up state ─────────────────────────────────────────────────────────
-  const [suName, setSuName]         = React.useState('');
+  const [suFirst, setSuFirst]       = React.useState('');
+  const [suLast, setSuLast]         = React.useState('');
   const [suEmail, setSuEmail]       = React.useState('');
   const [suPass, setSuPass]         = React.useState('');
   const [suConfirm, setSuConfirm]   = React.useState('');
@@ -104,7 +105,8 @@ function LoginScreen({ onSignIn }) {
   const handleSignUp = async (e) => {
     e.preventDefault();
     setError('');
-    if (!suName.trim() || !suEmail || !suPass || !suConfirm) {
+    const suName = (suFirst.trim() + ' ' + suLast.trim()).trim();
+    if (!suFirst.trim() || !suLast.trim() || !suEmail || !suPass || !suConfirm) {
       setError('All fields are required.');
       return;
     }
@@ -241,9 +243,18 @@ function LoginScreen({ onSignIn }) {
               </div>
 
               <form onSubmit={handleSignUp}>
-                <label className="t-label-muted" style={{ display: 'block', marginBottom: 6 }}>FULL NAME</label>
-                <input className="input" type="text" value={suName} onChange={e => setSuName(e.target.value)}
-                  style={{ marginBottom: 16 }} placeholder="First Last" autoFocus />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+                  <div>
+                    <label className="t-label-muted" style={{ display: 'block', marginBottom: 6 }}>FIRST NAME</label>
+                    <input className="input" type="text" value={suFirst} onChange={e => setSuFirst(e.target.value)}
+                      placeholder="First" autoFocus />
+                  </div>
+                  <div>
+                    <label className="t-label-muted" style={{ display: 'block', marginBottom: 6 }}>LAST NAME</label>
+                    <input className="input" type="text" value={suLast} onChange={e => setSuLast(e.target.value)}
+                      placeholder="Last" />
+                  </div>
+                </div>
 
                 <label className="t-label-muted" style={{ display: 'block', marginBottom: 6 }}>EMAIL</label>
                 <input className="input" type="email" value={suEmail} onChange={e => setSuEmail(e.target.value)}
