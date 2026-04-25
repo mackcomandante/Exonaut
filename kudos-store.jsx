@@ -4,7 +4,7 @@
 // ============================================================================
 
 (function () {
-  const STORE_KEY = 'exo:kudos:v2';
+  const STORE_KEY = 'exo:kudos:v3';
 
   function seed() {
     if (typeof KUDOS_FEED === 'undefined' || !Array.isArray(KUDOS_FEED)) return [];
@@ -67,11 +67,11 @@
     },
     toUser(userId)   { return store.all().filter(k => k.to === userId); },
     fromUser(userId) { return store.all().filter(k => k.from === userId); },
-    give({ from, fromName, fromRole, to, msg, pillar }) {
+    give({ from, fromName, fromRole, to, toName, msg, pillar }) {
       const k = {
         id: 'k' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
         from, fromName: fromName || null, fromRole: fromRole || 'exonaut',
-        to, msg: String(msg || '').trim(),
+        to, toName: toName || null, msg: String(msg || '').trim(),
         pillar: pillar || 'project',
         createdAt: Date.now(),
       };

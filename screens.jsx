@@ -329,7 +329,7 @@ function KudosFeed({ onGive }) {
       <div style={{ display: 'grid', gap: 10 }}>
         {feed.map((k, i) => {
           const fromInfo = resolveAuthor(k.from, k.fromName);
-          const toInfo   = resolveAuthor(k.to, null);
+          const toInfo   = resolveAuthor(k.to, k.toName);
           const fromRoleStyle = roleBadgeStyle(k.fromRole);
           return (
             <div key={k.id || i} className="card-panel" style={{ padding: 18 }}>

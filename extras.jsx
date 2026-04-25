@@ -172,8 +172,8 @@ function KudosModal({ onClose, onSent }) {
     const recipientUser = pool.find(u => u.id === recipient);
     const recipientName = recipientUser?.name || 'a community member';
     kudos.give({
-      from: me.id, fromName: me.role === 'exonaut' ? null : me.name, fromRole: me.role,
-      to: recipient, msg: message, pillar,
+      from: me.id, fromName: me.name, fromRole: me.role,
+      to: recipient, toName: recipientName, msg: message, pillar,
     });
     // Post kudos to Message Board
     window.__boardStore?.createThread({
