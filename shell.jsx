@@ -1,6 +1,8 @@
 // Shell: sidebar, topbar, app frame
 
 function Sidebar({ current, onNavigate, onSignOut }) {
+  const userId = typeof ME_ID !== 'undefined' ? ME_ID : null;
+  const notifs = userId && window.useNotifications ? window.useNotifications(userId) : { hasUnread: false };
   const me = [
     { id: 'profile',       label: 'My Profile',    icon: 'fa-id-badge' },
     { id: 'community',     label: 'Community',     icon: 'fa-users' },
@@ -69,7 +71,7 @@ function Sidebar({ current, onNavigate, onSignOut }) {
       <div className="sidebar-footer">
         <button title="Notifications" onClick={() => onNavigate('notifications')}>
           <i className="fa-solid fa-bell" />
-          <span style={{ position: 'absolute', top: 6, right: 6, width: 6, height: 6, borderRadius: '50%', background: 'var(--lime)' }} />
+          {notifs.hasUnread && <span style={{ position: 'absolute', top: 6, right: 6, width: 6, height: 6, borderRadius: '50%', background: '#ef4444' }} />}
         </button>
         <button title="Settings" onClick={() => onNavigate('settings')}><i className="fa-solid fa-gear" /></button>
         <button title="Log out" onClick={onSignOut}><i className="fa-solid fa-right-from-bracket" /></button>
@@ -79,6 +81,8 @@ function Sidebar({ current, onNavigate, onSignOut }) {
 }
 
 function Topbar({ crumbs, onNavigate }) {
+  const userId = typeof ME_ID !== 'undefined' ? ME_ID : null;
+  const notifs = userId && window.useNotifications ? window.useNotifications(userId) : { hasUnread: false };
   const [time, setTime] = React.useState('');
   React.useEffect(() => {
     const tick = () => {
@@ -112,7 +116,7 @@ function Topbar({ crumbs, onNavigate }) {
                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--off-white-68)', position: 'relative', padding: '0 6px' }}
                 title="Notifications">
           <i className="fa-solid fa-bell" />
-          <span style={{ position: 'absolute', top: -2, right: 0, width: 6, height: 6, borderRadius: '50%', background: 'var(--lime)' }} />
+          {notifs.hasUnread && <span style={{ position: 'absolute', top: -2, right: 0, width: 6, height: 6, borderRadius: '50%', background: '#ef4444' }} />}
         </button>
         <span className="topbar-live"><span className="pulse" /> LIVE</span>
       </div>

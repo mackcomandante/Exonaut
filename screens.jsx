@@ -463,35 +463,36 @@ function AnnouncementsPage() {
 }
 
 // ========== NOTIFICATIONS ==========
-const NOTIFICATIONS = [
-  { type: 'badge', title: 'You earned Silver Strategist', sub: '300-point milestone · +0 pts (badge-only)', time: '2h ago', icon: 'fa-medal', unread: true,
-    share: { kind: 'badge', payload: { code: 'MIL-SLV', name: 'Silver Strategist', subtitle: '300 points milestone', category: 'milestone', color: '#A8B4BE' } } },
-  { type: 'kudos', title: 'Priya sent you kudos', sub: '"Your Kestrel brief was absurdly clean…"', time: '4h ago', icon: 'fa-hand-sparkles', unread: true },
-  { type: 'rank', title: 'Rank update: #17 → #14', sub: 'You moved up 3 positions this week', time: '8h ago', icon: 'fa-arrow-trend-up', unread: true },
-  { type: 'points', title: '+40 points awarded', sub: 'Track Orientation · graded EXCELLENT', time: 'Yesterday', icon: 'fa-bolt', unread: false,
-    share: { kind: 'citation', payload: { id: 'CIT-TRK-ORI', title: 'Track Orientation', grade: 'Excellent', pointsAwarded: 40, color: '#C9F24A', feedback: 'Strong grasp of the full track arc. Reading of the 12-week rhythm and pillar weighting is unusually clear for week 1.' } } },
-  { type: 'mission', title: 'New mission assigned', sub: 'Competitive Landscape Analysis · due in 2 days', time: 'Yesterday', icon: 'fa-bullseye', unread: false },
-  { type: 'award', title: 'You were named Intern of the Week', sub: 'Week 2 · +25 pts · Community vote', time: '3d ago', icon: 'fa-trophy', unread: false,
-    share: { kind: 'award', payload: { code: 'SPL-IOW', name: 'Intern of the Week', subtitle: 'Week 2 · community-voted', color: '#FFB020' } } },
-  { type: 'announce', title: 'Mack posted an announcement', sub: 'Midpoint Fire Check scheduled · OCT 28', time: '2d ago', icon: 'fa-bullhorn', unread: false },
-];
-
 function NotificationsPage() {
+  const userId = (typeof ME_ID !== 'undefined') ? ME_ID : 'u14';
+  const notifs = window.useNotifications ? window.useNotifications(userId) : { list: [], hasUnread: false, markAllRead: () => {} };
+  const unreadCount = notifs.list.filter(n => n.unread).length;
+  const timeAgo = window.__notifStore?.timeAgo || (() => '');
+
   return (
     <div className="enter">
       <div className="section-head">
         <div>
-          <div className="t-label" style={{ marginBottom: 8 }}>REAL-TIME · 3 UNREAD</div>
+          <div className="t-label" style={{ marginBottom: 8 }}>
+            {unreadCount > 0 ? `${unreadCount} UNREAD` : 'ALL CAUGHT UP'}
+          </div>
           <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>Notifications</h1>
         </div>
-        <button className="btn btn-ghost">MARK ALL READ</button>
+        {unreadCount > 0 && (
+          <button className="btn btn-ghost" onClick={notifs.markAllRead}>MARK ALL READ</button>
+        )}
       </div>
 
       <div className="card-panel" style={{ padding: 0 }}>
-        {NOTIFICATIONS.map((n, i) => (
-          <div key={i} style={{
-            display: 'grid', gridTemplateColumns: '40px 1fr auto auto', gap: 16,
-            padding: '18px 24px', borderBottom: i < NOTIFICATIONS.length - 1 ? '1px solid var(--off-white-07)' : 'none',
+        {notifs.list.length === 0 ? (
+          <div style={{ padding: 48, textAlign: 'center' }}>
+            <i className="fa-solid fa-bell-slash" style={{ fontSize: 28, color: 'var(--off-white-40)', marginBottom: 12 }} />
+            <div className="t-body" style={{ color: 'var(--off-white-68)' }}>No notifications yet. Kudos and updates will appear here.</div>
+          </div>
+        ) : notifs.list.map((n, i) => (
+          <div key={n.id} style={{
+            display: 'grid', gridTemplateColumns: '40px 1fr auto', gap: 16,
+            padding: '18px 24px', borderBottom: i < notifs.list.length - 1 ? '1px solid var(--off-white-07)' : 'none',
             background: n.unread ? 'rgba(201,229,0,0.03)' : 'transparent',
             alignItems: 'center', cursor: 'pointer', transition: 'background 150ms',
           }}>
@@ -500,21 +501,12 @@ function NotificationsPage() {
             </div>
             <div>
               <div className="t-heading" style={{ fontSize: 13, textTransform: 'none', letterSpacing: 0 }}>
-                {n.title} {n.unread && <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: 'var(--lime)', marginLeft: 6, verticalAlign: 'middle' }} />}
+                {n.title}
+                {n.unread && <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: '#ef4444', marginLeft: 6, verticalAlign: 'middle' }} />}
               </div>
               <div className="t-body" style={{ fontSize: 13, marginTop: 2 }}>{n.sub}</div>
             </div>
-            <div>
-              {n.share && (
-                <ShareButton
-                  kind={n.share.kind}
-                  payload={n.share.payload}
-                  label={n.share.kind === 'citation' ? 'SHARE CITATION' : n.share.kind === 'award' ? 'SHARE AWARD' : 'SHARE BADGE'}
-                  icon={n.share.kind === 'citation' ? 'fa-stamp' : n.share.kind === 'award' ? 'fa-trophy' : 'fa-medal'}
-                />
-              )}
-            </div>
-            <div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)' }}>{n.time}</div>
+            <div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)' }}>{timeAgo(n.ts)}</div>
           </div>
         ))}
       </div>
