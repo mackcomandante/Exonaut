@@ -911,39 +911,7 @@ function getCommunityMembers() {
     };
   });
 
-  // Seed alumni — 14 graduates, mix of tracks and tiers.
-  const alumniSeed = [
-    { id: 'a01', name: 'Zara Okonkwo',     track: 'AIS', points: 1080, badges: 9, cohort: '2025-26', role: 'Senior AI Consultant @ Exoasia' },
-    { id: 'a02', name: 'Mateo Villarreal', track: 'VB',  points: 980,  badges: 8, cohort: '2025-26', role: 'Founder @ Cascade Payments' },
-    { id: 'a03', name: 'Aiko Tanaka',      track: 'POL', points: 910,  badges: 7, cohort: '2025-26', role: 'Policy Analyst @ MAS' },
-    { id: 'a04', name: 'Ravi Subramanian', track: 'AID', points: 840,  badges: 7, cohort: '2025-26', role: 'Data Eng Lead @ Nuvo' },
-    { id: 'a05', name: 'Lena Borisova',    track: 'XM',  points: 820,  badges: 6, cohort: '2025-26', role: 'UX Researcher @ GovTech SG' },
-    { id: 'a06', name: 'Kwame Asante',     track: 'AIS', points: 760,  badges: 6, cohort: '2025-26', role: 'ML Engineer @ Grab' },
-    { id: 'a07', name: 'Isabel Ferreira',  track: 'CC',  points: 720,  badges: 5, cohort: '2025-26', role: 'Brand Strategist @ Ogilvy' },
-    { id: 'a08', name: 'Dmitri Volkov',    track: 'LP',  points: 1120, badges: 10,cohort: '2024-25', role: 'Chief of Staff @ Exoasia' },
-    { id: 'a09', name: 'Noor Al-Mansouri', track: 'VB',  points: 890,  badges: 7, cohort: '2024-25', role: 'Principal @ Antler' },
-    { id: 'a10', name: 'Takeshi Hirano',   track: 'AIS', points: 860,  badges: 7, cohort: '2024-25', role: 'AI Advisor @ PwC' },
-    { id: 'a11', name: 'Sofia Martinez',   track: 'POL', points: 800,  badges: 6, cohort: '2024-25', role: 'Regulatory Lead @ MAS' },
-    { id: 'a12', name: 'Elijah Osei',      track: 'AID', points: 770,  badges: 6, cohort: '2024-25', role: 'Analytics Lead @ Shopee' },
-    { id: 'a13', name: 'Amara Chen',       track: 'XM',  points: 740,  badges: 5, cohort: '2024-25', role: 'Service Designer @ DBS' },
-    { id: 'a14', name: 'Linh Tran',        track: 'CC',  points: 700,  badges: 5, cohort: '2024-25', role: 'Head of Content @ Lazada' },
-  ];
-  const alumni = alumniSeed.map(u => {
-    const creds = COMMUNITY_CREDENTIALS[u.track] || [];
-    const projects = COMMUNITY_PROJECTS_BY_TRACK[u.track] || [];
-    const hash = u.id.charCodeAt(1) + u.id.charCodeAt(2);
-    return {
-      ...u,
-      status: 'alumni',
-      tierBadge: activeTierFor(u),
-      credentials: creds.slice(hash % 3, hash % 3 + 5),
-      project: projects[hash % projects.length],
-      projectsAll: projects,
-      socials: makeSocials(u.name, u.id),
-    };
-  });
-
-  return [...active, ...alumni];
+  return [...active];
 }
 
 function CommunityPage() {
