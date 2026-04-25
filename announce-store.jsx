@@ -10,7 +10,7 @@
 // ============================================================================
 
 (function () {
-  const STORE_KEY = 'exo:announcements:v1';
+  const STORE_KEY = 'exo:announcements:v2';
 
   function seedFromConst() {
     if (typeof ANNOUNCEMENTS === 'undefined' || !Array.isArray(ANNOUNCEMENTS)) return [];

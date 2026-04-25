@@ -405,48 +405,19 @@ function RitualsPage() {
 
       <div className="section-head" style={{ marginBottom: 14 }}>
         <h2 style={{ fontSize: 16 }}>Ritual History · All Weeks</h2>
-        <span className="section-meta">{weeks.length} WEEKS LOGGED</span>
+        <span className="section-meta">TRACKED FROM WEEK 1</span>
       </div>
 
-      <div className="lb-table">
-        <div className="lb-header" style={{ gridTemplateColumns: '80px repeat(5, 1fr) 80px' }}>
-          <div>WEEK</div>
-          {RITUALS.map(r => <div key={r.id}>{r.name.split(' ').slice(-1)[0].toUpperCase()}</div>)}
-          <div>PTS</div>
-        </div>
-        {weeks.slice().reverse().map(w => {
-          const isCurrent = w === COHORT.week;
-          const weekStates = isCurrent ? RITUALS.map(r => r.state) : RITUALS.map((r, i) => {
-            const seed = (w * 7 + i) % 4;
-            return seed === 0 ? 'missed' : 'done';
-          });
-          const pts = weekStates.reduce((s, st, i) => s + (st === 'done' ? RITUALS[i].points : 0), 0);
-          return (
-            <div key={w} className="lb-row" style={{ gridTemplateColumns: '80px repeat(5, 1fr) 80px' }}>
-              <div className="lb-rank">W{String(w).padStart(2, '0')}</div>
-              {weekStates.map((st, i) => (
-                <div key={i} style={{ fontSize: 14 }}>
-                  {st === 'done' ? <i className="fa-solid fa-circle-check" style={{ color: 'var(--green)' }} />
-                   : st === 'missed' ? <i className="fa-solid fa-circle-xmark" style={{ color: 'var(--red)', opacity: 0.6 }} />
-                   : <i className="fa-solid fa-circle-dot" style={{ color: 'var(--ink)' }} />}
-                </div>
-              ))}
-              <div className="lb-points" style={{ fontSize: 14 }}>{pts}</div>
-            </div>
-          );
-        })}
+      <div className="card-panel" style={{ textAlign: 'center', padding: 40 }}>
+        <i className="fa-solid fa-clock-rotate-left" style={{ fontSize: 24, color: 'var(--off-white-40)', marginBottom: 12 }} />
+        <div className="t-body" style={{ color: 'var(--off-white-68)' }}>No ritual history yet. Completed weeks will appear here.</div>
       </div>
     </div>
   );
 }
 
 // ========== ANNOUNCEMENTS ==========
-const ANNOUNCEMENTS = [
-  { type: 'celebration', title: 'Batch 2026 · Week 2 Intern of the Week', body: 'Sade Obanjo takes IOW for shipping the first full AI Strategy deck and getting a 5★ from client. +25 pts. The bar moves.', from: 'Mack Comandante', time: '4h ago' },
-  { type: 'action', title: 'Midpoint Fire Check scheduled · OCT 28', body: 'Every Exonaut gets a 20-min 1:1. Book yours in the admin panel before Friday. +10 pts on completion.', from: 'Mack Comandante', time: 'Yesterday' },
-  { type: 'info', title: 'New mission dropped · Competitive Landscape', body: 'AI Strategy track — due Thursday. 30 points base, up to 50 with excellent grade. Kestrel is watching.', from: 'Mack Comandante', time: '2d ago' },
-  { type: 'urgent', title: 'Friday Win Wall goes live TONIGHT', body: 'Post your Week 2 win by 21:00 SGT. This replaces the group chat permanently.', from: 'Mack Comandante', time: '3d ago' },
-];
+const ANNOUNCEMENTS = [];
 
 function AnnouncementsPage() {
   const typeMap = {
@@ -914,7 +885,23 @@ function CommunityPage() {
   const [query, setQuery] = React.useState('');
   const [selected, setSelected] = React.useState(null);
 
-  const members = React.useMemo(getCommunityMembers, []);
+  const registeredUsers = window.useRegisteredUsers ? window.useRegisteredUsers() : [];
+  const members = React.useMemo(() =>
+    registeredUsers.map(u => ({
+      id: u.userId,
+      name: u.name,
+      status: 'active',
+      cohort: '2026-27',
+      track: null,
+      tier: 'entry',
+      tierBadge: 'entry',
+      points: 0,
+      badges: 0,
+      credentials: [],
+      project: null,
+      role: null,
+      socials: null,
+    })), [registeredUsers]);
 
   // Unique batches (cohort years) across all members, sorted newest → oldest
   const allBatches = React.useMemo(() => {

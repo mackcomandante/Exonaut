@@ -454,13 +454,22 @@ function Onboarding({ onComplete }) {
   const [step, setStep] = React.useState(1);
   const [pledgeAccepted, setPledgeAccepted] = React.useState(false);
   const [bio, setBio] = React.useState('');
+  const [liUrl, setLiUrl] = React.useState('');
   const [tourSlide, setTourSlide] = React.useState(0);
   const [liPosted, setLiPosted] = React.useState(false);
   const [avatarUrl, setAvatarUrl] = React.useState(null);
   const fileInputRef = React.useRef(null);
 
   const canAdvance = { 1: pledgeAccepted, 2: bio.length > 0, 3: true, 4: liPosted }[step];
-  const next = () => step < 4 ? setStep(step + 1) : onComplete();
+  const next = () => {
+    if (step === 2) {
+      const uid = localStorage.getItem('exo:userId') || ME_ID;
+      if (avatarUrl) localStorage.setItem('exo:avatar:' + uid, avatarUrl);
+      if (bio.trim()) localStorage.setItem('exo:bio:' + uid, bio.trim());
+      if (liUrl.trim()) localStorage.setItem('exo:linkedin:' + uid, liUrl.trim());
+    }
+    step < 4 ? setStep(step + 1) : onComplete();
+  };
 
   function handleAvatarChange(e) {
     const file = e.target.files[0];
@@ -557,7 +566,7 @@ function Onboarding({ onComplete }) {
                 </div>
 
                 <label className="t-label-muted" style={{ display: 'block', marginBottom: 6, marginTop: 20 }}>LINKEDIN URL · OPTIONAL</label>
-                <input className="input" placeholder="linkedin.com/in/yourname" />
+                <input className="input" placeholder="linkedin.com/in/yourname" value={liUrl} onChange={e => setLiUrl(e.target.value)} />
               </div>
             </div>
           </div>
