@@ -914,13 +914,17 @@ function TrajectoryChart() {
 }
 
 // ========== ROLE SWITCHER ==========
-function RoleSwitcher({ current, onChange }) {
-  const roles = [
+function RoleSwitcher({ current, onChange, userRole }) {
+  const allRoles = [
     { id: 'exonaut',   label: 'Exonaut',  sub: 'Intern',    icon: 'fa-user-astronaut', accent: 'var(--lime)' },
     { id: 'lead',      label: 'Lead',     sub: 'Manager',   icon: 'fa-user-shield',    accent: 'var(--platinum)' },
     { id: 'commander', label: 'Commander',sub: 'Director',  icon: 'fa-star',           accent: 'var(--amber)' },
     { id: 'admin',     label: 'Admin',    sub: 'Platform',  icon: 'fa-shield-halved',  accent: 'var(--sky)' },
   ];
+  const roles = userRole === 'admin'
+    ? allRoles
+    : allRoles.filter(r => r.id === (userRole || 'exonaut'));
+  if (roles.length <= 1) return null;
   return (
     <div style={{
       position: 'fixed', top: 12, left: 232, zIndex: 120,

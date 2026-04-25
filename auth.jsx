@@ -16,17 +16,35 @@ function LoginScreen({ onSignIn }) {
   const [showSuPw, setShowSuPw]     = React.useState(false);
 
   // ── Shared ────────────────────────────────────────────────────────────────
-  const [loading, setLoading] = React.useState(false);
-  const [error, setError]     = React.useState('');
+  const [loading, setLoading]               = React.useState(false);
+  const [error, setError]                   = React.useState('');
+  const [verificationSent, setVerificationSent] = React.useState(false);
 
-  const switchMode = (m) => { setMode(m); setError(''); };
+  const switchMode = (m) => { setMode(m); setError(''); setVerificationSent(false); };
+
+  // ── Auto-login when user returns from verification link ───────────────────
+  React.useEffect(() => {
+    async function checkVerifiedSession() {
+      const { data: { session } } = await window.__db.auth.getSession();
+      if (!session) return;
+      const reg = await window.__userRegistry.find(session.user.email);
+      if (!reg) return;
+      const loginId = reg.role === 'lead' && reg.leadId ? reg.leadId : reg.userId;
+      const firstTime = reg.role === 'exonaut' && !localStorage.getItem('exo:onboarded:' + reg.userId);
+      localStorage.setItem('exo:userName', reg.name);
+      localStorage.setItem('exo:userTrack', reg.track || 'AIS');
+      applySession(loginId, reg.role, reg.homeRoute, firstTime);
+    }
+    checkVerifiedSession();
+  }, []);
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   function applySession(userId, role, homeRoute, isFirstTimeExonaut) {
-    localStorage.setItem('exo:userId',  userId);
-    localStorage.setItem('exo:role',    role);
-    localStorage.setItem('exo:route',   homeRoute);
-    localStorage.setItem('exo:auth',    isFirstTimeExonaut ? 'onboarding' : 'app');
+    localStorage.setItem('exo:userId',    userId);
+    localStorage.setItem('exo:role',      role);
+    localStorage.setItem('exo:authRole',  role);
+    localStorage.setItem('exo:route',     homeRoute);
+    localStorage.setItem('exo:auth',      isFirstTimeExonaut ? 'onboarding' : 'app');
     location.reload();
   }
 
@@ -44,15 +62,25 @@ function LoginScreen({ onSignIn }) {
         applySession(seed.userId, seed.role, seed.homeRoute, firstTime);
         return;
       }
-      // 2. Check Supabase registered users
-      const reg = await window.__userRegistry.find(email);
-      if (reg && reg.password === password) {
-        const loginId = reg.role === 'lead' && reg.leadId ? reg.leadId : reg.userId;
-        const firstTime = reg.role === 'exonaut' && !localStorage.getItem('exo:onboarded:' + reg.userId);
-        localStorage.setItem('exo:userName', reg.name);
-        localStorage.setItem('exo:userTrack', reg.track || 'AIS');
-        applySession(loginId, reg.role, reg.homeRoute, firstTime);
-        return;
+      // 2. Try Supabase Auth for registered users
+      const { data: authData, error: authError } = await window.__db.auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
+        password,
+      });
+      if (authData?.user) {
+        if (!authData.user.email_confirmed_at) {
+          setError('Please verify your email first — check your inbox for a confirmation link.');
+          return;
+        }
+        const reg = await window.__userRegistry.find(email);
+        if (reg) {
+          const loginId = reg.role === 'lead' && reg.leadId ? reg.leadId : reg.userId;
+          const firstTime = reg.role === 'exonaut' && !localStorage.getItem('exo:onboarded:' + reg.userId);
+          localStorage.setItem('exo:userName', reg.name);
+          localStorage.setItem('exo:userTrack', reg.track || 'AIS');
+          applySession(loginId, reg.role, reg.homeRoute, firstTime);
+          return;
+        }
       }
       setError('Invalid email or password.');
     } catch (err) {
@@ -85,10 +113,8 @@ function LoginScreen({ onSignIn }) {
         setError('An account with this email already exists.');
         return;
       }
-      const reg = await window.__userRegistry.register({ name: suName, email: suEmail, password: suPass });
-      localStorage.setItem('exo:userName', reg.name);
-      localStorage.setItem('exo:userTrack', 'AIS');
-      applySession(reg.userId, 'exonaut', 'dashboard', true);
+      await window.__userRegistry.register({ name: suName, email: suEmail, password: suPass });
+      setVerificationSent(true);
     } catch (err) {
       setError('Registration failed. Please try again.');
     } finally {
@@ -164,20 +190,34 @@ function LoginScreen({ onSignIn }) {
                     ? <><i className="fa-solid fa-circle-notch fa-spin" /> AUTHENTICATING…</>
                     : <><i className="fa-solid fa-arrow-right-to-bracket" /> SIGN IN</>}
                 </button>
-                <button type="button" className="btn btn-ghost" style={{ width: '100%', justifyContent: 'center' }}>
-                  FORGOT PASSWORD?
-                </button>
+                <div style={{ textAlign: 'center', marginTop: 4 }}>
+                  <span className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)', letterSpacing: '0.08em' }}>
+                    Forgot your password? Email{' '}
+                    <span style={{ color: 'var(--lavender)' }}>admin@exoasia.hub</span>
+                  </span>
+                </div>
               </form>
-
-              <div style={{ marginTop: 22, paddingTop: 18, borderTop: '1px solid var(--off-white-07)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)', letterSpacing: '0.08em' }}>OR</span>
-                <button className="btn btn-ghost btn-sm"><i className="fa-brands fa-google" /> GOOGLE OAUTH</button>
-              </div>
             </>
           )}
 
           {/* ── SIGN-UP FORM ── */}
-          {mode === 'signup' && (
+          {mode === 'signup' && verificationSent && (
+            <div style={{ textAlign: 'center', padding: '12px 0' }}>
+              <i className="fa-solid fa-envelope-circle-check" style={{ fontSize: 40, color: 'var(--lime)', marginBottom: 20, display: 'block' }} />
+              <div className="t-label" style={{ marginBottom: 8 }}>VERIFY YOUR EMAIL</div>
+              <h2 className="t-title" style={{ fontSize: 26, margin: '0 0 12px 0' }}>Check your inbox</h2>
+              <div className="t-body" style={{ color: 'var(--off-white-60)', fontSize: 13, lineHeight: 1.6, marginBottom: 24 }}>
+                We sent a confirmation link to <strong style={{ color: 'var(--off-white)' }}>{suEmail}</strong>.<br />
+                Click it to activate your account, then come back here to sign in.
+              </div>
+              <button type="button" className="btn btn-ghost" style={{ width: '100%', justifyContent: 'center' }}
+                onClick={() => switchMode('login')}>
+                <i className="fa-solid fa-arrow-right-to-bracket" /> BACK TO SIGN IN
+              </button>
+            </div>
+          )}
+
+          {mode === 'signup' && !verificationSent && (
             <>
               <div className="t-label" style={{ marginBottom: 10 }}>NEW ACCOUNT</div>
               <h1 className="t-title" style={{ fontSize: 32, margin: '0 0 8px 0' }}>Join the Program</h1>
