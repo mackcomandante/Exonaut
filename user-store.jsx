@@ -57,7 +57,15 @@
     },
 
     async register({ name, email, password }) {
-      const userId = 'reg-' + Date.now();
+      // 1. Create Supabase Auth user — triggers verification email
+      const { data: authData, error: authError } = await window.__db.auth.signUp({
+        email: email.trim().toLowerCase(),
+        password,
+      });
+      if (authError) throw authError;
+
+      // 2. Insert profile row using the Supabase Auth UUID
+      const userId = authData.user.id;
       const row = {
         user_id:    userId,
         name:       name.trim(),
@@ -67,8 +75,8 @@
         lead_id:    null,
         home_route: 'dashboard',
       };
-      const { error } = await window.__db.from('registered_users').insert(row);
-      if (error) throw error;
+      const { error: dbError } = await window.__db.from('registered_users').insert(row);
+      if (dbError) throw dbError;
       return toClient({ ...row, created_at: new Date().toISOString() });
     },
 
