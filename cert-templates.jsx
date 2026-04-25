@@ -217,19 +217,29 @@ function TierCertificate({ tierKey, tierData, earned, name, cohort, cohortName, 
               </>
             );
           }
+          // Scale rank-word font size by character count so it always fits.
+          // Right panel runs x=298 → x=690, giving 392 px of room.
+          // Montserrat 900 is ~0.70× em wide per glyph on average.
+          // At 36px: 7 chars × 25px + 6×1px spacing ≈ 181px  → fits BUILDER
+          // At 42px: 5 chars × 29px + 4×1px spacing ≈ 149px  → fits PRIME / ELITE
+          // At 46px: 4 chars × 32px + 3×1px spacing ≈ 131px  → fits APEX
+          const rankWord = parts.slice(1).join(' ');
+          const rankFs   = rankWord.length <= 4 ? 46
+                         : rankWord.length <= 5 ? 42
+                         : 36;
           return (
             <>
-              <text x="298" y="242"
-                fontFamily="Montserrat, sans-serif" fontSize="13" fontWeight="700"
-                fill={color} fillOpacity="0.55" letterSpacing="6">
+              <text x="298" y="240"
+                fontFamily="Montserrat, sans-serif" fontSize="11" fontWeight="700"
+                fill={color} fillOpacity="0.5" letterSpacing="7">
                 {parts[0]}
               </text>
-              <text x="298" y="284"
-                fontFamily="Montserrat, sans-serif" fontSize="46" fontWeight="900"
-                fill={color} letterSpacing="2" filter={`url(#glow-${tierKey})`}>
-                {parts.slice(1).join(' ')}
+              <text x="298" y={240 + rankFs + 4}
+                fontFamily="Montserrat, sans-serif" fontSize={rankFs} fontWeight="900"
+                fill={color} letterSpacing="1" filter={`url(#glow-${tierKey})`}>
+                {rankWord}
               </text>
-              <text x="298" y="302"
+              <text x="298" y={240 + rankFs + 22}
                 fontFamily="JetBrains Mono, monospace" fontSize="9"
                 fill={color} fillOpacity="0.5" letterSpacing="2.5">
                 {tierData.min != null ? `UNLOCKED AT ${tierData.min} PTS` : 'AWARDED BY MISSION COMMANDER'}
