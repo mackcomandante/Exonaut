@@ -330,11 +330,10 @@ function Onboarding({ onComplete }) {
             </div>
 
             <div className="card-panel" style={{ background: 'var(--bg-darkest)', padding: 36, borderLeft: '2px solid var(--lime)' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginBottom: 28 }}>
-                <div><div className="t-label-muted" style={{ marginBottom: 4 }}>COHORT</div><div className="t-heading" style={{ fontSize: 16 }}>{COHORT.name}</div></div>
-                <div><div className="t-label-muted" style={{ marginBottom: 4 }}>TRACK</div><div className="t-heading" style={{ fontSize: 16 }}>{userTrack.name}</div></div>
-                <div><div className="t-label-muted" style={{ marginBottom: 4 }}>TRACK CODE</div><div className="t-heading" style={{ fontSize: 16 }}>{userTrack.code}</div></div>
-                <div><div className="t-label-muted" style={{ marginBottom: 4 }}>EXO-ID</div><div className="t-heading" style={{ fontSize: 16, fontFamily: 'var(--font-mono)' }}>{ME_ID.toUpperCase().slice(0,8)}-2026</div></div>
+              <div style={{ marginBottom: 28 }}>
+                <div className="t-label-muted" style={{ marginBottom: 4 }}>EXO-ID</div>
+                <div className="t-heading" style={{ fontSize: 16, fontFamily: 'var(--font-mono)' }}>{(ME_ID || 'PENDING').toUpperCase().slice(0,8)}-2026</div>
+                <div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)', marginTop: 6, letterSpacing: '0.08em' }}>Track and cohort will be assigned by your Admin.</div>
               </div>
               <div style={{ fontFamily: 'var(--font-serif)', fontSize: 18, lineHeight: 1.7, color: 'var(--off-white)', fontStyle: 'italic', paddingTop: 24, borderTop: '1px solid var(--off-white-07)' }}>
                 "I show up before I'm asked. I lift before I climb. I ship before I'm ready.<br/>
@@ -380,15 +379,8 @@ function Onboarding({ onComplete }) {
                   {bio.length} / 160
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginTop: 20 }}>
-                  <div>
-                    <label className="t-label-muted" style={{ display: 'block', marginBottom: 6 }}>TRACK · ASSIGNED</label>
-                    <div className="input" style={{ color: 'var(--ink)', background: 'var(--bg-footer)', cursor: 'not-allowed' }}>{userTrack.name}</div>
-                  </div>
-                  <div>
-                    <label className="t-label-muted" style={{ display: 'block', marginBottom: 6 }}>COHORT</label>
-                    <div className="input" style={{ color: 'var(--ink)', background: 'var(--bg-footer)', cursor: 'not-allowed' }}>{COHORT.name}</div>
-                  </div>
+                <div style={{ marginTop: 20, padding: '10px 14px', background: 'rgba(201,242,74,0.05)', border: '1px solid var(--off-white-07)', borderRadius: 4 }}>
+                  <div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)', letterSpacing: '0.08em' }}>Track and cohort will be assigned by your Admin after enrollment.</div>
                 </div>
 
                 <label className="t-label-muted" style={{ display: 'block', marginBottom: 6, marginTop: 20 }}>LINKEDIN URL · OPTIONAL</label>
