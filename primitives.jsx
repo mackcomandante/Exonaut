@@ -107,11 +107,14 @@ function GeometricAvatar({ name = '', size = 48, seedOverride }) {
   );
 }
 
-function AvatarWithRing({ name, size = 48, tier, showInitials = false }) {
+function AvatarWithRing({ name, size = 48, tier, showInitials = false, photoUrl }) {
   const ringClass = 'avatar-ring avatar-ring-' + (tier || 'entry');
   return (
-    <div style={{ position: 'relative', width: size, height: size, display: 'inline-block' }}>
-      <GeometricAvatar name={name} size={size} />
+    <div style={{ position: 'relative', width: size, height: size, display: 'inline-block', flexShrink: 0 }}>
+      {photoUrl
+        ? <img src={photoUrl} alt={name} style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', display: 'block' }} />
+        : <GeometricAvatar name={name} size={size} />
+      }
       <div className={ringClass} />
     </div>
   );

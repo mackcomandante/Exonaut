@@ -25,7 +25,8 @@ function Sidebar({ current, onNavigate, onSignOut }) {
         <div className="sidebar-tag">EXONAUT PORTAL · v2.0</div>
       </div>
       <div className="sidebar-user" onClick={() => onNavigate('profile')} style={{ cursor: 'pointer' }}>
-        <AvatarWithRing name={ME.name} size={36} tier={ME.tier} />
+        <AvatarWithRing name={ME.name} size={36} tier={ME.tier}
+          photoUrl={localStorage.getItem('exo:avatar:' + ME_ID) || undefined} />
         <div className="sidebar-user-info">
           <div className="sidebar-user-name">{ME.name}</div>
           <div className="sidebar-user-tier" style={{ color: TIERS[ME.tier].color }}>

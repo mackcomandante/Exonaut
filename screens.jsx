@@ -1019,7 +1019,8 @@ function CommunityCard({ m, onOpen }) {
     onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--off-white-15)'; e.currentTarget.style.background = 'transparent'; }}>
 
       <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', marginBottom: 12 }}>
-        <AvatarWithRing name={m.name} size={44} tier={m.tierBadge} />
+        <AvatarWithRing name={m.name} size={44} tier={m.tierBadge}
+          photoUrl={localStorage.getItem('exo:avatar:' + m.id) || undefined} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <div className="t-heading" style={{ fontSize: 13, textTransform: 'none', letterSpacing: 0, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
@@ -1122,7 +1123,8 @@ function CommunityProfileSheet({ m, onClose }) {
           }}><i className="fa-solid fa-xmark" /></div>
 
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 18 }}>
-            <AvatarWithRing name={m.name} size={72} tier={m.tierBadge} />
+            <AvatarWithRing name={m.name} size={72} tier={m.tierBadge}
+              photoUrl={localStorage.getItem('exo:avatar:' + m.id) || undefined} />
             <div style={{ flex: 1 }}>
               <div className="t-mono" style={{ fontSize: 10, color: 'var(--ink)', letterSpacing: '0.08em', fontWeight: 700, marginBottom: 4 }}>
                 BATCH {m.cohort}
