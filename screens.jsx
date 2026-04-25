@@ -948,8 +948,8 @@ function CommunityPage() {
             { id: 'alumni', label: 'Alumni · ' + counts.alumni },
           ].map(opt => (
             <button key={opt.id} onClick={() => setFilter(opt.id)} style={{
-              padding: '7px 14px', background: filter === opt.id ? 'var(--ink)' : 'transparent',
-              color: filter === opt.id ? 'var(--deep-black)' : 'var(--off-white-68)',
+              padding: '7px 14px', background: filter === opt.id ? 'var(--lime)' : 'transparent',
+              color: filter === opt.id ? 'var(--ink)' : 'var(--off-white-68)',
               border: 'none', borderRadius: 2, fontFamily: 'var(--font-mono)', fontSize: 10,
               fontWeight: 700, letterSpacing: '0.08em', cursor: 'pointer', textTransform: 'uppercase',
             }}>{opt.label}</button>

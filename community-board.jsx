@@ -136,8 +136,8 @@ function CommunityBoard() {
             {['hot', 'new', 'top'].map(s => (
               <button key={s} onClick={() => setSort(s)} style={{
                 padding: '6px 12px',
-                background: sort === s ? 'var(--ink)' : 'transparent',
-                color: sort === s ? 'var(--deep-black)' : 'var(--off-white-68)',
+                background: sort === s ? 'var(--lime)' : 'transparent',
+                color: sort === s ? 'var(--ink)' : 'var(--off-white-68)',
                 border: 'none', borderRadius: 2,
                 fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700, letterSpacing: '0.1em',
                 cursor: 'pointer', textTransform: 'uppercase',

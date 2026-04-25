@@ -48,6 +48,9 @@
   --lavender: #C6B8FF;
 
   /* legacy alpha tokens — remapped to ink */
+  /* ————— Dark-theme compat tokens ————— */
+  --deep-black: #ffffff;        /* was near-black in dark mode; maps to white for light-bg contrast */
+
   --off-white: var(--ink);
   --off-white-68: var(--ink-soft);
   --off-white-40: var(--ink-muted);
