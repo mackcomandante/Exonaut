@@ -1479,30 +1479,40 @@ function BadgeCard({ badge, earned, currentPts }) {
 
   return (
     <div style={{
-      padding: '16px 18px',
-      border: `1px solid ${earned ? badge.color + '55' : 'var(--off-white-15)'}`,
-      borderRadius: 5,
-      background: earned ? `${badge.color}07` : 'transparent',
-      display: 'flex', alignItems: 'flex-start', gap: 12,
-      filter: earned ? 'none' : 'grayscale(1)',
-      opacity: earned ? 1 : 0.55,
+      padding: '14px 16px',
+      border: `1px solid ${earned ? badge.color + '50' : 'var(--off-white-15)'}`,
+      borderRadius: 6,
+      background: earned ? `${badge.color}06` : 'transparent',
+      display: 'flex', alignItems: 'center', gap: 16,
       transition: 'all 0.2s',
     }}>
-      <div style={{ width: 36, height: 36, borderRadius: 4, background: badge.color + '20', border: `1.5px solid ${badge.color}40`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-        <i className="fa-solid fa-medal" style={{ color: badge.color, fontSize: 15 }} />
+      {/* Badge SVG thumbnail */}
+      <div style={{ width: 72, flexShrink: 0 }}>
+        {window.BadgeSVG
+          ? <window.BadgeSVG badge={badge} earned={earned}/>
+          : <i className="fa-solid fa-medal" style={{ color: badge.color, fontSize: 22 }}/>}
       </div>
+
+      {/* Text content */}
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div className="t-mono" style={{ fontSize: 9, color: earned ? badge.color : 'var(--off-white-40)', letterSpacing: '0.1em', fontWeight: 700, marginBottom: 3 }}>
+        <div className="t-mono" style={{ fontSize: 9, color: earned ? badge.color : 'var(--off-white-40)', letterSpacing: '0.1em', fontWeight: 700, marginBottom: 4 }}>
           {badge.category?.toUpperCase()}
         </div>
-        <div className="t-heading" style={{ fontSize: 13, textTransform: 'none', letterSpacing: 0, margin: '0 0 4px 0' }}>{badge.name}</div>
+        <div className="t-heading" style={{ fontSize: 13, textTransform: 'none', letterSpacing: 0, margin: '0 0 4px 0', opacity: earned ? 1 : 0.55 }}>
+          {badge.name}
+        </div>
         <div className="t-body" style={{ fontSize: 11, color: 'var(--off-white-40)' }}>
-          {earned ? (badge.date ? `Earned ${badge.date}` : badge.subtitle) : (remaining != null ? `${remaining} pts remaining · ${badge.subtitle}` : badge.subtitle)}
+          {earned
+            ? (badge.date ? `Earned ${badge.date}` : badge.subtitle)
+            : (remaining != null ? `${remaining} pts to go · ${badge.subtitle}` : badge.subtitle)}
         </div>
         {earned && (
           <a href={linkedInUrl} target="_blank" rel="noreferrer"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 8, padding: '4px 10px', background: '#0A66C2', borderRadius: 3, color: '#fff', fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 700, textDecoration: 'none', letterSpacing: '0.06em' }}>
-            <i className="fa-brands fa-linkedin" />SHARE
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 8,
+                     padding: '4px 10px', background: '#0A66C2', borderRadius: 3,
+                     color: '#fff', fontFamily: 'var(--font-mono)', fontSize: 9,
+                     fontWeight: 700, textDecoration: 'none', letterSpacing: '0.06em' }}>
+            <i className="fa-brands fa-linkedin"/>SHARE
           </a>
         )}
       </div>

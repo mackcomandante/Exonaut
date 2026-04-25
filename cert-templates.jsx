@@ -357,3 +357,426 @@ function TierCertificate({ tierKey, tierData, earned, name, cohort, cohortName, 
 }
 
 Object.assign(window, { TierCertificate });
+
+// ─────────────────────────────────────────────
+// SHARED BADGE HELPERS
+// ─────────────────────────────────────────────
+const BG = '#0E0D1B';
+
+// Pointy-top regular hexagon points string given center + radius
+function hexPoints(cx, cy, r) {
+  return [0,1,2,3,4,5].map(i => {
+    const a = Math.PI / 3 * i - Math.PI / 2;
+    return `${(cx + r * Math.cos(a)).toFixed(1)},${(cy + r * Math.sin(a)).toFixed(1)}`;
+  }).join(' ');
+}
+
+// 8-pointed star points string given center, outer radius, inner radius
+function starPoints(cx, cy, R, r) {
+  return Array.from({ length: 16 }, (_, i) => {
+    const a = Math.PI / 8 * i - Math.PI / 2;
+    const rad = i % 2 === 0 ? R : r;
+    return `${(cx + rad * Math.cos(a)).toFixed(1)},${(cy + rad * Math.sin(a)).toFixed(1)}`;
+  }).join(' ');
+}
+
+// ─────────────────────────────────────────────
+// MILESTONE BADGE  — hexagonal medal
+// ─────────────────────────────────────────────
+function MilestoneBadge({ badge, earned }) {
+  const { code, name, subtitle, color } = badge;
+  const id = code.replace(/[^A-Z0-9]/g, '');
+
+  const ROMAN  = { 'MILBRZ':'I',  'MILSLV':'II', 'MILGLD':'III', 'MILPLT':'IV'  };
+  const METAL  = { 'MILBRZ':'BRONZE','MILSLV':'SILVER','MILGLD':'GOLD','MILPLT':'PLATINUM' };
+  const roman  = ROMAN[id]  || 'I';
+  const metal  = METAL[id]  || '';
+  const isGold = id === 'MILGLD';
+  const isPlt  = id === 'MILPLT';
+
+  // Hex geometry — viewBox 160×195, center (80,82)
+  const CX = 80, CY = 82;
+  const outerHex  = hexPoints(CX, CY, 62);
+  const innerHex  = hexPoints(CX, CY, 52);
+  const microHex  = hexPoints(CX, CY, 44);
+
+  return (
+    <svg viewBox="0 0 160 195" xmlns="http://www.w3.org/2000/svg"
+      style={{ width:'100%', display:'block',
+               filter: earned ? 'none' : 'grayscale(0.9)', opacity: earned ? 1 : 0.45 }}>
+      <defs>
+        <radialGradient id={`mg-${id}`} cx="50%" cy="40%" r="65%">
+          <stop offset="0%" stopColor={color} stopOpacity="0.22"/>
+          <stop offset="100%" stopColor={BG}  stopOpacity="1"/>
+        </radialGradient>
+        <filter id={`gw-${id}`}>
+          <feGaussianBlur stdDeviation="3" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+
+      {/* Background fill */}
+      <polygon points={outerHex} fill={BG}/>
+      <polygon points={outerHex} fill={`url(#mg-${id})`}/>
+
+      {/* Gold: sunrays */}
+      {isGold && [0,1,2,3,4,5,6,7,8,9,10,11].map(i => {
+        const a = Math.PI / 6 * i;
+        return <line key={i}
+          x1={CX} y1={CY}
+          x2={(CX + 70 * Math.cos(a)).toFixed(1)}
+          y2={(CY + 70 * Math.sin(a)).toFixed(1)}
+          stroke={color} strokeWidth="0.6" strokeOpacity="0.12"/>;
+      })}
+
+      {/* Platinum: extra outer glow ring */}
+      {isPlt && <polygon points={hexPoints(CX,CY,68)}
+        fill="none" stroke={color} strokeWidth="0.8" strokeOpacity="0.2" strokeDasharray="4 3"/>}
+
+      {/* Outer hex border */}
+      <polygon points={outerHex}
+        fill="none" stroke={color} strokeWidth="1.8" strokeOpacity="0.7"
+        filter={earned ? `url(#gw-${id})` : undefined}/>
+      {/* Inner hex ring */}
+      <polygon points={innerHex}
+        fill="none" stroke={color} strokeWidth="0.7" strokeOpacity="0.3"/>
+      {/* Silver / Platinum: micro ring */}
+      {(id === 'MILSLV' || isPlt) && (
+        <polygon points={microHex}
+          fill="none" stroke={color} strokeWidth="0.4" strokeOpacity="0.2"/>
+      )}
+
+      {/* Roman numeral */}
+      <text x={CX} y={CY + 12} textAnchor="middle"
+        fontFamily="Montserrat, sans-serif" fontSize="38" fontWeight="900"
+        fill={color} filter={earned ? `url(#gw-${id})` : undefined}>
+        {roman}
+      </text>
+
+      {/* Metal label */}
+      <text x={CX} y={CY + 30} textAnchor="middle"
+        fontFamily="JetBrains Mono, monospace" fontSize="6.5" fontWeight="700"
+        fill={color} fillOpacity="0.55" letterSpacing="3">
+        {metal}
+      </text>
+
+      {/* Dot row ornament */}
+      {[-14, 0, 14].map((dx, i) => (
+        <circle key={i} cx={CX + dx} cy={CY + 44} r="2"
+          fill={color} fillOpacity={i === 1 ? 0.9 : 0.3}/>
+      ))}
+
+      {/* Name */}
+      <text x={CX} y="158" textAnchor="middle"
+        fontFamily="Montserrat, sans-serif" fontSize="10.5" fontWeight="800"
+        fill="rgba(255,255,255,0.88)">
+        {name}
+      </text>
+      {/* Subtitle */}
+      <text x={CX} y="173" textAnchor="middle"
+        fontFamily="JetBrains Mono, monospace" fontSize="7.5"
+        fill="rgba(255,255,255,0.32)" letterSpacing="1">
+        {subtitle.toUpperCase()}
+      </text>
+    </svg>
+  );
+}
+
+// ─────────────────────────────────────────────
+// TRACK BADGE  — circular credential
+// ─────────────────────────────────────────────
+function TrackBadge({ badge, earned }) {
+  const { code, name, subtitle, color } = badge;
+  const id = code.replace(/[^A-Z0-9]/g, '');
+
+  const SYMBOL = {
+    'TRKAIS':'AIS', 'TRKVB':'VB', 'TRKLD':'L&D',
+    'TRKXM':'XM',  'TRKAID':'DEV','TRKPOL':'POL', 'TRKCC':'SMM',
+  };
+  const sym    = SYMBOL[id] || code.replace('TRK-','');
+  const symFs  = sym.length <= 2 ? 30 : sym.length <= 3 ? 24 : 18;
+
+  const CX = 80, CY = 80, R = 62;
+
+  // 12 tick marks around the rim
+  const ticks = Array.from({ length: 12 }, (_, i) => {
+    const a    = Math.PI / 6 * i - Math.PI / 2;
+    const r1   = R - 2, r2 = R + 5;
+    const long = i % 3 === 0;
+    return {
+      x1: (CX + (long ? r1 - 4 : r1) * Math.cos(a)).toFixed(1),
+      y1: (CY + (long ? r1 - 4 : r1) * Math.sin(a)).toFixed(1),
+      x2: (CX + r2 * Math.cos(a)).toFixed(1),
+      y2: (CY + r2 * Math.sin(a)).toFixed(1),
+      long,
+    };
+  });
+
+  return (
+    <svg viewBox="0 0 160 195" xmlns="http://www.w3.org/2000/svg"
+      style={{ width:'100%', display:'block',
+               filter: earned ? 'none' : 'grayscale(0.9)', opacity: earned ? 1 : 0.45 }}>
+      <defs>
+        <radialGradient id={`tg-${id}`} cx="50%" cy="40%" r="65%">
+          <stop offset="0%" stopColor={color} stopOpacity="0.2"/>
+          <stop offset="100%" stopColor={BG}  stopOpacity="1"/>
+        </radialGradient>
+        <filter id={`tw-${id}`}>
+          <feGaussianBlur stdDeviation="3" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+        <clipPath id={`tc-${id}`}>
+          <circle cx={CX} cy={CY} r={R}/>
+        </clipPath>
+      </defs>
+
+      {/* Background */}
+      <circle cx={CX} cy={CY} r={R} fill={BG}/>
+      <circle cx={CX} cy={CY} r={R} fill={`url(#tg-${id})`}/>
+
+      {/* Concentric guide rings */}
+      <circle cx={CX} cy={CY} r={R - 10} fill="none" stroke={color} strokeWidth="0.5" strokeOpacity="0.15"/>
+      <circle cx={CX} cy={CY} r={R - 20} fill="none" stroke={color} strokeWidth="0.4" strokeOpacity="0.1"/>
+
+      {/* Outer ring */}
+      <circle cx={CX} cy={CY} r={R}
+        fill="none" stroke={color} strokeWidth="2" strokeOpacity="0.7"
+        filter={earned ? `url(#tw-${id})` : undefined}/>
+
+      {/* Tick marks */}
+      {ticks.map((t, i) => (
+        <line key={i} x1={t.x1} y1={t.y1} x2={t.x2} y2={t.y2}
+          stroke={color} strokeWidth={t.long ? 1.4 : 0.7}
+          strokeOpacity={t.long ? 0.7 : 0.3}/>
+      ))}
+
+      {/* Track symbol */}
+      <text x={CX} y={CY + symFs * 0.36} textAnchor="middle"
+        fontFamily="Montserrat, sans-serif" fontSize={symFs} fontWeight="900"
+        fill={color} letterSpacing="1"
+        filter={earned ? `url(#tw-${id})` : undefined}>
+        {sym}
+      </text>
+
+      {/* TRACK label */}
+      <text x={CX} y={CY + symFs * 0.36 + 14} textAnchor="middle"
+        fontFamily="JetBrains Mono, monospace" fontSize="6" fontWeight="700"
+        fill={color} fillOpacity="0.45" letterSpacing="3">
+        TRACK
+      </text>
+
+      {/* Name */}
+      <text x={CX} y="158" textAnchor="middle"
+        fontFamily="Montserrat, sans-serif" fontSize="10.5" fontWeight="800"
+        fill="rgba(255,255,255,0.88)">
+        {name}
+      </text>
+      <text x={CX} y="173" textAnchor="middle"
+        fontFamily="JetBrains Mono, monospace" fontSize="7.5"
+        fill="rgba(255,255,255,0.32)" letterSpacing="1">
+        {subtitle.toUpperCase()}
+      </text>
+    </svg>
+  );
+}
+
+// ─────────────────────────────────────────────
+// PILLAR BADGE  — diamond shape
+// ─────────────────────────────────────────────
+function PillarBadge({ badge, earned }) {
+  const { code, name, subtitle, color } = badge;
+  const id = code.replace(/[^A-Z0-9]/g, '');
+
+  const SYMBOL = {
+    'PILCLV':'DLV','PILDLV':'DLV','PILINN':'INN','PILCLT':'CLT','PILTAL':'TAL',
+  };
+  // Column-bar heights for decorative "pillar" graphic inside diamond
+  const BARS = {
+    'PILDLV': [42, 60, 42],  // Delivery — tall center
+    'PILINN': [36, 36, 60],  // Innovation — rising right
+    'PILCLT': [54, 54, 54],  // Client — equal
+    'PILTAL': [60, 42, 30],  // Talent — descending
+  };
+  const bars  = BARS[id] || [44, 60, 44];
+  const sym   = SYMBOL[id] || code.replace('PIL-','');
+
+  const CX = 80, CY = 82;
+  // Diamond: top, right, bottom, left
+  const outerDiamond = `${CX},${CY-64} ${CX+58},${CY} ${CX},${CY+64} ${CX-58},${CY}`;
+  const innerDiamond = `${CX},${CY-54} ${CX+48},${CY} ${CX},${CY+54} ${CX-48},${CY}`;
+
+  return (
+    <svg viewBox="0 0 160 195" xmlns="http://www.w3.org/2000/svg"
+      style={{ width:'100%', display:'block',
+               filter: earned ? 'none' : 'grayscale(0.9)', opacity: earned ? 1 : 0.45 }}>
+      <defs>
+        <radialGradient id={`pg-${id}`} cx="50%" cy="40%" r="65%">
+          <stop offset="0%" stopColor={color} stopOpacity="0.2"/>
+          <stop offset="100%" stopColor={BG}  stopOpacity="1"/>
+        </radialGradient>
+        <filter id={`pw-${id}`}>
+          <feGaussianBlur stdDeviation="2.5" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+        <clipPath id={`pc-${id}`}>
+          <polygon points={outerDiamond}/>
+        </clipPath>
+      </defs>
+
+      {/* Background */}
+      <polygon points={outerDiamond} fill={BG}/>
+      <polygon points={outerDiamond} fill={`url(#pg-${id})`}/>
+
+      {/* Cross-hair guides */}
+      <line x1={CX} y1={CY - 64} x2={CX} y2={CY + 64}
+        stroke={color} strokeWidth="0.4" strokeOpacity="0.1"/>
+      <line x1={CX - 58} y1={CY} x2={CX + 58} y2={CY}
+        stroke={color} strokeWidth="0.4" strokeOpacity="0.1"/>
+
+      {/* Pillar bars (decorative column graphic) */}
+      {bars.map((h, i) => {
+        const bw = 9, gap = 6;
+        const totalW = bars.length * bw + (bars.length - 1) * gap;
+        const x = CX - totalW / 2 + i * (bw + gap);
+        const y = CY + 24 - h;
+        return (
+          <rect key={i} x={x} y={y} width={bw} height={h} rx="1.5"
+            fill={color} fillOpacity={i === 1 ? 0.35 : 0.2}
+            clipPath={`url(#pc-${id})`}/>
+        );
+      })}
+
+      {/* Outer diamond border */}
+      <polygon points={outerDiamond}
+        fill="none" stroke={color} strokeWidth="1.8" strokeOpacity="0.7"
+        filter={earned ? `url(#pw-${id})` : undefined}/>
+      {/* Inner diamond ring */}
+      <polygon points={innerDiamond}
+        fill="none" stroke={color} strokeWidth="0.6" strokeOpacity="0.25"/>
+
+      {/* Badge code */}
+      <text x={CX} y={CY - 8} textAnchor="middle"
+        fontFamily="Montserrat, sans-serif" fontSize="22" fontWeight="900"
+        fill={color} letterSpacing="2"
+        filter={earned ? `url(#pw-${id})` : undefined}>
+        {sym}
+      </text>
+      <text x={CX} y={CY + 8} textAnchor="middle"
+        fontFamily="JetBrains Mono, monospace" fontSize="6" fontWeight="700"
+        fill={color} fillOpacity="0.45" letterSpacing="3">
+        PILLAR
+      </text>
+
+      {/* Name */}
+      <text x={CX} y="162" textAnchor="middle"
+        fontFamily="Montserrat, sans-serif" fontSize="10.5" fontWeight="800"
+        fill="rgba(255,255,255,0.88)">
+        {name}
+      </text>
+      <text x={CX} y="177" textAnchor="middle"
+        fontFamily="JetBrains Mono, monospace" fontSize="7.5"
+        fill="rgba(255,255,255,0.32)" letterSpacing="1">
+        {subtitle.toUpperCase()}
+      </text>
+    </svg>
+  );
+}
+
+// ─────────────────────────────────────────────
+// SPECIAL AWARD BADGE  — 8-point starburst
+// ─────────────────────────────────────────────
+function SpecialBadge({ badge, earned }) {
+  const { code, name, subtitle, color } = badge;
+  const id = code.replace(/[^A-Z0-9]/g, '');
+
+  const SYMBOL = {
+    'SPLTRI':'TRI','SPLMVP':'MVP','SPLIOW':'IOW',
+    'SPLDIS':'DIS','SPLCLT':'CLT','SPLFVL':'FCL',
+    'SPLFUL':'FCL','SPLPIP':'PIP',
+  };
+  const sym   = SYMBOL[id] || code.replace('SPL-','');
+  const symFs = sym.length <= 2 ? 28 : sym.length <= 3 ? 22 : 16;
+
+  const CX = 80, CY = 80;
+  const star  = starPoints(CX, CY, 62, 28);
+  const star2 = starPoints(CX, CY, 54, 24); // inner echo
+
+  return (
+    <svg viewBox="0 0 160 195" xmlns="http://www.w3.org/2000/svg"
+      style={{ width:'100%', display:'block',
+               filter: earned ? 'none' : 'grayscale(0.9)', opacity: earned ? 1 : 0.45 }}>
+      <defs>
+        <radialGradient id={`sg-${id}`} cx="50%" cy="40%" r="65%">
+          <stop offset="0%" stopColor={color} stopOpacity="0.22"/>
+          <stop offset="100%" stopColor={BG}  stopOpacity="1"/>
+        </radialGradient>
+        <filter id={`sw-${id}`}>
+          <feGaussianBlur stdDeviation="3" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+        <clipPath id={`sc-${id}`}>
+          <polygon points={star}/>
+        </clipPath>
+      </defs>
+
+      {/* Background */}
+      <polygon points={star} fill={BG}/>
+      <polygon points={star} fill={`url(#sg-${id})`}/>
+
+      {/* Inner echo star */}
+      <polygon points={star2}
+        fill="none" stroke={color} strokeWidth="0.5" strokeOpacity="0.2"/>
+
+      {/* Outer starburst */}
+      <polygon points={star}
+        fill="none" stroke={color} strokeWidth="1.8" strokeOpacity="0.7"
+        filter={earned ? `url(#sw-${id})` : undefined}/>
+
+      {/* Central circle */}
+      <circle cx={CX} cy={CY} r="26"
+        fill="none" stroke={color} strokeWidth="0.6" strokeOpacity="0.25"/>
+
+      {/* Award symbol */}
+      <text x={CX} y={CY + symFs * 0.36} textAnchor="middle"
+        fontFamily="Montserrat, sans-serif" fontSize={symFs} fontWeight="900"
+        fill={color} letterSpacing="1.5"
+        filter={earned ? `url(#sw-${id})` : undefined}>
+        {sym}
+      </text>
+
+      {/* AWARD label */}
+      <text x={CX} y={CY + symFs * 0.36 + 14} textAnchor="middle"
+        fontFamily="JetBrains Mono, monospace" fontSize="6" fontWeight="700"
+        fill={color} fillOpacity="0.45" letterSpacing="3">
+        AWARD
+      </text>
+
+      {/* Name */}
+      <text x={CX} y="158" textAnchor="middle"
+        fontFamily="Montserrat, sans-serif" fontSize="10.5" fontWeight="800"
+        fill="rgba(255,255,255,0.88)">
+        {name}
+      </text>
+      <text x={CX} y="173" textAnchor="middle"
+        fontFamily="JetBrains Mono, monospace" fontSize="7.5"
+        fill="rgba(255,255,255,0.32)" letterSpacing="1">
+        {subtitle.toUpperCase()}
+      </text>
+    </svg>
+  );
+}
+
+// ─────────────────────────────────────────────
+// BADGE SVG DISPATCHER
+// ─────────────────────────────────────────────
+function BadgeSVG({ badge, earned }) {
+  if (!badge) return null;
+  const cat = badge.category;
+  if (cat === 'milestone') return <MilestoneBadge badge={badge} earned={earned}/>;
+  if (cat === 'track')     return <TrackBadge     badge={badge} earned={earned}/>;
+  if (cat === 'pillar')    return <PillarBadge    badge={badge} earned={earned}/>;
+  if (cat === 'special')   return <SpecialBadge   badge={badge} earned={earned}/>;
+  return null;
+}
+
+Object.assign(window, { TierCertificate, BadgeSVG });
