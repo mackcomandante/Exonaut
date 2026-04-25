@@ -103,29 +103,38 @@ function PillarGrid() {
   );
 }
 
+function weekDateRange(weekNum) {
+  const start = new Date('2026-10-06');
+  const ws = new Date(start); ws.setDate(start.getDate() + (weekNum - 1) * 7);
+  const we = new Date(ws); we.setDate(ws.getDate() + 6);
+  const fmt = d => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toUpperCase();
+  return `${fmt(ws)} — ${fmt(we)}`;
+}
+
 function RitualTracker() {
+  const userId = ME_ID;
+  const weekNum = COHORT.week;
+  const { weekData, refresh } = window.useRituals ? window.useRituals(userId, weekNum) : { weekData: {}, refresh: () => {} };
+
   return (
     <div style={{ marginBottom: 32 }}>
       <div className="section-head">
         <h2>Weekly Ritual Tracker</h2>
-        <span className="section-meta">WEEK {COHORT.week} · OCT 19 — OCT 25</span>
+        <span className="section-meta">WEEK {weekNum} · {weekNum > 0 ? weekDateRange(weekNum) : 'COHORT NOT STARTED'}</span>
       </div>
       <div className="ritual-row">
         {RITUALS.map(r => {
-          const iconCls =
-            r.state === 'done' ? 'fa-circle-check' :
-            r.state === 'missed' ? 'fa-circle-xmark' :
-            'fa-circle-dot';
-          const cCls = r.state === 'done' ? 'done-c' : r.state === 'missed' ? 'miss-c' : 'pend-c';
+          const state = weekData[r.id]?.state || 'not-started';
+          const iconCls = state === 'confirmed' ? 'fa-circle-check' : state === 'submitted' ? 'fa-circle-half-stroke' : 'fa-circle-dot';
+          const cCls = state === 'confirmed' ? 'done-c' : state === 'submitted' ? 'done-c' : 'pend-c';
+          const label = state === 'confirmed' ? 'CONFIRMED' : state === 'submitted' ? 'SUBMITTED' : 'PENDING';
           return (
-            <div key={r.id} className={'ritual-cell ' + r.state}>
+            <div key={r.id} className={'ritual-cell ' + (state === 'not-started' ? 'not-started' : 'done')}>
               <div className="ritual-head">
                 <div className="ritual-name">{r.name}</div>
                 <i className={'fa-solid ' + iconCls + ' ritual-icon ' + cCls} />
               </div>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--off-white-40)', letterSpacing: '0.05em' }}>
-                {r.state === 'done' ? 'LOGGED' : r.state === 'missed' ? 'MISSED' : 'PENDING'}
-              </div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--off-white-40)', letterSpacing: '0.05em' }}>{label}</div>
               <div className="ritual-points">+{r.points} PTS</div>
             </div>
           );

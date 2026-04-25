@@ -81,11 +81,9 @@ const ME_ID = localStorage.getItem('exo:userId') || null;
 const MISSIONS = [];
 
 const RITUALS = [
-  { id: 'mon-ign',  name: 'Monday Ignition', points: 5,  state: 'not-started' },
-  { id: 'mid-pls',  name: 'Mid-Week Pulse',  points: 3,  state: 'not-started' },
-  { id: 'fri-win',  name: 'Friday Win Wall', points: 5,  state: 'not-started' },
-  { id: 'iotw',     name: 'Intern of Week',  points: 25, state: 'not-started' },
-  { id: 'teach-bk', name: 'Teach-Back',      points: 15, state: 'not-started' },
+  { id: 'mon-ign', name: 'Monday Ignition', points: 5,  hashtag: '#MondayIgnition' },
+  { id: 'mid-pls', name: 'Mid-Week Pulse',  points: 3,  hashtag: '#MidWeekPulse'   },
+  { id: 'fri-win', name: 'Friday Win Wall', points: 5,  hashtag: '#FridayWin'       },
 ];
 
 const BADGES = [

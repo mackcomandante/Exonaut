@@ -363,10 +363,88 @@ function KudosFeed({ onGive }) {
   );
 }
 
-// ========== RITUALS HISTORY ==========
+// ========== RITUALS ==========
+function ritualWeekRange(weekNum) {
+  const start = new Date('2026-10-06');
+  const ws = new Date(start); ws.setDate(start.getDate() + (weekNum - 1) * 7);
+  const we = new Date(ws); we.setDate(ws.getDate() + 6);
+  const fmt = d => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toUpperCase();
+  return `${fmt(ws)} — ${fmt(we)}`;
+}
+
+function RitualComposer({ ritual, weekNum, onClose, onDone }) {
+  const [body, setBody] = React.useState('');
+  const [submitting, setSubmitting] = React.useState(false);
+
+  function handlePost() {
+    const trimmed = body.trim();
+    if (!trimmed) return;
+    setSubmitting(true);
+    const fullBody = trimmed + '\n\n' + ritual.hashtag;
+    const title = `${ritual.name} · Week ${weekNum}`;
+    let postId = null;
+    if (window.__boardStore) {
+      const thread = window.__boardStore.createThread({
+        title,
+        body: fullBody,
+        channel: 'general',
+        authorId: ME_ID,
+        authorName: ME.name,
+      });
+      postId = thread?.id || null;
+    }
+    if (window.__ritualStore) {
+      window.__ritualStore.submit(ME_ID, ritual.id, weekNum, postId);
+    }
+    onDone();
+  }
+
+  return (
+    <div className="modal-scrim" onClick={onClose} style={{ alignItems: 'center' }}>
+      <div className="modal-body" onClick={e => e.stopPropagation()} style={{ maxWidth: 520 }}>
+        <div className="modal-header">
+          <div>
+            <div className="t-label" style={{ marginBottom: 4 }}>RITUAL POST · {ritual.hashtag}</div>
+            <div className="t-heading" style={{ fontSize: 20, textTransform: 'none', letterSpacing: 0, margin: 0 }}>{ritual.name}</div>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--off-white-68)', fontSize: 18 }}>
+            <i className="fa-solid fa-xmark" />
+          </button>
+        </div>
+        <div className="t-body" style={{ color: 'var(--off-white-68)', marginBottom: 16, fontSize: 13 }}>
+          Share your update. This will post to Message Board — General with {ritual.hashtag}. Points awarded once your Mission Lead confirms.
+        </div>
+        <textarea
+          autoFocus
+          rows={5}
+          value={body}
+          onChange={e => setBody(e.target.value)}
+          placeholder={`What's your ${ritual.name} update this week?`}
+          style={{ width: '100%', background: 'var(--bg-dark)', border: '1px solid var(--off-white-15)', borderRadius: 4, padding: '12px 14px', color: 'var(--off-white)', fontFamily: 'var(--font-body)', fontSize: 14, resize: 'vertical', boxSizing: 'border-box' }}
+        />
+        <div style={{ display: 'flex', gap: 10, marginTop: 14, justifyContent: 'flex-end' }}>
+          <button className="btn btn-ghost" onClick={onClose}>CANCEL</button>
+          <button className="btn btn-primary" onClick={handlePost} disabled={!body.trim() || submitting}>
+            <i className="fa-solid fa-paper-plane" style={{ marginRight: 6 }} />POST {ritual.hashtag}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function RitualsPage() {
-  const weeks = Array.from({ length: COHORT.week }, (_, i) => i + 1);
-  const statuses = ['done','done','pending','missed','pending'];
+  const userId = ME_ID;
+  const weekNum = COHORT.week;
+  const [composing, setComposing] = React.useState(null);
+  const { weekData, refresh } = window.useRituals ? window.useRituals(userId, weekNum) : { weekData: {}, refresh: () => {} };
+  const allHistory = window.__ritualStore ? window.__ritualStore.getAll(userId) : {};
+  const pastWeeks = Object.keys(allHistory).map(Number).filter(w => w < weekNum).sort((a, b) => b - a);
+
+  function handleDone() {
+    setComposing(null);
+    refresh();
+  }
 
   return (
     <div className="enter">
@@ -375,43 +453,96 @@ function RitualsPage() {
           <div className="t-label" style={{ marginBottom: 8 }}>WEEKLY CADENCE</div>
           <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>Rituals</h1>
         </div>
-        <div className="t-mono" style={{ fontSize: 11, color: 'var(--off-white-40)' }}>WEEK {COHORT.week}/{COHORT.weekTotal}</div>
+        <div className="t-mono" style={{ fontSize: 11, color: 'var(--off-white-40)' }}>WEEK {weekNum}/{COHORT.weekTotal}</div>
       </div>
 
-      <div style={{ marginBottom: 28 }}>
-        <div className="section-head" style={{ marginBottom: 14 }}>
-          <h2 style={{ fontSize: 16 }}>This Week</h2>
-          <span className="section-meta">OCT 19 — OCT 25</span>
+      {weekNum === 0 ? (
+        <div className="card-panel" style={{ textAlign: 'center', padding: 48 }}>
+          <i className="fa-solid fa-calendar-days" style={{ fontSize: 28, color: 'var(--off-white-40)', marginBottom: 12 }} />
+          <div className="t-body" style={{ color: 'var(--off-white-68)' }}>Cohort starts OCT 06 2026. Rituals will unlock then.</div>
         </div>
-        <div className="ritual-row">
-          {RITUALS.map(r => {
-            const iconCls = r.state === 'done' ? 'fa-circle-check' : r.state === 'missed' ? 'fa-circle-xmark' : 'fa-circle-dot';
-            const cCls = r.state === 'done' ? 'done-c' : r.state === 'missed' ? 'miss-c' : 'pend-c';
+      ) : (
+        <>
+          <div style={{ marginBottom: 28 }}>
+            <div className="section-head" style={{ marginBottom: 14 }}>
+              <h2 style={{ fontSize: 16 }}>This Week</h2>
+              <span className="section-meta">{ritualWeekRange(weekNum)}</span>
+            </div>
+            <div className="ritual-row">
+              {RITUALS.map(r => {
+                const state = weekData[r.id]?.state || 'not-started';
+                const isDone = state === 'confirmed';
+                const isSubmitted = state === 'submitted';
+                const iconCls = isDone ? 'fa-circle-check' : isSubmitted ? 'fa-circle-half-stroke' : 'fa-circle-dot';
+                const cCls = (isDone || isSubmitted) ? 'done-c' : 'pend-c';
+                return (
+                  <div key={r.id} className={'ritual-cell ' + (isDone || isSubmitted ? 'done' : 'not-started')}
+                    style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div className="ritual-head">
+                      <div className="ritual-name">{r.name}</div>
+                      <i className={'fa-solid ' + iconCls + ' ritual-icon ' + cCls} />
+                    </div>
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--off-white-40)', letterSpacing: '0.05em' }}>
+                      {isDone ? 'CONFIRMED' : isSubmitted ? 'SUBMITTED · PENDING LEAD' : 'PENDING'}
+                    </div>
+                    <div className="ritual-points">+{r.points} PTS</div>
+                    {!isDone && !isSubmitted && (
+                      <button className="btn btn-primary btn-sm" style={{ marginTop: 4, fontSize: 11 }} onClick={() => setComposing(r)}>
+                        <i className="fa-solid fa-pen-to-square" style={{ marginRight: 5 }} />POST
+                      </button>
+                    )}
+                    {isSubmitted && (
+                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--ink)', letterSpacing: '0.05em', marginTop: 4 }}>
+                        <i className="fa-solid fa-check" style={{ marginRight: 4 }} />POSTED TO BOARD
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="section-head" style={{ marginBottom: 14 }}>
+            <h2 style={{ fontSize: 16 }}>Ritual History · All Weeks</h2>
+            <span className="section-meta">TRACKED FROM WEEK 1</span>
+          </div>
+
+          {pastWeeks.length === 0 ? (
+            <div className="card-panel" style={{ textAlign: 'center', padding: 40 }}>
+              <i className="fa-solid fa-clock-rotate-left" style={{ fontSize: 24, color: 'var(--off-white-40)', marginBottom: 12 }} />
+              <div className="t-body" style={{ color: 'var(--off-white-68)' }}>No ritual history yet. Completed weeks will appear here.</div>
+            </div>
+          ) : pastWeeks.map(w => {
+            const wData = allHistory[w] || {};
             return (
-              <div key={r.id} className={'ritual-cell ' + r.state}>
-                <div className="ritual-head">
-                  <div className="ritual-name">{r.name}</div>
-                  <i className={'fa-solid ' + iconCls + ' ritual-icon ' + cCls} />
+              <div key={w} className="card-panel" style={{ marginBottom: 10, padding: '16px 22px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <div className="t-mono" style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em' }}>WEEK {w}</div>
+                  <div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)' }}>{ritualWeekRange(w)}</div>
                 </div>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--off-white-40)' }}>
-                  {r.state === 'done' ? 'LOGGED' : r.state === 'missed' ? 'MISSED' : 'PENDING'}
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                  {RITUALS.map(r => {
+                    const st = wData[r.id]?.state || 'not-started';
+                    const color = st === 'confirmed' ? 'var(--ink)' : st === 'submitted' ? 'var(--amber)' : 'var(--off-white-40)';
+                    const icon = st === 'confirmed' ? 'fa-circle-check' : st === 'submitted' ? 'fa-circle-half-stroke' : 'fa-circle-xmark';
+                    return (
+                      <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--off-white-68)' }}>
+                        <i className={'fa-solid ' + icon} style={{ color, fontSize: 13 }} />
+                        {r.name}
+                        {st !== 'not-started' && <span style={{ color, fontSize: 10 }}>· {st.toUpperCase()}</span>}
+                      </div>
+                    );
+                  })}
                 </div>
-                <div className="ritual-points">+{r.points} PTS</div>
               </div>
             );
           })}
-        </div>
-      </div>
+        </>
+      )}
 
-      <div className="section-head" style={{ marginBottom: 14 }}>
-        <h2 style={{ fontSize: 16 }}>Ritual History · All Weeks</h2>
-        <span className="section-meta">TRACKED FROM WEEK 1</span>
-      </div>
-
-      <div className="card-panel" style={{ textAlign: 'center', padding: 40 }}>
-        <i className="fa-solid fa-clock-rotate-left" style={{ fontSize: 24, color: 'var(--off-white-40)', marginBottom: 12 }} />
-        <div className="t-body" style={{ color: 'var(--off-white-68)' }}>No ritual history yet. Completed weeks will appear here.</div>
-      </div>
+      {composing && (
+        <RitualComposer ritual={composing} weekNum={weekNum} onClose={() => setComposing(null)} onDone={handleDone} />
+      )}
     </div>
   );
 }
