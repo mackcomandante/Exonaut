@@ -1,0 +1,1608 @@
+
+
+EXOASIA INNOVATION HUB
+
+Exonaut Program Platform
+
+Product Requirements &amp; Design Brief
+
+────────────────────────────────────────────────────────────
+
+This document contains everything needed to design and build the Exonaut Program Platform — the gamified internship management system for Exoasia Innovation Hub. Read this fully before beginning any design or development work.
+
+Prepared by Mack Comandante  ·  Founder &amp; CEO, Exoasia Innovation Hub  ·  Batch 2026–2027
+
+
+
+1. Executive Summary
+
+The Exonaut Program Platform is a full-stack web application that manages, gamifies, and celebrates the Exoasia Innovation Hub internship experience. It is the digital home of every Exonaut — from the moment they accept their offer through their entire post-program alumni journey.
+
+The platform replaces spreadsheets, manual tracking, and fragmented group chats with a single, beautifully designed system that makes excellence visible, competition healthy, and culture contagious.
+
+
+
+The platform serves three primary audiences:
+
+
+Exonauts (Active Interns) — track their missions, points, badges, rank, and cohort standing in real time
+
+
+Mission Leads &amp; Admins — manage cohorts, assign missions, award badges, post announcements, and generate reports
+
+
+Alumni (Exonaut Corps) — maintain lifelong access to their profile, badges, and alumni network
+
+
+
+The system is built around three pillars that every Exonaut must fulfill:
+
+
+Pillar 1 — Project: Quality and completion of track deliverables and missions
+
+
+Pillar 2 — Client: Relationship management and satisfaction score from their assigned client
+
+
+Pillar 3 — Recruitment: Successfully identifying and referring the next Exonaut
+
+
+
+The platform must be production-ready, mobile-responsive, deployable as a web app (ideally React + Node.js or a modern full-stack framework), and designed in Exoasia&apos;s brand colors.
+
+────────────────────────────────────────────────────────────
+
+
+2. Brand &amp; Design System
+
+All UI must strictly follow the Exoasia brand. There are no exceptions. Submit mockups for review before building.
+
+
+
+
+2.1  Color Palette
+Role
+Name
+Hex Code
+Primary Background
+Deep Purple
+#2D0A28
+Secondary Background
+Maroon
+#4A1040
+Tertiary Background
+Dark BG
+#1A0516
+Deepest Background
+Darkest BG
+#220820
+Footer / Darkest
+Footer BG
+#0E0410
+Primary Accent
+Lime
+#C9E500
+Secondary Accent
+Purple
+#7B3FA0
+Tertiary Accent
+Lavender
+#B095C5
+Body Text (on dark)
+Off-White
+#F5F0F8
+Gold (trophy/elite)
+Gold
+#C9A000
+Bronze tier
+Bronze
+#CD7F32
+Silver tier
+Silver
+#A8B4BE
+Platinum tier
+Platinum
+#8BE8FF
+Success
+Green
+#22C55E
+Error
+Red
+#EF4444
+Warning
+Amber
+#F59E0B
+
+
+
+
+2.2  Typography
+Element
+Specification
+Page / Section Title
+Montserrat Black 900 · 36–64px · Uppercase · Off-White
+Card / Panel Heading
+Montserrat Bold 700 · 18–28px · Uppercase · Off-White
+Labels &amp; Tags
+Montserrat Bold 700 · 10–12px · Uppercase · Letter spacing 0.15em · Lime
+Body Copy
+EB Garamond Regular · 16–18px · Off-White 68% opacity
+Numbers / IDs / Code
+JetBrains Mono 400/700 · Used for points, badge IDs, tier codes
+Button Text
+Montserrat ExtraBold 800 · 12px · Uppercase · Letter spacing 0.12em
+Nav Links
+Montserrat Bold 700 · 11px · Uppercase · Letter spacing 0.10em
+Micro Labels
+Montserrat Bold 700 · 9–10px · All caps · Muted / Lime
+
+
+
+
+2.3  Component Standards
+
+
+Buttons: Primary = Lime bg + Deep Purple text. Ghost = Transparent + 1px Off-White border. Danger = Red border. Radius = 2px. Font = Montserrat ExtraBold 800. Always uppercase.
+
+
+Cards: Background #3A1035 (default) or #3E1438 (hover). Border: 1px rgba(201,229,0,0.15). Radius = 6px. Shadow on hover only.
+
+
+Inputs: Background #1A0516. Border: 1px rgba(245,240,248,0.15). Focus: 1px Lime border. Radius = 4px. Font: Montserrat. Text: Off-White.
+
+
+Icons: Font Awesome 6.5+ via CDN (cdnjs). Always use FA icons — no emoji in UI components.
+
+
+Borders: Hairline dividers at rgba(245,240,248,0.07). Accent borders at rgba(201,229,0,0.25).
+
+
+Spacing: Base unit 8px. Component padding: 16–32px. Section padding: clamp(3rem, 6vw, 5rem).
+
+
+Shadows: 0 8px 32px rgba(45,10,40,0.4) on elevated cards. Lime glow on primary CTAs: 0 0 24px rgba(201,229,0,0.22).
+
+
+Animations: Entrance: translateY(20px) → 0 + opacity 0→1, 0.6s cubic-bezier(.22,1,.36,1). Hover transitions: 200–300ms ease. No jarring or bouncing.
+
+────────────────────────────────────────────────────────────
+
+
+3. User Roles &amp; Permissions
+Role
+Who
+Access Level
+Super Admin
+Mack Comandante
+Full platform access. Can do everything.
+Admin
+Program Directors, Exoasia Staff
+Manage cohorts, missions, badges, users, reports. Cannot delete admins.
+Mission Lead
+Track mentors, senior staff
+Manage their track&apos;s missions, grade submissions, award kudos, view their cohort&apos;s leaderboard.
+Exonaut (Active)
+Current batch interns
+View own dashboard, submit missions, give kudos, view leaderboard, manage profile.
+Exonaut Corps (Alumni)
+Graduates
+Read-only access to their own historic profile, badges, and alumni directory. Can participate in alumni events.
+Guest / Recruiter
+Prospective interns, partners
+View public leaderboard and public Exonaut profiles (if enabled). Cannot log in.
+
+
+
+Role assignment is done by Admin at account creation or when upgrading an Exonaut to Alumni status after Launch Day.
+
+────────────────────────────────────────────────────────────
+
+
+4. Authentication &amp; Onboarding
+
+
+4.1  Login Screen
+
+The login screen is the first thing every Exonaut sees. It must feel premium and on-brand.
+
+
+
+REQUIRED ELEMENTS
+
+
+Exoasia logo (Exoasia wordmark in Lime) centered at top
+
+
+Page title: &apos;Exonaut Portal&apos; in Montserrat 900
+
+
+Tagline below title: &apos;We don&apos;t wait for the map. We build it.&apos; — italic, Lavender
+
+
+Email input field
+
+
+Password input field with show/hide toggle
+
+
+&apos;Sign In&apos; primary button (Lime)
+
+
+&apos;Forgot Password?&apos; ghost link below button
+
+
+Footer: &apos;Exoasia Innovation Hub · Cohort 2026–2027&apos;
+
+
+Full-page background: Deep Purple #2D0A28 with subtle grid pattern (same as landing page)
+
+
+
+
+4.2  Authentication Method
+
+
+Email + password authentication (primary)
+
+
+Google OAuth (optional, as secondary method)
+
+
+Admin creates user accounts manually and sends invite emails with a one-time setup link
+
+
+Exonauts set their own password on first login via the invite link
+
+
+Password reset via email link (standard flow)
+
+
+Session tokens: JWT. Refresh token: 30 days. Access token: 1 hour.
+
+
+
+
+4.3  First Login Onboarding Flow
+
+When an Exonaut logs in for the first time, they are guided through a 4-step onboarding wizard before reaching their dashboard.
+
+
+
+
+Step 1 — Welcome Screen: Displays their name, cohort, and track. Shows the Exonaut Pledge text. They must click &apos;I Accept the Pledge&apos; to proceed.
+
+
+Step 2 — Profile Setup: Upload profile photo, write a 1-sentence bio, confirm their assigned track and client. All required.
+
+
+Step 3 — Platform Tour: Brief 5-slide walkthrough of the dashboard, leaderboard, badge system, and mission tracker. Can be skipped but not before Step 2.
+
+
+Step 4 — LinkedIn Prompt: Shows the LinkedIn announcement template pre-filled with their name and track. One-click copy button. Checkbox: &apos;I have posted my LinkedIn announcement&apos;. Required to unlock the full dashboard.
+
+────────────────────────────────────────────────────────────
+
+
+5. Exonaut Dashboard
+
+The dashboard is the home screen every Exonaut sees after login. It is personal, data-driven, and motivating. It must answer: Where am I? How am I doing? What do I need to do next?
+
+
+
+
+5.1  Dashboard Layout
+
+The dashboard uses a fixed left sidebar for navigation and a main content area. The layout is consistent across all pages.
+
+
+
+LEFT SIDEBAR (COLLAPSED ON MOBILE → HAMBURGER)
+
+
+Exoasia logo / wordmark at top
+
+
+User avatar + name + tier badge
+
+
+Navigation links: Dashboard · Missions · Leaderboard · Badges · Profile · Alumni (if Corps) · Admin (if Admin)
+
+
+Bottom: Notifications bell · Settings · Logout
+
+
+
+MAIN CONTENT AREA — DASHBOARD HOME
+
+Organized in sections from top to bottom:
+
+
+
+
+Section A — Hero Stat Bar (top of page, full width)
+
+A horizontal bar of 5 stat cards:
+
+
+Total Points (large number, Lime, JetBrains Mono)
+
+
+Current Rank (#X of Y, with up/down arrow vs last week)
+
+
+Current Tier (tier name + color-coded badge icon)
+
+
+Missions Completed (X of Y assigned)
+
+
+Badges Earned (count with badge icon preview of latest)
+
+
+
+
+Section B — Pillar Progress (3-column grid)
+
+One card per pillar showing:
+
+
+Pillar 1 — Project: Points earned / max possible. List of 3 most recent mission submissions with status (Pending / Approved / Needs Revision)
+
+
+Pillar 2 — Client: Client satisfaction score (star rating, 1–5). Client name. Last touchpoint date. Action needed badge if response overdue.
+
+
+Pillar 3 — Recruitment: Recruit pipeline status. 0 / 1 / 2+ candidates submitted. CTA: &apos;Add a Recruit&apos; if pipeline empty.
+
+
+
+
+Section C — Weekly Ritual Tracker
+
+A horizontal row of 5 ritual completion status indicators for the current week:
+
+
+Monday Ignition — attended? (Checkmark / X)
+
+
+Mid-Week Pulse — posted? (Checkmark / X)
+
+
+Friday Win Wall — posted? (Checkmark / X)
+
+
+Intern of the Week — won? (Star icon if yes, dash if no)
+
+
+Teach-Back — assigned this week? Completed? (Status badge)
+
+Each ritual has a small CTA if not yet completed for the current week.
+
+
+
+
+Section D — Mission Feed (right 2/3 of screen)
+
+Card-based feed of assigned missions sorted by due date. Each card shows:
+
+
+Mission title · Track label · Due date (red if overdue)
+
+
+Status badge: Not Started / In Progress / Submitted / Approved / Needs Revision
+
+
+Points value
+
+
+Action button: &apos;Start&apos; / &apos;Continue&apos; / &apos;View Feedback&apos;
+
+
+
+
+Section E — Recent Activity Feed (left 1/3)
+
+Chronological activity log:
+
+
+Kudos received (from whom, for what)
+
+
+Badge earned
+
+
+Points awarded
+
+
+Rank change
+
+
+Announcement from Admin
+
+
+
+
+Section F — Leaderboard Snapshot (bottom)
+
+A compact 5-row preview of the cohort leaderboard showing top 3 + the current user&apos;s row (highlighted) + the user immediately above them. &apos;View Full Leaderboard&apos; CTA.
+
+────────────────────────────────────────────────────────────
+
+
+6. Exonaut Profile
+
+Every Exonaut has a public-facing profile card and a private profile settings page.
+
+
+
+
+6.1  Profile Card (Public View)
+
+PROFILE HEADER
+
+
+Large circular profile photo with tier-color border ring (e.g., Lime for Entry, Bronze for Builder, etc.)
+
+
+Full name (Montserrat 900, large)
+
+
+Tier badge (icon + tier name + color, e.g., ⭐ Exonaut Prime)
+
+
+Track label (e.g., &apos;AI Strategy &amp; Advisory&apos;)
+
+
+Cohort label (e.g., &apos;Batch 2026–2027&apos;)
+
+
+School and degree
+
+
+1-sentence bio
+
+
+LinkedIn URL (icon link)
+
+
+
+STATS ROW (BELOW HEADER)
+
+
+Total Points  ·  Rank in Cohort  ·  Badges Earned  ·  Missions Completed  ·  Recruits Placed
+
+
+
+BADGES DISPLAY
+
+A grid of all earned badge icons. Unearned badges shown as locked/greyed out silhouettes. Hover/tap on any badge shows the badge name, description, and date earned.
+
+
+
+MISSION HISTORY
+
+A timeline of completed missions with track label, mission name, grade, and date submitted.
+
+
+
+PILLAR SUMMARY
+
+Three pillar progress bars (Project / Client / Recruitment) showing points earned vs maximum possible.
+
+
+
+
+6.2  Profile Settings (Private)
+
+
+Edit profile photo
+
+
+Edit bio (max 160 characters)
+
+
+Edit LinkedIn URL
+
+
+Edit school and degree
+
+
+Change password
+
+
+Notification preferences (email, in-app)
+
+
+Privacy settings: Make profile public / Cohort-only / Private
+
+────────────────────────────────────────────────────────────
+
+
+7. Points System
+
+Points are the currency of the platform. Every meaningful action earns points. Points determine rank, tier, and badge eligibility.
+
+
+
+
+7.1  Points Table
+Action
+Points
+Notes
+Mission submitted on time (Pillar 1)
++10 to +50
+Varies by mission weight, set by Admin
+Mission approved — Good
++10 bonus
+Added on top of submission points
+Mission approved — Excellent
++20 bonus
+Added on top of submission points
+Mission revised and resubmitted
++5
+For showing commitment after feedback
+Client touchpoint logged
++15
+Per verified touchpoint
+Client satisfaction score 4★
++20
+Awarded by Mission Lead
+Client satisfaction score 5★
++35
+Awarded by Mission Lead
+Client deliverable accepted
++25
+Per accepted client deliverable
+Recruit candidate submitted
++30
+Name + contact info submitted
+Recruit passes interview
++50
+Candidate accepts offer
+Recruit completes Batch 1 month
++25
+Retention bonus — your recruit stays
+Teach-Back session conducted
++15
+Verified by Mission Lead
+Attend Monday Ignition
++5
+Per session (max 12)
+Post Friday Win Wall
++5
+Per week (max 12)
+Post Mid-Week Pulse
++3
+Per week (max 12)
+Give peer kudos
++2
+Per kudos given (max 3/week)
+Receive peer kudos
++3
+Per kudos received (uncapped)
+Intern of the Week — winner
++25
+Weekly award
+Midpoint Fire Check — completed
++10
+Flat attendance bonus
+Pledge signed (Day 1)
++50
+One-time onboarding bonus
+LinkedIn post published
++20
+Verified by screenshot or tag
+Demo Day presentation delivered
++50
+One-time, all Exonauts who present
+Perfect Pillar — max Project score
++100
+One-time, end of program
+Perfect Pillar — max Client score
++100
+One-time, end of program
+Perfect Pillar — max Recruit score
++100
+One-time, end of program
+
+
+
+Points deductions are not used. Poor performance results in missed opportunities for bonus points — not penalties.
+
+
+
+
+7.2  Pillar Weights
+
+For Tier and special award calculations, pillar scores are weighted:
+
+
+Pillar 1 — Project: 40% of total pillar score
+
+
+Pillar 2 — Client: 35% of total pillar score
+
+
+Pillar 3 — Recruitment: 25% of total pillar score
+
+Raw total points (unweighted) determine the leaderboard rank. Weighted pillar scores determine tier upgrades and special badge eligibility.
+
+────────────────────────────────────────────────────────────
+
+
+8. Tier &amp; Rank System
+
+
+8.1  Tier Definitions
+Tier
+Points Required
+Visual Identity
+Exonaut (Entry)
+0+
+Lime #C9E500 border · White background icon
+Exonaut Builder
+100+
+Bronze #CD7F32 border · Bronze icon
+Exonaut Prime
+300+
+Silver #A8B4BE border · Silver icon
+Exonaut Elite
+600+
+Gold #C9A000 border · Gold icon
+Exonaut Apex
+900+
+Platinum #8BE8FF border · Platinum icon with glow
+Exonaut Corps (Alumni)
+Program completion
+Lavender #B095C5 border · Permanent status
+
+
+
+Tier upgrades are automatic and immediate once the point threshold is crossed. A notification is sent and a Tier Upgrade celebration animation plays on the Exonaut&apos;s dashboard.
+
+
+
+Tier downgrades do not occur during a program. Once a tier is achieved it is kept for the remainder of the cohort.
+
+
+
+
+8.2  Rank
+
+Rank is the Exonaut&apos;s position on the cohort leaderboard, sorted by total raw points. Rank is real-time and updates every time points are added.
+
+
+Rank is displayed as &apos;#1 of 30&apos; format
+
+
+The change vs last week is shown as ↑3 (green) or ↓2 (red)
+
+
+The top 3 ranks are displayed with gold/silver/bronze crown icons
+
+
+All 30 positions are visible on the full leaderboard
+
+────────────────────────────────────────────────────────────
+
+
+9. Badge System
+
+Badges are the most emotionally resonant part of the platform. They are digital certificates of achievement that live on every Exonaut&apos;s profile forever.
+
+
+
+
+9.1  Badge Categories
+Category
+Description
+Milestone Tiers (4)
+Awarded when an Exonaut crosses a point threshold: Bronze Builder, Silver Strategist, Gold Innovator, Platinum Disruptor
+Track Completion (7)
+Awarded when the Exonaut completes all missions within their assigned track: AI Strategist, Venture Builder, L&amp;D Champion, Experience Maker, AI Dev Builder, Policy Analyst, Content Creator
+Pillar Badges (4)
+Awarded for achieving maximum score on a pillar: Delivery Machine (Project), Innovation Catalyst (Project), Client Champion (Client), Talent Scout (Recruitment)
+Special Awards (7)
+Program-end awards: Perfect Trifecta, Track MVP, Intern of the Week, Most Likely to Disrupt, Culture Carrier, Full Cycle, Pipeline Builder
+
+
+
+Total: 22 possible badges per cohort. Most Exonauts earn 4–10. An Exonaut who earns all 22 is an extremely rare achievement.
+
+
+
+
+9.2  Badge Display Rules
+
+
+Earned badges: Full color, with name, date, and description on hover/tap
+
+
+Unearned badges: Greyed-out silhouette with &apos;Locked&apos; label — visible to motivate
+
+
+New badge earned: Full-screen celebration animation on first view (confetti + badge zoom-in)
+
+
+Badge ID format: EXO-BADGE-[CATEGORY]-[CODE]-[BATCH] e.g. EXO-BADGE-MIL-GLD-2026
+
+
+Downloadable certificate: Each badge links to a downloadable PDF certificate (pre-filled with Exonaut&apos;s name, date, cohort)
+
+
+
+
+9.3  Badge Award Triggers
+
+
+Milestone tier badges: Auto-awarded when point threshold is crossed (system-generated)
+
+
+Track completion badge: Auto-awarded when all track missions are marked Approved by Mission Lead
+
+
+Pillar badges: Manually awarded by Admin or Mission Lead on the badge management screen
+
+
+Special awards: Manually awarded by Admin only — usually at Demo Day
+
+
+Intern of the Week badge: Auto-awarded weekly based on leaderboard logic, confirmed by Admin
+
+────────────────────────────────────────────────────────────
+
+
+10. Leaderboard
+
+The leaderboard is the most visited page after the dashboard. It is the social engine of the platform — make it beautiful, competitive, and fair.
+
+
+
+
+10.1  Leaderboard Views
+
+FULL COHORT LEADERBOARD (DEFAULT)
+
+All Exonauts in the current cohort, sorted by total points. Displays:
+
+
+Rank number (1–30) with crown icons for top 3
+
+
+Profile photo with tier-colored ring
+
+
+Full name + tier badge
+
+
+Track label
+
+
+Total points (large, JetBrains Mono, Lime)
+
+
+Pillar breakdown bar (3 segments: Project / Client / Recruit in different shades)
+
+
+Week-over-week change (↑/↓ with number)
+
+
+Badges earned count
+
+The current logged-in user&apos;s row is always highlighted with a Lime left border, even if they are rank 28.
+
+
+
+ADDITIONAL LEADERBOARD TABS
+
+
+This Week — ranked by points earned in current week only (resets Monday)
+
+
+Pillar View — toggle between Project / Client / Recruit rankings independently
+
+
+Alumni Hall of Fame — all-time top Exonauts across all cohorts (public, read-only)
+
+
+
+
+10.2  Leaderboard Filters
+
+
+Filter by track (show only AI Strategy track, etc.)
+
+
+Filter by tier
+
+
+Filter by batch/cohort (for Admins viewing historical data)
+
+
+
+
+10.3  Leaderboard Refresh
+
+Points update in real time. Rank recalculates instantly when any points transaction is committed. Leaderboard uses optimistic UI — show the projected rank change immediately, confirm with server response.
+
+────────────────────────────────────────────────────────────
+
+
+11. Mission Management
+
+Missions are the tasks and deliverables that Exonauts complete during the program. They are the primary driver of Project pillar points.
+
+
+
+
+11.1  Mission Data Model
+Field
+Description
+Mission ID
+Auto-generated: EXO-MSN-[TRACK]-[BATCH]-[NUM]
+Title
+Short mission name, max 80 characters
+Description
+Full brief, rich text, max 2000 characters
+Track
+One of 7 tracks (or &apos;All Tracks&apos; for cohort-wide missions)
+Assigned To
+Individual Exonaut or all Exonauts in a track
+Points Value
+Base points for on-time submission (set by Admin)
+Due Date
+Hard deadline with time
+Pillar
+Project / Client / Recruitment
+Deliverable Type
+Document · Presentation · Video · Link · Tool/Code · Event Plan
+Status
+Not Started / In Progress / Submitted / Approved / Needs Revision / Overdue
+Submission
+File upload or URL link
+Mission Lead Feedback
+Rich text, visible to Exonaut after review
+Grade
+Needs Revision / Good / Excellent (not numeric)
+Bonus Points Awarded
+Set by Mission Lead at grading (0 / +10 / +20)
+
+
+
+
+11.2  Mission Workflow
+
+
+Admin or Mission Lead creates mission and assigns it
+
+
+Exonaut receives notification (in-app + email)
+
+
+Exonaut marks mission &apos;In Progress&apos; (optional but tracked for engagement metrics)
+
+
+Exonaut submits deliverable (file upload or URL) before deadline
+
+
+Mission Lead reviews within 48 hours and grades it
+
+
+If &apos;Needs Revision&apos;: Exonaut is notified with feedback. They can resubmit once.
+
+
+If &apos;Good&apos; or &apos;Excellent&apos;: Points are auto-awarded. Badge eligibility is rechecked.
+
+
+Mission marked Approved. Visible on Exonaut profile history.
+
+
+
+
+11.3  Mission Feed &amp; Filters
+
+
+Filter by: All / My Track / All Tracks
+
+
+Filter by: Status / Due Date / Pillar
+
+
+Sort by: Due Date (default) / Points Value / Status
+
+
+Overdue missions are highlighted in red
+
+
+&apos;Assigned this week&apos; section at top
+
+────────────────────────────────────────────────────────────
+
+
+12. Peer Kudos System
+
+Kudos is the social recognition engine. It drives the &apos;lift before you climb&apos; culture and powers the Culture Carrier badge.
+
+
+
+
+Any Exonaut can give kudos to any other Exonaut in their cohort
+
+
+Maximum 3 kudos given per Exonaut per week (resets Monday)
+
+
+Kudos are public — posted to the cohort activity feed with the giver&apos;s name and message
+
+
+Giver earns +2 points. Receiver earns +3 points.
+
+
+Kudos history visible on recipient&apos;s profile
+
+
+The Exonaut with the most kudos received in the cohort earns the Culture Carrier badge
+
+
+
+KUDOS FORM
+
+
+Select recipient from cohort list (dropdown with photos)
+
+
+Write a kudos message (max 200 characters, required)
+
+
+Optional: tag a pillar (Project / Client / Recruitment) that the kudos is for
+
+
+Submit button (&apos;Give Kudos&apos;) — Lime, prominent
+
+────────────────────────────────────────────────────────────
+
+
+13. Weekly Rituals Tracker
+
+The rituals tracker is a lightweight attendance and participation system that keeps Exonauts accountable to the weekly cadence.
+
+
+Ritual
+How It&apos;s Tracked
+Points
+Monday Ignition
+Admin marks attendance in-app after the session
++5
+Mid-Week Pulse
+Exonaut posts their Pulse in the platform (replaces group chat)
++3
+Friday Win Wall
+Exonaut posts their Win in the platform (replaces group chat)
++5
+Intern of the Week
+Auto-calculated from weekly points, Admin confirms
++25
+Teach-Back Session
+Mission Lead marks completion, uploads recording link
++15
+Midpoint Fire Check
+Admin marks completion after 1:1 meeting
++10
+Demo Day
+Admin marks all presenters at end of program
++50
+Pledge Signing
+Admin marks at Day 1 onboarding
++50 (one-time)
+
+
+
+The Weekly Ritual Tracker on the dashboard shows the current week&apos;s completion status in real time. Past weeks are archived and visible in the Rituals History section of the profile.
+
+────────────────────────────────────────────────────────────
+
+
+14. Announcements &amp; Notifications
+
+
+14.1  Admin Announcements
+
+
+Admins can post announcements visible to: All Exonauts / Specific Track / Single Exonaut
+
+
+Announcements appear at the top of the dashboard feed with a &apos;New&apos; badge
+
+
+Announcement types: Info (blue) / Action Required (amber) / Celebration (lime) / Urgent (red)
+
+
+Announcements include a rich text body and optional attachment/link
+
+
+Exonauts can react to announcements (emoji reactions: 🔥 ⚡ 🚀 💡)
+
+
+
+
+14.2  Notification System
+
+IN-APP NOTIFICATIONS (BELL ICON IN SIDEBAR)
+
+
+New mission assigned
+
+
+Mission deadline in 48 hours
+
+
+Mission graded (with result)
+
+
+Kudos received (with message preview)
+
+
+Rank change (up or down)
+
+
+Tier upgrade achieved (with animation trigger)
+
+
+Badge earned (with animation trigger)
+
+
+Admin announcement posted
+
+
+Intern of the Week — you won
+
+
+
+EMAIL NOTIFICATIONS (USER CAN TOGGLE OFF IN SETTINGS)
+
+
+New mission assigned
+
+
+Mission deadline in 24 hours (reminder)
+
+
+Weekly summary email (sent Sunday evening): points earned, rank, top 3 wins, next week&apos;s missions
+
+
+Badge earned
+
+
+Admin announcement (Action Required type only, always sent)
+
+────────────────────────────────────────────────────────────
+
+
+15. Admin Panel
+
+The Admin Panel is a separate, protected section of the platform accessible only to Super Admin and Admin roles. It is the mission control for running the program.
+
+
+
+
+15.1  Admin Panel Pages
+
+COHORT MANAGEMENT
+
+
+Create / edit / archive cohorts
+
+
+Set cohort start date, end date, Demo Day date
+
+
+Add/remove Exonauts from a cohort
+
+
+Assign Exonauts to tracks and clients
+
+
+Assign Mission Leads to tracks
+
+
+
+USER MANAGEMENT
+
+
+Create new user accounts (name, email, role, track, cohort)
+
+
+Send invite email
+
+
+Edit user details
+
+
+Upgrade Exonaut to Alumni (Corps) status after program end
+
+
+Deactivate accounts
+
+
+Reset passwords
+
+
+
+MISSION MANAGEMENT
+
+
+Create / edit / delete missions
+
+
+Assign missions to individual Exonauts or entire tracks
+
+
+Set points value, due date, deliverable type
+
+
+Review submissions queue (all pending reviews in one view)
+
+
+Grade submissions and add feedback
+
+
+
+POINTS MANAGEMENT
+
+
+Manually award or adjust points for any Exonaut (with required reason text)
+
+
+Award pillar bonus points (Client satisfaction, Recruitment bonus)
+
+
+View full points transaction ledger per Exonaut
+
+
+Bulk award: Award all attendees of Monday Ignition in one click
+
+
+
+BADGE MANAGEMENT
+
+
+View all badge award history
+
+
+Manually award any badge to any Exonaut
+
+
+Revoke a badge (with reason, Super Admin only)
+
+
+Export badge certificates as PDF for a specific Exonaut
+
+
+
+RITUAL MANAGEMENT
+
+
+Mark Monday Ignition attendance for the current session
+
+
+Confirm Intern of the Week (select from top 3 auto-candidates)
+
+
+Mark Midpoint Fire Check completion
+
+
+Mark Demo Day presenter completion
+
+
+
+REPORTS &amp; ANALYTICS
+
+
+Cohort overview: average points, tier distribution, submission rate, top performers
+
+
+Mission completion rate by track
+
+
+Ritual participation rate by week
+
+
+Kudos activity heatmap
+
+
+Dropout / inactivity alert: flag Exonauts with no submissions in 7+ days
+
+
+Export all data to CSV
+
+
+
+ANNOUNCEMENTS
+
+
+Create and send announcements (as described in Section 14)
+
+────────────────────────────────────────────────────────────
+
+
+16. Alumni Portal (Exonaut Corps)
+
+After completing the program and being upgraded to Corps status, Exonauts retain permanent access to a read-only alumni experience.
+
+
+
+
+Permanent profile with all badges, points history, and mission history preserved
+
+
+Alumni directory: browse other Corps members by cohort, track, or tier achieved
+
+
+Hall of Exonauts: all-time top performers across all cohorts (public)
+
+
+Alumni-only announcements: posted by Admin for Corps events, opportunities, and digest
+
+
+Mentor badge: Senior Corps members who are assigned as mentors receive a &apos;Mentor&apos; badge on their profile
+
+
+Corps tier display on profile: Active Corps / Senior Corps / Founding Corps (based on graduation date)
+
+
+No ability to earn more points or badges after becoming Corps (program is closed)
+
+────────────────────────────────────────────────────────────
+
+
+17. Core Data Models
+
+
+17.1  User
+Field
+Type &amp; Notes
+id
+UUID, primary key
+email
+String, unique, required
+name
+String, required
+role
+Enum: super_admin / admin / mission_lead / exonaut / alumni
+status
+Enum: active / invited / inactive / alumni
+avatar_url
+String (CDN URL)
+bio
+String, max 160 chars
+linkedin_url
+String
+school
+String
+degree
+String
+track_id
+Foreign key → Track
+cohort_id
+Foreign key → Cohort
+client_id
+Foreign key → Client
+total_points
+Integer, computed/cached
+tier
+Enum: entry / builder / prime / elite / apex / corps
+rank
+Integer, computed from leaderboard
+linkedin_posted
+Boolean (onboarding checkpoint)
+pledge_signed
+Boolean (onboarding checkpoint)
+onboarding_complete
+Boolean
+created_at
+Timestamp
+last_active_at
+Timestamp
+
+
+
+
+17.2  Badge
+Field
+Type &amp; Notes
+id
+UUID
+code
+String, unique: e.g. MIL-GLD, TRK-01, PIL-DLV, SPL-MVP
+name
+String: e.g. &apos;Gold Innovator&apos;
+subtitle
+String: e.g. &apos;Innovator&apos;
+category
+Enum: milestone / track / pillar / special
+description
+String — award copy
+icon
+String — FA icon class or image URL
+accent_color
+String — hex code for this badge&apos;s accent
+award_trigger
+Enum: auto_points / auto_missions / manual
+points_threshold
+Integer (if auto_points trigger)
+
+
+
+
+17.3  UserBadge (junction)
+Field
+Type &amp; Notes
+id
+UUID
+user_id
+Foreign key → User
+badge_id
+Foreign key → Badge
+awarded_by
+Foreign key → User (admin who awarded it)
+awarded_at
+Timestamp
+cohort_id
+Foreign key → Cohort
+certificate_url
+String (generated PDF URL)
+
+
+
+
+17.4  PointsTransaction
+Field
+Type &amp; Notes
+id
+UUID
+user_id
+Foreign key → User (recipient)
+points
+Integer (positive only)
+source
+Enum: mission / ritual / kudos / client / recruit / manual / badge / onboarding
+source_id
+UUID — the mission/ritual/kudos that generated this
+pillar
+Enum: project / client / recruitment / general
+awarded_by
+Foreign key → User (or &apos;system&apos;)
+note
+String — reason/context
+created_at
+Timestamp
+
+
+
+
+17.5  Mission
+Field
+Type &amp; Notes
+id
+UUID
+code
+String: EXO-MSN-[TRACK]-[BATCH]-[NUM]
+title
+String
+description
+Rich text (HTML stored, rendered sanitized)
+track_id
+Foreign key → Track (or null for all-cohort)
+cohort_id
+Foreign key → Cohort
+created_by
+Foreign key → User (admin)
+base_points
+Integer
+due_at
+Timestamp
+pillar
+Enum: project / client / recruitment
+deliverable_type
+Enum: document / presentation / video / link / code / event_plan
+status
+Enum: draft / active / closed
+
+
+
+
+17.6  MissionSubmission
+Field
+Type &amp; Notes
+id
+UUID
+mission_id
+Foreign key → Mission
+user_id
+Foreign key → User
+submission_url
+String (file or link)
+submission_note
+String — Exonaut&apos;s note to reviewer
+status
+Enum: submitted / approved / needs_revision / overdue
+grade
+Enum: needs_revision / good / excellent / null
+feedback
+Rich text — Mission Lead&apos;s feedback
+points_awarded
+Integer (base + bonus)
+reviewed_by
+Foreign key → User
+submitted_at
+Timestamp
+reviewed_at
+Timestamp
+revision_number
+Integer: 1 or 2 (max 1 revision allowed)
+
+────────────────────────────────────────────────────────────
+
+
+18. Recommended Tech Stack
+Layer
+Recommended Technology
+Frontend Framework
+React (Next.js 14+ with App Router) — preferred for SSR, SEO, and file-based routing
+Styling
+Tailwind CSS with Exoasia custom theme config + shadcn/ui components
+State Management
+Zustand (lightweight) or React Query for server state
+Backend
+Node.js with Express, or Next.js API Routes for smaller deployments
+Database
+PostgreSQL (via Supabase for rapid build, or PlanetScale/Railway for production)
+ORM
+Prisma — type-safe, schema-first, works great with Next.js
+Authentication
+NextAuth.js (supports email/password + Google OAuth + JWT)
+File Storage
+Cloudinary (profile photos, badge images) or Supabase Storage
+PDF Generation
+Puppeteer or @react-pdf/renderer for certificate downloads
+Email
+Resend or SendGrid for transactional emails
+Realtime Updates
+Supabase Realtime or Pusher for live leaderboard updates
+Deployment
+Vercel (frontend + API) or Railway (full-stack)
+Icons
+Font Awesome 6.5 (CDN) — matches existing Exoasia design system
+
+
+
+If Supabase is used, it handles PostgreSQL + Auth + Realtime + Storage in one platform, significantly reducing complexity for a small team or solo developer.
+
+────────────────────────────────────────────────────────────
+
+
+19. Key Screens to Build
+Screen
+Priority
+Login / Auth Screen
+P0 — Must build first
+Onboarding Wizard (4 steps)
+P0 — Blocks first login
+Exonaut Dashboard (home)
+P0 — Core experience
+Leaderboard (full + weekly)
+P0 — High engagement
+Missions List + Detail + Submit
+P0 — Core functionality
+Profile (public + settings)
+P0 — Identity system
+Badges Gallery (profile tab)
+P1 — Key gamification
+Admin — User Management
+P1 — Operations
+Admin — Mission Management
+P1 — Operations
+Admin — Points Management
+P1 — Operations
+Admin — Cohort Management
+P1 — Operations
+Kudos System (give/feed)
+P1 — Culture
+Ritual Tracker (dashboard widget)
+P1 — Culture
+Notifications (bell + list)
+P1 — Engagement
+Weekly Ritual Posts (Pulse + Win Wall)
+P2 — Culture
+Admin — Badge Management
+P2 — Ceremony
+Admin — Reports &amp; Analytics
+P2 — Insights
+Alumni Portal
+P2 — Legacy
+Certificate PDF Download
+P2 — Awards
+Hall of Exonauts (all-time public)
+P3 — Showcase
+Guest / Public Leaderboard view
+P3 — Recruiting
+
+────────────────────────────────────────────────────────────
+
+
+20. Special UX Moments
+
+These are the emotional high points of the platform experience. Build them with care — they are what Exonauts will remember.
+
+
+
+
+Tier Upgrade Celebration: When an Exonaut crosses a tier threshold, display a full-screen overlay: their new tier badge animates in from center with a 3D rotation, confetti falls in Lime and Purple, the new tier name appears large, and a sound effect plays (optional, dismissible). This happens once per tier change.
+
+
+Badge Earned Celebration: Similar to tier upgrade. The badge icon zooms in from the center, rotates, glows, and then settles. Shows the badge name, description, and earned date. &apos;Share to LinkedIn&apos; button appears.
+
+
+Intern of the Week Announcement: When an Exonaut is named Intern of the Week, their profile photo appears large in the activity feed with a Lime glow animation, a star burst, and the cohort&apos;s reaction emojis visible in real time.
+
+
+Rank Milestone Moments: When an Exonaut enters the Top 10, Top 5, or #1 for the first time, a brief toast notification appears: &apos;You just entered the Top 10! Keep building.&apos; These should feel earned, not cheap.
+
+
+Pledge Signing: On Day 1 onboarding, the pledge signing screen should feel ceremonial. Large text, solemn dark background, signature field (stylus or type), Mack&apos;s signature pre-loaded. A &apos;You are now an Exonaut.&apos; confirmation after signing.
+
+
+Launch Day / Program End: When the Admin marks the program as complete, every Exonaut&apos;s dashboard shows a special &apos;You&apos;ve Launched&apos; banner. Final badge certificates are auto-generated. A &apos;Your Exonaut Journey&apos; summary card is generated for LinkedIn sharing.
+
+────────────────────────────────────────────────────────────
+
+
+21. Important Notes for the Developer
+
+Read these carefully before starting any work.
+
+
+
+
+The brand guide in Section 2 is not a suggestion. It is the law. Every color, font, border radius, and spacing decision must match. If in doubt, ask before building.
+
+
+&apos;GCF&apos; refers to Game Changer Funnel (GoHighLevel), which is Exoasia&apos;s CRM and website platform. The Exonaut Platform is a separate application but should be embeddable or linkable from GCF pages. Build as a standalone web app first.
+
+
+Mobile-first is mandatory. Most Exonauts will check the platform on their phones. Every screen must be fully functional and beautiful on 375px viewport width.
+
+
+The leaderboard is the most sensitive screen. Any bug that shows wrong rankings will erode trust immediately. Build it with strong test coverage and server-side rank calculation — never trust client-side math for rankings.
+
+
+Points transactions are financial-grade. Every point award must be logged with source, awarded_by, and timestamp. No silent mutations. Build an audit trail.
+
+
+Notifications must be near-real-time. Use Supabase Realtime or websockets. Polling is acceptable as fallback but not preferred. Exonauts should feel the platform is alive.
+
+
+The certificate PDF feature is a premium moment. Every badge certificate should look like the PPTX certificates Exoasia already uses — same layout, same brand, same gravitas. Use the PPTX designs as reference.
+
+
+Do not build for scale prematurely. Start at 30 Exonauts per cohort. Design the data model to scale to 500 alumni, but don&apos;t over-engineer the infrastructure.
+
+
+The platform uses the same brand as the Exonaut Culture Guide landing page and the Exoasia Internship landing page. Maintain visual consistency with those references.
+
+
+Every Admin action that awards or adjusts points must require a reason/note field. This protects integrity and creates an audit trail Mack can review.
+
+
+
+When in doubt about any product decision, refer to the Exonaut Culture Guide and the Exoasia brand. The platform is an extension of that document — it should feel like it was built by Exonauts, for Exonauts.
+
+
+
+We don&apos;t wait for the map. We build it.
+
+────────────────────────────────────────────────────────────
+
+Exoasia Innovation Hub  ·  Exonaut Platform Product Brief  ·  Batch 2026–2027  ·  Prepared by Mack Comandante
+
+
