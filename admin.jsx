@@ -1139,6 +1139,7 @@ function ManagerRosterModal({ managerId, scopedCohortId, scopeLabel, onClose, on
   const [search, setSearch] = React.useState('');
   const manager = window.__managerStore?.byId(managerId);
   const { all } = useCohort();
+  const registeredUsers = window.useRegisteredUsers ? window.useRegisteredUsers() : [];
   if (!manager) return null;
 
   const track = TRACKS.find(t => t.code === manager.track);
@@ -1153,11 +1154,25 @@ function ManagerRosterModal({ managerId, scopedCohortId, scopeLabel, onClose, on
 
   const mgrCohorts = mgrCohortIds.map(id => all.find(c => c.id === id)).filter(Boolean);
 
+  // Merge seed USERS + Supabase-registered users into one pool (no duplicates).
+  const seedUsers = typeof USERS !== 'undefined' ? USERS : [];
+  const seedIds = new Set(seedUsers.map(u => u.id));
+  const regAsUsers = registeredUsers
+    .filter(u => u.role === 'exonaut' && !seedIds.has(u.userId))
+    .map(u => ({
+      id: u.userId,
+      name: u.name,
+      cohort: u.cohortId || 'c2627',
+      track: u.track || '',
+      tier: 'entry',
+    }));
+  const allUsers = [...seedUsers, ...regAsUsers];
+
   // Exonauts currently on this manager (via lead-assignment override or reports).
-  const assigned = USERS.filter(u => getUserLead(u.id)?.id === managerId);
+  const assigned = allUsers.filter(u => getUserLead(u.id)?.id === managerId);
 
   // Candidates: users inside candidate cohorts, NOT already on this manager.
-  const inScope = USERS.filter(u =>
+  const inScope = allUsers.filter(u =>
     candidateCohortIds.includes(getUserCohort(u.id)) &&
     !assigned.some(a => a.id === u.id)
   );
