@@ -1020,7 +1020,10 @@ function CommunityPage() {
       badges: 0,
       credentials: [],
       project: null,
-      role: null,
+      role: u.role === 'admin' ? 'Platform Admin'
+          : u.role === 'lead' ? 'Mission Lead'
+          : u.role === 'commander' ? 'Commander'
+          : null,
       socials: null,
     })), [registeredUsers]);
 

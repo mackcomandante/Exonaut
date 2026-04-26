@@ -106,18 +106,47 @@ function RoleProfile({ roleKey }) {
   const [editing, setEditing] = React.useState(false);
   const [draft, setDraft] = React.useState(current);
   const accentVar = 'var(--' + (current.roleColor || 'lime') + ')';
+  const avatarInputRef = React.useRef(null);
 
   React.useEffect(() => { if (!editing) setDraft(current); }, [current, editing]);
   function patch(k, v) { setDraft(d => ({ ...d, [k]: v })); }
   function save() { saveRoleProfile(roleKey, draft); setEditing(false); }
   function cancel() { setDraft(current); setEditing(false); }
 
+  function handleAvatarChange(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => patch('avatar', ev.target.result);
+    reader.readAsDataURL(file);
+  }
+
+  const displayAvatar = editing ? draft.avatar : current.avatar;
+
   return (
     <div className="enter">
       {/* HERO */}
       <div className="profile-hero">
-        <div>
-          <AvatarWithRing name={current.name} size={140} tier="corps" />
+        <div style={{ position: 'relative', width: 140, height: 140, flexShrink: 0 }}>
+          {displayAvatar
+            ? <img src={displayAvatar} alt={current.name}
+                style={{ width: 140, height: 140, borderRadius: '50%', objectFit: 'cover', border: '3px solid ' + accentVar }} />
+            : <AvatarWithRing name={current.name} size={140} tier="corps" />
+          }
+          {editing && (
+            <>
+              <input ref={avatarInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleAvatarChange} />
+              <button onClick={() => avatarInputRef.current.click()} style={{
+                position: 'absolute', bottom: 4, right: 4,
+                width: 32, height: 32, borderRadius: '50%',
+                background: accentVar, border: 'none', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+              }}>
+                <i className="fa-solid fa-camera" style={{ fontSize: 13, color: 'var(--deep-black)' }} />
+              </button>
+            </>
+          )}
         </div>
         <div>
           <div className="t-label" style={{ marginBottom: 10, color: accentVar }}>{current.roleLabel}</div>
