@@ -36,7 +36,7 @@ function AdminCohortFilter() {
   const current = scope === 'all' ? null : all.find(c => c.id === scope);
   const totalUsers = USERS.length;
   const scopedUsers = scope === 'all' ? totalUsers : getCohortUsers(scope).length;
-  const accent = scope === 'all' ? 'var(--sky)' : (current?.status === 'active' ? 'var(--lime)' : 'var(--lavender)');
+  const accent = scope === 'all' ? 'var(--sky)' : (COHORT_STATUS_COLOR[current?.status] || 'var(--lavender)');
 
   return (
     <div style={{ padding: '14px 16px 8px', borderBottom: '1px solid var(--off-white-07)' }}>
@@ -93,7 +93,7 @@ function AdminCohortFilter() {
           {all.map(c => {
             const count = getCohortUsers(c.id).length;
             const isActive = c.id === scope;
-            const cAccent = c.status === 'active' ? 'var(--lime)' : c.status === 'upcoming' ? 'var(--sky)' : 'var(--lavender)';
+            const cAccent = COHORT_STATUS_COLOR[c.status] || 'var(--lavender)';
             return (
               <div key={c.id}
                 onClick={() => { setScope(c.id); setOpen(false); }}
@@ -204,8 +204,29 @@ function PlatformAdminSidebar({ current, onNavigate, onSignOut }) {
 }
 
 // -------- Cohort Management --------
+// Cohort lifecycle: upcoming → open → closed → active → alumni
+// Each status maps to the actions available and the resulting next status.
+const COHORT_LIFECYCLE = {
+  upcoming: [{ label: 'OPEN',  icon: 'fa-door-open',        color: 'var(--lime)',     next: 'open',   verb: 'Open enrollment for' }],
+  open:     [
+    { label: 'CLOSE', icon: 'fa-lock',             color: 'var(--amber)',    next: 'closed', verb: 'Close enrollment for' },
+    { label: 'START', icon: 'fa-play',             color: 'var(--lime)',     next: 'active', verb: 'Start mission for' },
+  ],
+  closed:   [{ label: 'START', icon: 'fa-play',             color: 'var(--lime)',     next: 'active', verb: 'Start mission for' }],
+  active:   [{ label: 'END',   icon: 'fa-flag-checkered',   color: 'var(--lavender)', next: 'alumni', verb: 'End cohort' }],
+  alumni:   [],
+};
+
+const COHORT_STATUS_COLOR = {
+  upcoming: 'var(--sky)',
+  open:     'var(--lime)',
+  closed:   'var(--amber)',
+  active:   'var(--lime)',
+  alumni:   'var(--lavender)',
+};
+
 function AdminCohorts() {
-  const { all, cohortId, setSelected, createCohort, deleteCohort } = useCohort();
+  const { all, cohortId, setSelected, createCohort, deleteCohort, updateCohortStatus } = useCohort();
   const registeredUsers = useRegisteredUsers();
   const [creating, setCreating] = React.useState(false);
 
@@ -235,16 +256,20 @@ function AdminCohorts() {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 14 }}>
         {all.map(c => {
-          const count  = cohortUserCount(c.id);
-          const accent = c.status === 'active' ? 'var(--lime)' : c.status === 'upcoming' ? 'var(--sky)' : 'var(--lavender)';
+          const count     = cohortUserCount(c.id);
+          const status    = c.status || 'upcoming';
+          const accent    = COHORT_STATUS_COLOR[status] || 'var(--off-white-40)';
           const isSelected = c.id === cohortId;
+          const actions   = COHORT_LIFECYCLE[status] || [];
           return (
             <div key={c.id} className="card-panel" style={{
               padding: 20, borderColor: isSelected ? accent : undefined, cursor: 'pointer',
             }} onClick={() => setSelected(c.id)}>
+
+              {/* Status row */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                 <div className="t-mono" style={{ fontSize: 9, color: accent, letterSpacing: '0.12em', fontWeight: 700 }}>
-                  {(c.status || '').toUpperCase()}
+                  {status.toUpperCase()}
                 </div>
                 {c.custom && (
                   <button onClick={(e) => { e.stopPropagation(); if (confirm(`Delete cohort "${c.name}"?`)) deleteCohort(c.id); }}
@@ -253,12 +278,16 @@ function AdminCohorts() {
                   </button>
                 )}
               </div>
+
+              {/* Name + code */}
               <h2 className="t-heading" style={{ fontSize: 18, margin: '0 0 4px 0', textTransform: 'none', letterSpacing: 0, color: 'var(--off-white)' }}>
                 {c.name}
               </h2>
               <div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)', letterSpacing: '0.08em', marginBottom: 14 }}>
                 {c.code || '—'}
               </div>
+
+              {/* Dates */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
                 <div>
                   <div className="t-mono" style={{ fontSize: 8, color: 'var(--off-white-40)', letterSpacing: '0.08em' }}>START</div>
@@ -269,12 +298,38 @@ function AdminCohorts() {
                   <div className="t-body" style={{ fontSize: 11, color: 'var(--off-white)', marginTop: 2 }}>{c.end || '—'}</div>
                 </div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: 'var(--off-white-07)', borderRadius: 2 }}>
+
+              {/* Member count */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: 'var(--off-white-07)', borderRadius: 2, marginBottom: actions.length ? 12 : 0 }}>
                 <i className="fa-solid fa-user-group" style={{ fontSize: 10, color: 'var(--off-white-68)' }} />
                 <span className="t-mono" style={{ fontSize: 10, color: 'var(--off-white)', letterSpacing: '0.06em' }}>
                   {count} EXONAUT{count === 1 ? '' : 'S'}
                 </span>
               </div>
+
+              {/* Lifecycle action buttons */}
+              {actions.length > 0 && (
+                <div style={{ display: 'flex', gap: 8 }} onClick={e => e.stopPropagation()}>
+                  {actions.map(act => (
+                    <button key={act.label} onClick={() => {
+                      if (confirm(`${act.verb} "${c.name}"?`)) updateCohortStatus(c.id, act.next);
+                    }} style={{
+                      flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                      padding: '8px 10px', background: 'transparent',
+                      border: '1px solid ' + act.color, borderRadius: 2,
+                      color: act.color, cursor: 'pointer',
+                      fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700, letterSpacing: '0.1em',
+                      transition: 'background 0.12s, color 0.12s',
+                    }}
+                      onMouseEnter={e => { e.currentTarget.style.background = act.color; e.currentTarget.style.color = 'var(--deep-black)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = act.color; }}
+                    >
+                      <i className={'fa-solid ' + act.icon} style={{ fontSize: 10 }} />
+                      {act.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           );
         })}
@@ -833,7 +888,7 @@ function AdminManagers() {
                 ) : (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                     {mgrCohorts.map(c => {
-                      const cAccent = c.status === 'active' ? 'var(--lime)' : c.status === 'upcoming' ? 'var(--sky)' : 'var(--lavender)';
+                      const cAccent = COHORT_STATUS_COLOR[c.status] || 'var(--lavender)';
                       return (
                         <div key={c.id} style={{
                           padding: '3px 8px', background: 'var(--off-white-07)', border: '1px solid ' + cAccent, borderRadius: 2,
@@ -1012,7 +1067,7 @@ function ManagerEditModal({ mode, initial, cohorts = [], defaultCohortId, onClos
                 <div style={{ padding: 14, color: 'var(--off-white-40)', fontSize: 12 }}>No cohorts available.</div>
               )}
               {cohorts.map(c => {
-                const cAccent = c.status === 'active' ? 'var(--lime)' : c.status === 'upcoming' ? 'var(--sky)' : 'var(--lavender)';
+                const cAccent = COHORT_STATUS_COLOR[c.status] || 'var(--lavender)';
                 const checked = selectedCohorts.includes(c.id);
                 return (
                   <div
@@ -1140,7 +1195,7 @@ function ManagerRosterModal({ managerId, scopedCohortId, scopeLabel, onClose, on
           {/* Cohort chips */}
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 8 }}>
             {mgrCohorts.map(c => {
-              const cAccent = c.status === 'active' ? 'var(--lime)' : c.status === 'upcoming' ? 'var(--sky)' : 'var(--lavender)';
+              const cAccent = COHORT_STATUS_COLOR[c.status] || 'var(--lavender)';
               const dimmed = scopedCohortId && c.id !== scopedCohortId;
               return (
                 <div key={c.id} style={{

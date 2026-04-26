@@ -18,10 +18,11 @@
           assignments: parsed.assignments && typeof parsed.assignments === 'object' ? parsed.assignments : {},
           trackAssignments: parsed.trackAssignments && typeof parsed.trackAssignments === 'object' ? parsed.trackAssignments : {},
           leadAssignments: parsed.leadAssignments && typeof parsed.leadAssignments === 'object' ? parsed.leadAssignments : {},
+          statusOverrides: parsed.statusOverrides && typeof parsed.statusOverrides === 'object' ? parsed.statusOverrides : {},
         };
       }
     } catch (e) { /* ignore */ }
-    return { selectedId: 'c2627', createdCohorts: [], assignments: {}, trackAssignments: {}, leadAssignments: {} };
+    return { selectedId: 'c2627', createdCohorts: [], assignments: {}, trackAssignments: {}, leadAssignments: {}, statusOverrides: {} };
   }
 
   function persist(state) {
@@ -35,9 +36,12 @@
 
   const store = {
     // Get every known cohort — seeds from data.js + user-created ones
+    // Status overrides applied so seed cohorts can be transitioned by Admin.
     getAll() {
       const seed = (typeof COHORTS !== 'undefined') ? COHORTS : [];
-      return [...seed, ...state.createdCohorts];
+      const overrides = state.statusOverrides || {};
+      const seeded = seed.map(c => overrides[c.id] ? { ...c, status: overrides[c.id] } : c);
+      return [...seeded, ...state.createdCohorts];
     },
     getSelected() {
       return store.getAll().find(c => c.id === state.selectedId) || store.getAll()[0];
@@ -100,6 +104,18 @@
       notify();
     },
     getLeadAssignments() { return state.leadAssignments || {}; },
+    // Lifecycle status transitions — works for both seed and created cohorts
+    updateCohortStatus(id, status) {
+      const idx = state.createdCohorts.findIndex(c => c.id === id);
+      if (idx !== -1) {
+        state.createdCohorts[idx] = { ...state.createdCohorts[idx], status };
+      } else {
+        if (!state.statusOverrides) state.statusOverrides = {};
+        state.statusOverrides[id] = status;
+      }
+      persist(state);
+      notify();
+    },
     subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
   };
 
@@ -116,6 +132,7 @@
       setSelected: store.setSelected,
       createCohort: store.createCohort,
       deleteCohort: store.deleteCohort,
+      updateCohortStatus: store.updateCohortStatus,
       assignUserToCohort: store.assignUserToCohort,
       getAssignments: store.getAssignments,
       assignUserToTrack: store.assignUserToTrack,
