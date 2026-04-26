@@ -132,7 +132,7 @@
         author_role: authorRole || 'exonaut',
         votes:       { [authorId]: 1 },
         comments:    [],
-        pinned:      false,
+        // pinned omitted — column may not exist; defaults to false in rowToThread
       };
       // Optimistic insert
       const t = rowToThread({ ...row, created_at: new Date().toISOString() });
