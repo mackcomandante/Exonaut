@@ -63,6 +63,7 @@
       const { data: authData, error: authError } = await window.__db.auth.signUp({
         email: email.trim().toLowerCase(),
         password,
+        options: { emailRedirectTo: 'https://exonaut.exoasia.org' },
       });
       if (authError) throw authError;
 
