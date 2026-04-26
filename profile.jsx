@@ -73,6 +73,18 @@ function Profile({ onOpenMission, onTriggerBadge }) {
       localStorage.setItem('exo:school:'    + ME_ID, editSchool.trim());
       localStorage.setItem('exo:expertise:' + ME_ID, editExpertise.trim());
       if (editAvatar) localStorage.setItem('exo:avatar:' + ME_ID, editAvatar);
+
+      // Award +30 pts once when all 5 profile fields are filled
+      const profileFull = fullName &&
+        editBio.trim() &&
+        editLI.trim() &&
+        editSchool.trim() &&
+        editExpertise.trim() &&
+        (editAvatar || localStorage.getItem('exo:avatar:' + ME_ID));
+      if (profileFull && window.__pointsStore && !window.__pointsStore.hasSource(ME_ID, 'profile.complete')) {
+        window.__pointsStore.add(ME_ID, { source: 'profile.complete', note: 'Profile fully completed' });
+      }
+
       setDisplayName(fullName);
       setDisplayBio(editBio.trim());
       setDisplayLI(editLI.trim());

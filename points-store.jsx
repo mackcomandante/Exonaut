@@ -13,6 +13,7 @@
   const POINT_SOURCES = {
     'onboarding.pledge':          { label: 'Pledge Signed',                  pts: 50,  oneTime: true  },
     'onboarding.linkedin':        { label: 'LinkedIn Post Published',         pts: 20,  oneTime: true  },
+    'profile.complete':           { label: 'Profile Fully Completed',         pts: 30,  oneTime: true  },
     'mission.submit':             { label: 'Mission Submitted On Time',       pts: null               }, // variable
     'mission.good':               { label: 'Mission Graded Good',             pts: 10                 },
     'mission.excellent':          { label: 'Mission Graded Excellent',        pts: 20                 },
