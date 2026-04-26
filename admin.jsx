@@ -145,6 +145,10 @@ function AdminCohortFilter() {
 
 // -------- Platform Admin sidebar --------
 function PlatformAdminSidebar({ current, onNavigate, onSignOut }) {
+  const profile = window.loadRoleProfile ? window.loadRoleProfile('admin') : {};
+  const adminName   = profile.name  || 'Ops Admin';
+  const adminAvatar = profile.avatar || null;
+
   const me = [
     { id: 'pa-profile',  label: 'My Profile',         icon: 'fa-id-badge' },
     { id: 'community',   label: 'Community',          icon: 'fa-users-rectangle' },
@@ -165,9 +169,12 @@ function PlatformAdminSidebar({ current, onNavigate, onSignOut }) {
         <div className="sidebar-tag" style={{ color: 'var(--sky)' }}>PLATFORM · ADMIN</div>
       </div>
       <div className="sidebar-user" style={{ cursor: 'pointer' }} onClick={() => onNavigate('pa-profile')} title="Open my profile">
-        <AvatarWithRing name="Ops Admin" size={36} tier="corps" />
+        {adminAvatar
+          ? <img src={adminAvatar} alt={adminName} style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--sky)', flexShrink: 0 }} />
+          : <AvatarWithRing name={adminName} size={36} tier="corps" />
+        }
         <div className="sidebar-user-info">
-          <div className="sidebar-user-name">Ops Admin</div>
+          <div className="sidebar-user-name">{adminName}</div>
           <div className="sidebar-user-tier" style={{ color: 'var(--sky)' }}>PLATFORM ADMIN</div>
         </div>
       </div>

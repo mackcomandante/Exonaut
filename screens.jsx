@@ -547,48 +547,128 @@ function RitualsPage() {
   );
 }
 
-// ========== ANNOUNCEMENTS ==========
-const ANNOUNCEMENTS = [];
-
-function AnnouncementsPage() {
-  const typeMap = {
-    info: { color: 'var(--platinum)', icon: 'fa-circle-info', label: 'INFO' },
-    action: { color: 'var(--amber)', icon: 'fa-triangle-exclamation', label: 'ACTION REQUIRED' },
-    celebration: { color: 'var(--ink)', icon: 'fa-star', label: 'CELEBRATION' },
-    urgent: { color: 'var(--red)', icon: 'fa-bolt', label: 'URGENT' },
+// ========== ANNOUNCEMENT STORE (localStorage) ==========
+const __annStore = (() => {
+  const KEY = 'exo:announcements:v1';
+  const listeners = new Set();
+  function load() { try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch { return []; } }
+  function save(data) { try { localStorage.setItem(KEY, JSON.stringify(data)); } catch {} }
+  function notify() { listeners.forEach(fn => fn()); }
+  return {
+    getAll() { return load(); },
+    add(ann) {
+      const data = load();
+      data.unshift({ ...ann, id: Date.now(), ts: Date.now() });
+      save(data); notify();
+    },
+    remove(id) {
+      const data = load().filter(a => a.id !== id);
+      save(data); notify();
+    },
+    subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
   };
+})();
+
+function useAnnouncements() {
+  const [list, setList] = React.useState(() => __annStore.getAll());
+  React.useEffect(() => __annStore.subscribe(() => setList(__annStore.getAll())), []);
+  return list;
+}
+
+// ========== MISSION STORE (localStorage) ==========
+const __missionStore = (() => {
+  const KEY = 'exo:missions:v1';
+  const listeners = new Set();
+  function load() { try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch { return []; } }
+  function save(data) { try { localStorage.setItem(KEY, JSON.stringify(data)); } catch {} }
+  function notify() { listeners.forEach(fn => fn()); }
+  return {
+    getAll() { return load(); },
+    add(m) {
+      const data = load();
+      const id = 'M' + String(data.length + 1).padStart(2, '0');
+      data.push({ ...m, id, status: 'active', createdAt: Date.now() });
+      save(data); notify();
+      return id;
+    },
+    subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
+  };
+})();
+
+function useMissions() {
+  const [list, setList] = React.useState(() => __missionStore.getAll());
+  React.useEffect(() => __missionStore.subscribe(() => setList(__missionStore.getAll())), []);
+  return list;
+}
+
+// ========== BADGE AWARD STORE (localStorage) ==========
+const __badgeStore = (() => {
+  const KEY = 'exo:badge-awards:v1';
+  const listeners = new Set();
+  function load() { try { return JSON.parse(localStorage.getItem(KEY) || '{}'); } catch { return {}; } }
+  function save(data) { try { localStorage.setItem(KEY, JSON.stringify(data)); } catch {} }
+  function notify() { listeners.forEach(fn => fn()); }
+  return {
+    getAwardees(badgeCode) { return load()[badgeCode] || []; },
+    award(badgeCode, userId) {
+      const data = load();
+      if (!data[badgeCode]) data[badgeCode] = [];
+      if (!data[badgeCode].includes(userId)) data[badgeCode].push(userId);
+      save(data); notify();
+    },
+    subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
+  };
+})();
+
+// ========== ANNOUNCEMENTS PAGE ==========
+function AnnouncementsPage() {
+  const announcements = useAnnouncements();
+  const typeMap = {
+    info:        { color: 'var(--platinum)', icon: 'fa-circle-info',        label: 'INFO' },
+    action:      { color: 'var(--amber)',    icon: 'fa-triangle-exclamation',label: 'ACTION REQUIRED' },
+    celebration: { color: 'var(--ink)',      icon: 'fa-star',               label: 'CELEBRATION' },
+    urgent:      { color: 'var(--red)',      icon: 'fa-bolt',               label: 'URGENT' },
+  };
+  function timeAgo(ts) {
+    const d = Date.now() - ts, m = Math.floor(d / 60000);
+    if (m < 1) return 'just now';
+    if (m < 60) return m + 'm ago';
+    const h = Math.floor(d / 3600000);
+    if (h < 24) return h + 'h ago';
+    return Math.floor(d / 86400000) + 'd ago';
+  }
   return (
     <div className="enter">
       <div className="section-head">
         <div>
-          <div className="t-label" style={{ marginBottom: 8 }}>FROM YOUR PROGRAM DIRECTORS</div>
+          <div className="t-label" style={{ marginBottom: 8 }}>FROM YOUR LEADS, COMMANDERS, AND ADMINS</div>
           <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>Announcements</h1>
         </div>
       </div>
-      <div style={{ display: 'grid', gap: 14 }}>
-        {ANNOUNCEMENTS.map((a, i) => {
-          const t = typeMap[a.type];
-          return (
-            <div key={i} className="card-panel" style={{ borderLeft: `2px solid ${t.color}`, padding: 24 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 10, letterSpacing: '0.15em', color: t.color }}>
-                  <i className={'fa-solid ' + t.icon} style={{ marginRight: 6 }} />{t.label}
-                </span>
-                <span className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)' }}>{a.time} · {a.from.toUpperCase()}</span>
+      {announcements.length === 0 ? (
+        <div className="card-panel" style={{ padding: 48, textAlign: 'center' }}>
+          <i className="fa-solid fa-bullhorn" style={{ fontSize: 32, color: 'var(--off-white-40)', marginBottom: 12, display: 'block' }} />
+          <div className="t-mono" style={{ fontSize: 12, color: 'var(--off-white-40)', letterSpacing: '0.08em' }}>NO ANNOUNCEMENTS YET</div>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gap: 14 }}>
+          {announcements.map(a => {
+            const t = typeMap[a.type] || typeMap.info;
+            return (
+              <div key={a.id} className="card-panel" style={{ borderLeft: `2px solid ${t.color}`, padding: 24 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 10, letterSpacing: '0.15em', color: t.color }}>
+                    <i className={'fa-solid ' + t.icon} style={{ marginRight: 6 }} />{t.label}
+                  </span>
+                  <span className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)' }}>{timeAgo(a.ts)} · {(a.from || 'ADMIN').toUpperCase()}</span>
+                </div>
+                <h3 className="t-heading" style={{ fontSize: 18, margin: '0 0 8px 0', textTransform: 'none', letterSpacing: 0 }}>{a.title}</h3>
+                <div className="t-body">{a.body}</div>
               </div>
-              <h3 className="t-heading" style={{ fontSize: 18, margin: '0 0 8px 0', textTransform: 'none', letterSpacing: 0 }}>{a.title}</h3>
-              <div className="t-body">{a.body}</div>
-              <div style={{ display: 'flex', gap: 10, marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--off-white-07)' }}>
-                {['fa-fire','fa-bolt','fa-rocket','fa-lightbulb'].map(icon => (
-                  <button key={icon} className="btn btn-ghost btn-sm" style={{ padding: '4px 10px' }}>
-                    <i className={'fa-solid ' + icon} /> {Math.floor(Math.random() * 8) + 1}
-                  </button>
-                ))}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -648,6 +728,32 @@ function NotificationsPage() {
 // ========== ADMIN PANEL ==========
 function AdminPanel() {
   const [tab, setTab] = React.useState('users');
+  const registeredUsers = window.useRegisteredUsers ? window.useRegisteredUsers() : [];
+  const missions = useMissions();
+  const announcements = useAnnouncements();
+
+  // Live stats
+  const exonauts = registeredUsers.filter(u => u.role === 'exonaut');
+  const leads    = registeredUsers.filter(u => u.role === 'lead' || u.role === 'commander' || u.role === 'admin');
+  const userPoints = exonauts.map(u => window.__pointsStore ? window.__pointsStore.getTotal(u.userId) : 0);
+  const avgPoints  = exonauts.length ? Math.round(userPoints.reduce((s,p) => s+p, 0) / exonauts.length) : 0;
+  const atRisk     = exonauts.filter(u => window.__pointsStore ? window.__pointsStore.getTotal(u.userId) === 0 : false).length;
+
+  // Modal state
+  const [newMissionOpen, setNewMissionOpen]   = React.useState(false);
+  const [awardBadge, setAwardBadge]           = React.useState(null); // badge object
+  const [bulkRitual, setBulkRitual]           = React.useState(null); // ritual object
+  const [announceTitle, setAnnounceTitle]     = React.useState('');
+  const [announceBody, setAnnounceBody]       = React.useState('');
+  const [announceType, setAnnounceType]       = React.useState('info');
+  const [announceSuccess, setAnnounceSuccess] = React.useState(false);
+
+  function publish() {
+    if (!announceTitle.trim() || !announceBody.trim()) return;
+    __annStore.add({ title: announceTitle.trim(), body: announceBody.trim(), type: announceType, from: 'Admin' });
+    setAnnounceTitle(''); setAnnounceBody(''); setAnnounceType('info');
+    setAnnounceSuccess(true); setTimeout(() => setAnnounceSuccess(false), 3000);
+  }
 
   return (
     <div className="enter">
@@ -657,7 +763,7 @@ function AdminPanel() {
           <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>Admin Console</h1>
         </div>
         <div className="t-mono" style={{ fontSize: 11, color: 'var(--off-white-40)' }}>
-          {COHORT.size} EXONAUTS · 7 MISSION LEADS · {COHORT.code}
+          {exonauts.length} EXONAUTS · {leads.length} LEADS/ADMINS · {COHORT.code}
         </div>
       </div>
 
@@ -669,113 +775,334 @@ function AdminPanel() {
         ))}
       </div>
 
+      {/* ── REPORTS ── */}
       {tab === 'reports' && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
-          <div className="card-flat"><div className="t-label-muted">AVG POINTS</div><div className="t-mono" style={{ fontSize: 28, color: 'var(--ink)', fontWeight: 700, marginTop: 8 }}>298</div><div className="t-mono" style={{ fontSize: 10, color: 'var(--green)', marginTop: 4 }}>▲ 42 vs LAST WK</div></div>
-          <div className="card-flat"><div className="t-label-muted">SUBMISSION RATE</div><div className="t-mono" style={{ fontSize: 28, color: 'var(--off-white)', fontWeight: 700, marginTop: 8 }}>87%</div><div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)', marginTop: 4 }}>ON TIME</div></div>
-          <div className="card-flat"><div className="t-label-muted">RITUAL ATTEND</div><div className="t-mono" style={{ fontSize: 28, color: 'var(--off-white)', fontWeight: 700, marginTop: 8 }}>93%</div><div className="t-mono" style={{ fontSize: 10, color: 'var(--green)', marginTop: 4 }}>▲ 5% vs LAST WK</div></div>
-          <div className="card-flat" style={{ borderColor: 'rgba(239,68,68,0.3)' }}><div className="t-label-muted" style={{ color: 'var(--red)' }}>AT-RISK</div><div className="t-mono" style={{ fontSize: 28, color: 'var(--red)', fontWeight: 700, marginTop: 8 }}>2</div><div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)', marginTop: 4 }}>NO SUB IN 7+D</div></div>
+          <div className="card-flat">
+            <div className="t-label-muted">AVG POINTS</div>
+            <div className="t-mono" style={{ fontSize: 28, color: 'var(--ink)', fontWeight: 700, marginTop: 8 }}>{exonauts.length ? avgPoints : '—'}</div>
+            <div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)', marginTop: 4 }}>{exonauts.length} EXONAUTS TRACKED</div>
+          </div>
+          <div className="card-flat">
+            <div className="t-label-muted">MISSIONS LIVE</div>
+            <div className="t-mono" style={{ fontSize: 28, color: 'var(--off-white)', fontWeight: 700, marginTop: 8 }}>{missions.length}</div>
+            <div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)', marginTop: 4 }}>CONFIGURED</div>
+          </div>
+          <div className="card-flat">
+            <div className="t-label-muted">ANNOUNCEMENTS</div>
+            <div className="t-mono" style={{ fontSize: 28, color: 'var(--off-white)', fontWeight: 700, marginTop: 8 }}>{announcements.length}</div>
+            <div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)', marginTop: 4 }}>PUBLISHED</div>
+          </div>
+          <div className="card-flat" style={{ borderColor: atRisk > 0 ? 'rgba(239,68,68,0.3)' : undefined }}>
+            <div className="t-label-muted" style={{ color: atRisk > 0 ? 'var(--red)' : undefined }}>AT-RISK</div>
+            <div className="t-mono" style={{ fontSize: 28, color: atRisk > 0 ? 'var(--red)' : 'var(--off-white)', fontWeight: 700, marginTop: 8 }}>{exonauts.length ? atRisk : '—'}</div>
+            <div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)', marginTop: 4 }}>0 PTS · NO ACTIVITY</div>
+          </div>
         </div>
       )}
 
+      {/* ── USERS / POINTS ── */}
       {(tab === 'users' || tab === 'points' || tab === 'reports') && (
-        <div className="lb-table">
-          <div className="lb-header" style={{ gridTemplateColumns: '48px 1fr 140px 100px 100px 80px 120px' }}>
-            <div></div><div>EXONAUT</div><div>TRACK</div><div>POINTS</div><div>MISSIONS</div><div>BADGES</div><div>ACTIONS</div>
+        exonauts.length === 0 ? (
+          <div className="card-panel" style={{ padding: 48, textAlign: 'center', color: 'var(--off-white-40)' }}>
+            <i className="fa-solid fa-users" style={{ fontSize: 32, marginBottom: 12, display: 'block' }} />
+            <div className="t-mono" style={{ fontSize: 12, letterSpacing: '0.08em' }}>NO EXONAUTS ENROLLED YET</div>
+            <div className="t-body" style={{ fontSize: 12, marginTop: 6 }}>Registered users will appear here once they sign up.</div>
           </div>
-          {USERS.slice(0, 10).map(u => {
-            const track = TRACKS.find(t => t.code === u.track);
-            return (
-              <div key={u.id} className="lb-row" style={{ gridTemplateColumns: '48px 1fr 140px 100px 100px 80px 120px' }}>
-                <AvatarWithRing name={u.name} size={34} tier={u.tier} />
-                <div className="lb-name">{u.name}<TierCrest tier={u.tier} /></div>
-                <div className="lb-track">{track?.short}</div>
-                <div className="lb-points">{u.points}</div>
-                <div className="t-mono" style={{ fontSize: 12, color: 'var(--off-white-68)' }}>3 / 7</div>
-                <div className="lb-badges">{u.badges}</div>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <button className="btn btn-ghost btn-sm" style={{ padding: '4px 8px' }}><i className="fa-solid fa-bolt" /></button>
-                  <button className="btn btn-ghost btn-sm" style={{ padding: '4px 8px' }}><i className="fa-solid fa-pen" /></button>
+        ) : (
+          <div className="lb-table">
+            <div className="lb-header" style={{ gridTemplateColumns: '48px 1fr 180px 90px 80px 100px' }}>
+              <div /><div>EXONAUT</div><div>EMAIL</div><div>POINTS</div><div>TIER</div><div>ACTIONS</div>
+            </div>
+            {[...exonauts].sort((a,b) => (window.__pointsStore?.getTotal(b.userId)||0) - (window.__pointsStore?.getTotal(a.userId)||0)).map(u => {
+              const pts  = window.__pointsStore ? window.__pointsStore.getTotal(u.userId) : 0;
+              const tier = window.getTierFromPts ? window.getTierFromPts(pts) : 'entry';
+              return (
+                <div key={u.userId} className="lb-row" style={{ gridTemplateColumns: '48px 1fr 180px 90px 80px 100px' }}>
+                  <AvatarWithRing name={u.name} size={34} tier={tier} />
+                  <div className="lb-name">{u.name}<TierCrest tier={tier} /></div>
+                  <div className="t-mono" style={{ fontSize: 11, color: 'var(--off-white-68)', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.email}</div>
+                  <div className="lb-points">{pts}</div>
+                  <div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-68)', textTransform: 'uppercase' }}>{tier}</div>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button className="btn btn-ghost btn-sm" style={{ padding: '4px 8px' }} title="Award points"
+                      onClick={() => {
+                        const pts = prompt(`Award manual points to ${u.name}?\nEnter points amount:`);
+                        const n = parseInt(pts);
+                        if (!isNaN(n) && n !== 0 && window.__pointsStore) {
+                          window.__pointsStore.add(u.userId, { source: 'manual', pts: n, note: 'Manual award by Admin' });
+                        }
+                      }}>
+                      <i className="fa-solid fa-bolt" />
+                    </button>
+                  </div>
                 </div>
+              );
+            })}
+          </div>
+        )
+      )}
+
+      {/* ── MISSIONS ── */}
+      {tab === 'missions' && (
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+            <div className="t-mono" style={{ fontSize: 11, color: 'var(--off-white-40)' }}>
+              {missions.length} MISSION{missions.length !== 1 ? 'S' : ''} CONFIGURED
+            </div>
+            <button className="btn btn-primary btn-sm" onClick={() => setNewMissionOpen(true)}>
+              <i className="fa-solid fa-plus" /> NEW MISSION
+            </button>
+          </div>
+          {missions.length === 0 ? (
+            <div className="card-panel" style={{ padding: 48, textAlign: 'center', color: 'var(--off-white-40)' }}>
+              <i className="fa-solid fa-rocket" style={{ fontSize: 32, marginBottom: 12, display: 'block' }} />
+              <div className="t-mono" style={{ fontSize: 12, letterSpacing: '0.08em' }}>NO MISSIONS YET</div>
+              <div className="t-body" style={{ fontSize: 12, marginTop: 6 }}>Click NEW MISSION to create the first mission for your cohort.</div>
+            </div>
+          ) : missions.map(m => (
+            <div key={m.id} className="mission-row">
+              <div className="mission-meta">
+                <div className="mission-id">{m.id}</div>
+                <div className="mission-title">{m.title}</div>
+                <div className="mission-sub">{(m.track || 'ALL TRACKS').toUpperCase()} · {(m.status || 'ACTIVE').toUpperCase()}</div>
+              </div>
+              <div className="mission-points"><span className="plus">+</span>{m.points}</div>
+              <button className="btn btn-ghost btn-sm">REVIEW</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── BADGES ── */}
+      {tab === 'badges' && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12 }}>
+          {BADGES.map(b => {
+            const awardees = __badgeStore.getAwardees(b.code);
+            return (
+              <div key={b.code} className="card-flat" style={{ textAlign: 'center', padding: 20 }}>
+                <BadgeMedallion badge={b} size={50} />
+                <div style={{ marginTop: 10 }} className="t-heading">{b.name}</div>
+                <div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)', marginTop: 6 }}>
+                  {awardees.length > 0 ? `${awardees.length} AWARDED` : 'NOT YET AWARDED'}
+                </div>
+                <button className="btn btn-ghost btn-sm" style={{ marginTop: 10, width: '100%', justifyContent: 'center' }}
+                  onClick={() => setAwardBadge(b)}>
+                  AWARD MANUALLY
+                </button>
               </div>
             );
           })}
         </div>
       )}
 
-      {tab === 'missions' && (
-        <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 14 }}>
-            <div className="t-mono" style={{ fontSize: 11, color: 'var(--off-white-40)' }}>
-              REVIEW QUEUE · 4 AWAITING GRADE
-            </div>
-            <button className="btn btn-primary btn-sm"><i className="fa-solid fa-plus" /> NEW MISSION</button>
-          </div>
-          {MISSIONS.map(m => (
-            <div key={m.id} className="mission-row">
-              <div className="mission-meta">
-                <div className="mission-id">{m.id}</div>
-                <div className="mission-title">{m.title}</div>
-                <div className="mission-sub">CREATED BY MACK · {m.status.toUpperCase()} · {Math.floor(Math.random() * 20) + 5} ASSIGNED</div>
+      {/* ── RITUALS ── */}
+      {tab === 'rituals' && (
+        <div className="ritual-row">
+          {RITUALS.map(r => (
+            <div key={r.id} className="ritual-cell pending" style={{ cursor: 'default' }}>
+              <div className="ritual-head">
+                <div className="ritual-name">{r.name}</div>
+                <i className="fa-solid fa-gavel ritual-icon pend-c" />
               </div>
-              <div className="mission-points"><span className="plus">+</span>{m.points}</div>
-              <button className="btn btn-ghost btn-sm">REVIEW</button>
-              <button className="btn btn-ghost btn-sm"><i className="fa-solid fa-pen" /></button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {tab === 'announce' && (
-        <div>
-          <div className="card-panel" style={{ marginBottom: 16 }}>
-            <div className="t-label" style={{ marginBottom: 12 }}>COMPOSE ANNOUNCEMENT</div>
-            <input className="input" placeholder="Title…" style={{ marginBottom: 12 }} />
-            <textarea className="textarea" rows={4} placeholder="Body — rich text supported" style={{ marginBottom: 12 }} />
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', gap: 8 }}>
-                {['info','action','celebration','urgent'].map(t => (
-                  <div key={t} className="lb-filter">{t.toUpperCase()}</div>
-                ))}
+              <div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)' }}>
+                {exonauts.length > 0 ? `${exonauts.length} EXONAUTS` : 'NO EXONAUTS YET'}
               </div>
-              <button className="btn btn-primary"><i className="fa-solid fa-paper-plane" /> PUBLISH</button>
-            </div>
-          </div>
-          <AnnouncementsPage />
-        </div>
-      )}
-
-      {tab === 'badges' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12 }}>
-          {BADGES.map(b => (
-            <div key={b.code} className="card-flat" style={{ textAlign: 'center', padding: 20 }}>
-              <BadgeMedallion badge={b} size={50} />
-              <div style={{ marginTop: 10 }} className="t-heading" >{b.name}</div>
-              <div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)', marginTop: 6 }}>
-                {Math.floor(Math.random() * 8)} / 30 AWARDED
-              </div>
-              <button className="btn btn-ghost btn-sm" style={{ marginTop: 10, width: '100%', justifyContent: 'center' }}>
-                AWARD MANUALLY
+              <button className="btn btn-primary btn-sm"
+                style={{ width: '100%', justifyContent: 'center', marginTop: 'auto' }}
+                disabled={exonauts.length === 0}
+                onClick={() => setBulkRitual(r)}>
+                BULK MARK
               </button>
             </div>
           ))}
         </div>
       )}
 
-      {tab === 'rituals' && (
-        <div className="ritual-row">
-          {RITUALS.map(r => (
-            <div key={r.id} className="ritual-cell pending" style={{ cursor: 'pointer' }}>
-              <div className="ritual-head">
-                <div className="ritual-name">{r.name}</div>
-                <i className="fa-solid fa-gavel ritual-icon pend-c" />
+      {/* ── ANNOUNCE ── */}
+      {tab === 'announce' && (
+        <div>
+          <div className="card-panel" style={{ marginBottom: 24 }}>
+            <div className="t-label" style={{ marginBottom: 12 }}>COMPOSE ANNOUNCEMENT</div>
+            <input className="input" placeholder="Title…" style={{ marginBottom: 12 }}
+              value={announceTitle} onChange={e => setAnnounceTitle(e.target.value)} />
+            <textarea className="textarea" rows={4} placeholder="Body — share updates, wins, reminders…" style={{ marginBottom: 12 }}
+              value={announceBody} onChange={e => setAnnounceBody(e.target.value)} />
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {['info','action','celebration','urgent'].map(t => (
+                  <button key={t} onClick={() => setAnnounceType(t)} style={{
+                    padding: '5px 12px', borderRadius: 20, border: '1px solid',
+                    borderColor: announceType === t ? 'var(--lime)' : 'var(--off-white-15)',
+                    background: announceType === t ? 'var(--lime)' : 'transparent',
+                    color: announceType === t ? 'var(--deep-black)' : 'var(--off-white-68)',
+                    fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 700,
+                    letterSpacing: '0.08em', textTransform: 'uppercase', cursor: 'pointer',
+                  }}>{t.toUpperCase()}</button>
+                ))}
               </div>
-              <div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)' }}>AWAITING MARK</div>
-              <button className="btn btn-primary btn-sm" style={{ width: '100%', justifyContent: 'center', marginTop: 'auto' }}>BULK MARK</button>
+              {announceSuccess && <span className="t-mono" style={{ fontSize: 10, color: 'var(--lime)' }}>✓ PUBLISHED</span>}
+              <button className="btn btn-primary"
+                disabled={!announceTitle.trim() || !announceBody.trim()}
+                onClick={publish}
+                style={{ opacity: (!announceTitle.trim() || !announceBody.trim()) ? 0.5 : 1 }}>
+                <i className="fa-solid fa-paper-plane" /> PUBLISH
+              </button>
             </div>
-          ))}
+          </div>
+          <AnnouncementsPage />
         </div>
       )}
+
+      {/* ── NEW MISSION MODAL ── */}
+      {newMissionOpen && <NewMissionModal exonauts={exonauts} onClose={() => setNewMissionOpen(false)} />}
+
+      {/* ── AWARD BADGE MODAL ── */}
+      {awardBadge && <AwardBadgeModal badge={awardBadge} exonauts={exonauts} onClose={() => setAwardBadge(null)} />}
+
+      {/* ── BULK MARK RITUAL MODAL ── */}
+      {bulkRitual && <BulkMarkModal ritual={bulkRitual} exonauts={exonauts} onClose={() => setBulkRitual(null)} />}
+    </div>
+  );
+}
+
+function NewMissionModal({ exonauts, onClose }) {
+  const [title, setTitle]   = React.useState('');
+  const [points, setPoints] = React.useState('');
+  const [track, setTrack]   = React.useState('all');
+  const [week, setWeek]     = React.useState('');
+  const [saved, setSaved]   = React.useState(false);
+  function save() {
+    if (!title.trim() || !points) return;
+    __missionStore.add({ title: title.trim(), points: parseInt(points), track: track === 'all' ? '' : track, week: parseInt(week) || 0 });
+    setSaved(true); setTimeout(() => { setSaved(false); onClose(); }, 1000);
+  }
+  return (
+    <div onClick={onClose} style={{ position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',backdropFilter:'blur(4px)',zIndex:400,display:'flex',alignItems:'center',justifyContent:'center',padding:20 }}>
+      <div onClick={e => e.stopPropagation()} className="card-panel" style={{ width:'min(480px,100%)',padding:0,borderColor:'var(--lime)' }}>
+        <div style={{ padding:'18px 24px 14px',borderBottom:'1px solid var(--off-white-07)',display:'flex',justifyContent:'space-between',alignItems:'flex-start' }}>
+          <div>
+            <div className="t-mono" style={{ fontSize:9,color:'var(--lime)',letterSpacing:'0.12em',fontWeight:700,marginBottom:4 }}>NEW MISSION</div>
+            <h2 className="t-title" style={{ fontSize:22,margin:0 }}>Create Mission</h2>
+          </div>
+          <button onClick={onClose} style={{ background:'none',border:'none',color:'var(--off-white-40)',cursor:'pointer',fontSize:16 }}><i className="fa-solid fa-xmark" /></button>
+        </div>
+        <div style={{ padding:'20px 24px',display:'flex',flexDirection:'column',gap:14 }}>
+          <label style={{ display:'block' }}>
+            <div className="t-mono" style={{ fontSize:9,color:'var(--off-white-40)',letterSpacing:'0.1em',marginBottom:6,fontWeight:700 }}>MISSION TITLE</div>
+            <input className="input" value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. AI Landscape Report" style={{ width:'100%' }} />
+          </label>
+          <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:12 }}>
+            <label style={{ display:'block' }}>
+              <div className="t-mono" style={{ fontSize:9,color:'var(--off-white-40)',letterSpacing:'0.1em',marginBottom:6,fontWeight:700 }}>POINTS</div>
+              <input className="input" type="number" value={points} onChange={e => setPoints(e.target.value)} placeholder="e.g. 35" />
+            </label>
+            <label style={{ display:'block' }}>
+              <div className="t-mono" style={{ fontSize:9,color:'var(--off-white-40)',letterSpacing:'0.1em',marginBottom:6,fontWeight:700 }}>WEEK #</div>
+              <input className="input" type="number" value={week} onChange={e => setWeek(e.target.value)} placeholder="e.g. 3" />
+            </label>
+          </div>
+          <label style={{ display:'block' }}>
+            <div className="t-mono" style={{ fontSize:9,color:'var(--off-white-40)',letterSpacing:'0.1em',marginBottom:6,fontWeight:700 }}>TRACK</div>
+            <select className="input" value={track} onChange={e => setTrack(e.target.value)} style={{ width:'100%' }}>
+              <option value="all">All Tracks</option>
+              {(typeof TRACKS !== 'undefined' ? TRACKS : []).map(t => (
+                <option key={t.code} value={t.code}>{t.short || t.code}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <div style={{ padding:'12px 24px 20px',display:'flex',justifyContent:'flex-end',gap:8,borderTop:'1px solid var(--off-white-07)' }}>
+          <button onClick={onClose} className="btn btn-ghost btn-sm">CANCEL</button>
+          <button onClick={save} disabled={!title.trim() || !points}
+            className="btn btn-primary btn-sm"
+            style={{ opacity:(!title.trim()||!points)?0.5:1 }}>
+            {saved ? '✓ SAVED' : <><i className="fa-solid fa-check" /> CREATE MISSION</>}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AwardBadgeModal({ badge, exonauts, onClose }) {
+  const [search, setSearch] = React.useState('');
+  const [awarded, setAwarded] = React.useState([]);
+  const awardees = __badgeStore.getAwardees(badge.code);
+  function award(userId, name) {
+    __badgeStore.award(badge.code, userId);
+    if (window.__pointsStore) window.__pointsStore.add(userId, { source: 'manual', pts: 10, note: `Badge awarded: ${badge.name}` });
+    setAwarded(a => [...a, userId]);
+  }
+  const filtered = exonauts.filter(u => u.name.toLowerCase().includes(search.toLowerCase()));
+  return (
+    <div onClick={onClose} style={{ position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',backdropFilter:'blur(4px)',zIndex:400,display:'flex',alignItems:'center',justifyContent:'center',padding:20 }}>
+      <div onClick={e => e.stopPropagation()} className="card-panel" style={{ width:'min(440px,100%)',padding:0,borderColor:'var(--amber)',maxHeight:'80vh',display:'flex',flexDirection:'column' }}>
+        <div style={{ padding:'18px 24px 14px',borderBottom:'1px solid var(--off-white-07)' }}>
+          <div className="t-mono" style={{ fontSize:9,color:'var(--amber)',letterSpacing:'0.12em',fontWeight:700,marginBottom:8 }}>AWARD BADGE MANUALLY</div>
+          <div style={{ display:'flex',gap:12,alignItems:'center' }}>
+            <BadgeMedallion badge={badge} size={40} />
+            <div>
+              <div className="t-heading" style={{ fontSize:16,textTransform:'none',letterSpacing:0 }}>{badge.name}</div>
+              <div className="t-mono" style={{ fontSize:10,color:'var(--off-white-40)' }}>{awardees.length} ALREADY AWARDED</div>
+            </div>
+          </div>
+          <input className="input" placeholder="Search exonauts…" value={search} onChange={e => setSearch(e.target.value)} style={{ width:'100%',marginTop:12 }} />
+        </div>
+        <div style={{ overflow:'auto',flex:1,padding:'8px 12px 12px' }}>
+          {filtered.length === 0 && <div className="t-body" style={{ padding:24,textAlign:'center',color:'var(--off-white-40)',fontSize:12 }}>No exonauts found.</div>}
+          {filtered.map(u => {
+            const alreadyHas = awardees.includes(u.userId) || awarded.includes(u.userId);
+            return (
+              <div key={u.userId} style={{ display:'flex',alignItems:'center',gap:10,padding:'8px 8px',borderRadius:2 }}>
+                <AvatarWithRing name={u.name} size={30} tier="entry" />
+                <div style={{ flex:1 }} className="t-body" style={{ fontSize:12 }}>{u.name}</div>
+                {alreadyHas
+                  ? <span className="t-mono" style={{ fontSize:9,color:'var(--lime)' }}>✓ AWARDED</span>
+                  : <button className="btn btn-ghost btn-sm" style={{ padding:'4px 10px' }} onClick={() => award(u.userId, u.name)}>AWARD</button>
+                }
+              </div>
+            );
+          })}
+        </div>
+        <div style={{ padding:'12px 24px',borderTop:'1px solid var(--off-white-07)',display:'flex',justifyContent:'flex-end' }}>
+          <button onClick={onClose} className="btn btn-primary btn-sm">DONE</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BulkMarkModal({ ritual, exonauts, onClose }) {
+  const [done, setDone] = React.useState(false);
+  const sourceMap = { 'Monday Ignition':'ritual.mon_ign', 'Mid-Week Pulse':'ritual.mid_pls', 'Friday Win Wall':'ritual.fri_win' };
+  const ptsMap    = { 'ritual.mon_ign': 5, 'ritual.mid_pls': 3, 'ritual.fri_win': 5 };
+  const source    = sourceMap[ritual.name] || 'ritual.mon_ign';
+  const pts       = ptsMap[source] || 5;
+  function bulkMark() {
+    exonauts.forEach(u => {
+      if (window.__pointsStore) window.__pointsStore.add(u.userId, { source, pts, note: `${ritual.name} — bulk marked by Admin` });
+    });
+    setDone(true); setTimeout(onClose, 1500);
+  }
+  return (
+    <div onClick={onClose} style={{ position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',backdropFilter:'blur(4px)',zIndex:400,display:'flex',alignItems:'center',justifyContent:'center',padding:20 }}>
+      <div onClick={e => e.stopPropagation()} className="card-panel" style={{ width:'min(400px,100%)',padding:24,borderColor:'var(--lime)',textAlign:'center' }}>
+        <i className="fa-solid fa-gavel" style={{ fontSize:32,color:'var(--lime)',marginBottom:12,display:'block' }} />
+        <h2 className="t-title" style={{ fontSize:20,margin:'0 0 8px 0' }}>{ritual.name}</h2>
+        <div className="t-body" style={{ color:'var(--off-white-68)',fontSize:13,marginBottom:20 }}>
+          Award <strong>+{pts} pts</strong> to all <strong>{exonauts.length} Exonauts</strong> for this ritual?
+        </div>
+        {done
+          ? <div className="t-mono" style={{ color:'var(--lime)',fontSize:12 }}>✓ AWARDED TO {exonauts.length} EXONAUTS</div>
+          : <div style={{ display:'flex',gap:10,justifyContent:'center' }}>
+              <button onClick={onClose} className="btn btn-ghost btn-sm">CANCEL</button>
+              <button onClick={bulkMark} className="btn btn-primary">
+                <i className="fa-solid fa-check" /> CONFIRM BULK MARK
+              </button>
+            </div>
+        }
+      </div>
     </div>
   );
 }
@@ -1007,25 +1334,38 @@ function CommunityPage() {
   const [selected, setSelected] = React.useState(null);
 
   const registeredUsers = window.useRegisteredUsers ? window.useRegisteredUsers() : [];
+  const { all: allCohorts } = window.useCohort ? window.useCohort() : { all: [] };
+
   const members = React.useMemo(() =>
-    registeredUsers.map(u => ({
-      id: u.userId,
-      name: u.name,
-      status: 'active',
-      cohort: '2026-27',
-      track: null,
-      tier: 'entry',
-      tierBadge: 'entry',
-      points: 0,
-      badges: 0,
-      credentials: [],
-      project: null,
-      role: u.role === 'admin' ? 'Platform Admin'
-          : u.role === 'lead' ? 'Mission Lead'
-          : u.role === 'commander' ? 'Commander'
-          : null,
-      socials: null,
-    })), [registeredUsers]);
+    registeredUsers.map(u => {
+      // Resolve actual cohort name from assignment store
+      const cohortId = u.cohortId
+        || (window.getUserCohort ? window.getUserCohort(u.userId) : null);
+      const cohortObj = allCohorts.find(c => c.id === cohortId);
+      const cohortLabel = cohortObj
+        ? (cohortObj.name || cohortObj.code || cohortId)
+        : (cohortId || '—');
+      const pts  = window.__pointsStore ? window.__pointsStore.getTotal(u.userId) : 0;
+      const tier = window.getTierFromPts ? window.getTierFromPts(pts) : 'entry';
+      return {
+        id: u.userId,
+        name: u.name,
+        status: 'active',
+        cohort: cohortLabel,
+        track: window.getUserTrack ? window.getUserTrack(u.userId) : null,
+        tier,
+        tierBadge: tier,
+        points: pts,
+        badges: 0,
+        credentials: [],
+        project: null,
+        role: u.role === 'admin' ? 'Platform Admin'
+            : u.role === 'lead' ? 'Mission Lead'
+            : u.role === 'commander' ? 'Commander'
+            : null,
+        socials: null,
+      };
+    }), [registeredUsers, allCohorts]);
 
   // Unique batches (cohort years) across all members, sorted newest → oldest
   const allBatches = React.useMemo(() => {

@@ -132,14 +132,24 @@ function KudosModal({ onClose, onSent }) {
   const kudos = useKudos();
   const registeredUsers = window.useRegisteredUsers ? window.useRegisteredUsers() : [];
 
-  // Identify who's posting — varies by role.
+  // Identify who's posting — reads live role profile so name/identity is always current.
   const me = React.useMemo(() => {
     let auth = {};
     try { auth = JSON.parse(localStorage.getItem('exo:auth') || '{}'); } catch (e) {}
     const role = auth.role || 'exonaut';
-    if (role === 'lead')      return { id: 'lead-ais',   name: 'Dr. Nadia Oyelaran', role: 'lead',      badge: 'LEAD' };
-    if (role === 'commander') return { id: 'cmdr-mack',  name: 'Mack Comandante',    role: 'commander', badge: 'COMMANDER' };
-    if (role === 'admin')     return { id: 'admin-ops',  name: 'Ops Admin',          role: 'admin',     badge: 'ADMIN' };
+    const rp = window.loadRoleProfile;
+    if (role === 'lead') {
+      const p = rp ? rp('lead') : {};
+      return { id: 'lead-ais',  name: p.name || 'Dr. Nadia Oyelaran', role: 'lead',      badge: 'LEAD' };
+    }
+    if (role === 'commander') {
+      const p = rp ? rp('commander') : {};
+      return { id: 'cmdr-mack', name: p.name || 'Mack Comandante',    role: 'commander', badge: 'COMMANDER' };
+    }
+    if (role === 'admin') {
+      const p = rp ? rp('admin') : {};
+      return { id: 'admin-ops', name: p.name || 'Ops Admin',          role: 'admin',     badge: 'ADMIN' };
+    }
     return { id: (typeof ME_ID !== 'undefined') ? ME_ID : 'u14', name: (typeof ME !== 'undefined') ? ME.name : 'You', role: 'exonaut', badge: null };
   }, []);
 
