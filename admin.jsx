@@ -206,7 +206,15 @@ function PlatformAdminSidebar({ current, onNavigate, onSignOut }) {
 // -------- Cohort Management --------
 function AdminCohorts() {
   const { all, cohortId, setSelected, createCohort, deleteCohort } = useCohort();
+  const registeredUsers = useRegisteredUsers();
   const [creating, setCreating] = React.useState(false);
+
+  // Count users per cohort including Supabase-registered users
+  function cohortUserCount(cId) {
+    const seedCount = getCohortUsers(cId).length;
+    const regCount  = registeredUsers.filter(u => u.cohortId === cId).length;
+    return seedCount + regCount;
+  }
 
   return (
     <div className="enter">
@@ -227,7 +235,7 @@ function AdminCohorts() {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 14 }}>
         {all.map(c => {
-          const users = getCohortUsers(c.id);
+          const count  = cohortUserCount(c.id);
           const accent = c.status === 'active' ? 'var(--lime)' : c.status === 'upcoming' ? 'var(--sky)' : 'var(--lavender)';
           const isSelected = c.id === cohortId;
           return (
@@ -264,7 +272,7 @@ function AdminCohorts() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: 'var(--off-white-07)', borderRadius: 2 }}>
                 <i className="fa-solid fa-user-group" style={{ fontSize: 10, color: 'var(--off-white-68)' }} />
                 <span className="t-mono" style={{ fontSize: 10, color: 'var(--off-white)', letterSpacing: '0.06em' }}>
-                  {users.length} EXONAUT{users.length === 1 ? '' : 'S'}
+                  {count} EXONAUT{count === 1 ? '' : 'S'}
                 </span>
               </div>
             </div>
@@ -283,24 +291,33 @@ function AdminCohorts() {
 function AdminAssign() {
   const { all, assignUserToCohort, assignUserToTrack, assignUserToLead } = useCohort();
   const { scope } = useAdminScope();
+  const registeredUsers = useRegisteredUsers();
   const [, setTick] = React.useState(0);
   const [search, setSearch] = React.useState('');
 
-  // Leads bucketed by track — lets admin pick a plausible manager.
   const leadsByTrack = React.useMemo(() => {
     const map = {};
     LEADS.forEach(l => { (map[l.track] = map[l.track] || []).push(l); });
     return map;
   }, []);
 
-  const filtered = USERS.filter(u => {
-    const curCohort = getUserCohort(u.id);
+  // Registered Exonauts only — seed users are demo data
+  const filtered = registeredUsers.filter(u => {
+    if (u.role !== 'exonaut') return false;
+    const curCohort = u.cohortId || getUserCohort(u.userId);
     if (scope !== 'all' && curCohort !== scope) return false;
     if (search && !u.name.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
 
   const scopeLabel = scope === 'all' ? 'All Cohorts' : (all.find(c => c.id === scope)?.name || '—');
+
+  const selectStyle = {
+    padding: '6px 8px', background: 'var(--deep-black)', color: 'var(--off-white)',
+    border: '1px solid var(--off-white-15)', borderRadius: 2,
+    fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.06em',
+    cursor: 'pointer', outline: 'none', width: '100%',
+  };
 
   return (
     <div className="enter">
@@ -311,7 +328,7 @@ function AdminAssign() {
           </div>
           <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>Assign Exonauts</h1>
           <div className="t-body" style={{ marginTop: 6 }}>
-            Set Cohort, Track, and Manager for each Exonaut. Changes take effect immediately across all role views.
+            Set Cohort, Track, and Manager for each Exonaut. Changes take effect immediately.
           </div>
         </div>
       </div>
@@ -319,71 +336,70 @@ function AdminAssign() {
       <div className="card-panel" style={{ padding: 16, marginBottom: 16 }}>
         <div style={{ position: 'relative' }}>
           <i className="fa-solid fa-magnifying-glass" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--off-white-40)', fontSize: 11 }} />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name…"
-            style={{
-              width: '100%', padding: '9px 12px 9px 32px',
-              background: 'var(--deep-black)', color: 'var(--off-white)',
-              border: '1px solid var(--off-white-15)', borderRadius: 2,
-              fontFamily: 'var(--font-display)', fontSize: 12, outline: 'none',
-            }} />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by name…"
+            style={{ width: '100%', padding: '9px 12px 9px 32px', background: 'var(--deep-black)', color: 'var(--off-white)', border: '1px solid var(--off-white-15)', borderRadius: 2, fontFamily: 'var(--font-display)', fontSize: 12, outline: 'none' }} />
         </div>
         <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.08em', marginTop: 10 }}>
           <i className="fa-solid fa-filter" style={{ marginRight: 5 }} />
-          SCOPE: {scopeLabel.toUpperCase()} · CHANGE VIA SIDEBAR COHORT FILTER
+          SCOPE: {scopeLabel.toUpperCase()} · {filtered.length} EXONAUT{filtered.length !== 1 ? 'S' : ''}
         </div>
       </div>
 
-      <div className="lb-table">
-        <div className="lb-header" style={{ gridTemplateColumns: '48px 1.4fr 90px 180px 180px 200px' }}>
-          <div></div>
-          <div>EXONAUT</div>
-          <div>POINTS</div>
-          <div>COHORT</div>
-          <div>TRACK</div>
-          <div>MANAGER</div>
+      {registeredUsers.length === 0 ? (
+        <div className="card-panel" style={{ textAlign: 'center', padding: 48 }}>
+          <i className="fa-solid fa-user-plus" style={{ fontSize: 28, color: 'var(--off-white-40)', marginBottom: 12, display: 'block' }} />
+          <div className="t-heading" style={{ fontSize: 15, marginBottom: 6 }}>No registered Exonauts yet</div>
+          <div className="t-body" style={{ fontSize: 13, color: 'var(--off-white-40)' }}>
+            Users will appear here once they sign up via the Create Account screen.
+          </div>
         </div>
-        {filtered.slice(0, 50).map(u => {
-          const curCohort = getUserCohort(u.id);
-          const curTrack = getUserTrack(u.id);
-          const curLead = getUserLead(u.id);
-          const leadOptions = leadsByTrack[curTrack] || LEADS;
-          const selectStyle = {
-            padding: '6px 8px', background: 'var(--deep-black)', color: 'var(--off-white)',
-            border: '1px solid var(--off-white-15)', borderRadius: 2,
-            fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.06em',
-            cursor: 'pointer', outline: 'none', width: '100%',
-          };
-          return (
-            <div key={u.id} className="lb-row" style={{ gridTemplateColumns: '48px 1.4fr 90px 180px 180px 200px' }}>
-              <AvatarWithRing name={u.name} size={34} tier={u.tier} />
-              <div className="lb-name">{u.name}</div>
-              <div className="lb-points">{u.points}</div>
-              <select value={curCohort} onChange={(e) => { assignUserToCohort(u.id, e.target.value); setTick(t => t + 1); }} style={selectStyle}>
-                {all.map(c => (<option key={c.id} value={c.id}>{c.name}</option>))}
-              </select>
-              <select value={curTrack} onChange={(e) => { assignUserToTrack(u.id, e.target.value); setTick(t => t + 1); }} style={selectStyle}>
-                {TRACKS.map(t => (<option key={t.code} value={t.code}>{t.short} — {t.name}</option>))}
-              </select>
-              <select value={curLead?.id || ''} onChange={(e) => { assignUserToLead(u.id, e.target.value); setTick(t => t + 1); }} style={selectStyle}>
-                <option value="">— Unassigned —</option>
-                <optgroup label={'In ' + (TRACKS.find(t => t.code === curTrack)?.short || curTrack)}>
-                  {leadOptions.map(l => (<option key={l.id} value={l.id}>{l.name}</option>))}
-                </optgroup>
-                <optgroup label="Other tracks">
-                  {LEADS.filter(l => l.track !== curTrack).map(l => {
-                    const tr = TRACKS.find(t => t.code === l.track);
-                    return (<option key={l.id} value={l.id}>{l.name} ({tr?.short})</option>);
-                  })}
-                </optgroup>
-              </select>
-            </div>
-          );
-        })}
-      </div>
-
-      {filtered.length === 0 && (
-        <div className="card-panel" style={{ textAlign: 'center', padding: 48, marginTop: 14 }}>
+      ) : filtered.length === 0 ? (
+        <div className="card-panel" style={{ textAlign: 'center', padding: 48 }}>
           <div className="t-body" style={{ color: 'var(--off-white-68)' }}>No Exonauts match your filters.</div>
+        </div>
+      ) : (
+        <div className="lb-table">
+          <div className="lb-header" style={{ gridTemplateColumns: '48px 1.4fr 160px 180px 200px' }}>
+            <div></div><div>EXONAUT</div><div>COHORT</div><div>TRACK</div><div>MANAGER</div>
+          </div>
+          {filtered.map(u => {
+            const uid = u.userId;
+            const curCohort = u.cohortId || getUserCohort(uid) || '';
+            const curTrack  = getUserTrack(uid) || '';
+            const curLead   = getUserLead(uid);
+            const leadOpts  = leadsByTrack[curTrack] || LEADS;
+            return (
+              <div key={uid} className="lb-row" style={{ gridTemplateColumns: '48px 1.4fr 160px 180px 200px' }}>
+                <AvatarWithRing name={u.name} size={34} tier={u.tier || 'entry'} />
+                <div>
+                  <div className="lb-name">{u.name}</div>
+                  <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.06em', marginTop: 2 }}>{u.email}</div>
+                </div>
+                <select value={curCohort} onChange={e => { assignUserToCohort(uid, e.target.value); setTick(t => t + 1); }} style={selectStyle}>
+                  <option value="">— Unassigned —</option>
+                  {all.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+                <select value={curTrack} onChange={e => { assignUserToTrack(uid, e.target.value); setTick(t => t + 1); }} style={selectStyle}>
+                  <option value="">— Unassigned —</option>
+                  {TRACKS.map(t => <option key={t.code} value={t.code}>{t.short} — {t.name}</option>)}
+                </select>
+                <select value={curLead?.id || ''} onChange={e => { assignUserToLead(uid, e.target.value); setTick(t => t + 1); }} style={selectStyle}>
+                  <option value="">— Unassigned —</option>
+                  <optgroup label={'In ' + (TRACKS.find(t => t.code === curTrack)?.short || curTrack || 'Track')}>
+                    {leadOpts.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                  </optgroup>
+                  {LEADS.filter(l => l.track !== curTrack).length > 0 && (
+                    <optgroup label="Other tracks">
+                      {LEADS.filter(l => l.track !== curTrack).map(l => {
+                        const tr = TRACKS.find(t => t.code === l.track);
+                        return <option key={l.id} value={l.id}>{l.name} ({tr?.short})</option>;
+                      })}
+                    </optgroup>
+                  )}
+                </select>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
