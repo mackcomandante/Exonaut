@@ -572,7 +572,7 @@ function ThreadCompose({ open, onClose, defaultChannel, me }) {
     if (!canPost) return;
     board.createThread({
       channel, title: title.trim(), body: body.trim(),
-      authorId: me.id, authorName: me.role === 'exonaut' ? null : me.name, authorRole: me.role,
+      authorId: me.id, authorName: me.name, authorRole: me.role,
     });
     // Notify @mentioned users
     memberPool.forEach(m => {
