@@ -1118,10 +1118,14 @@ function ManagerEditModal({ mode, initial, cohorts = [], defaultCohortId, onClos
             fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.08em', fontWeight: 700, textTransform: 'uppercase',
           }}>Cancel</button>
           <button onClick={save} disabled={!canSave} style={{
-            padding: '9px 16px', background: canSave ? 'var(--sky)' : 'var(--off-white-15)',
-            border: 'none', borderRadius: 2, color: canSave ? 'var(--deep-black)' : 'var(--off-white-40)',
+            padding: '9px 16px',
+            background: canSave ? 'var(--sky)' : 'rgba(0,0,0,0.08)',
+            border: canSave ? 'none' : '1px solid rgba(0,0,0,0.15)',
+            borderRadius: 2,
+            color: canSave ? '#0a0a0a' : 'rgba(0,0,0,0.3)',
             cursor: canSave ? 'pointer' : 'not-allowed',
             fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.08em', fontWeight: 700, textTransform: 'uppercase',
+            opacity: canSave ? 1 : 0.6,
           }}>
             <i className={'fa-solid ' + icon} style={{ marginRight: 6 }} />{cta}
           </button>
