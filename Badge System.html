@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Exonaut — Badge System</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+
+  <!-- Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+  <!-- FontAwesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+
+  <!-- React + Babel -->
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+  <style>
+    :root {
+      --font-display: 'Space Grotesk', system-ui, sans-serif;
+      --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+      --ink: #14161A;
+      --paper: #F5F2EC;
+      --lime: #C9F24A;
+      --hairline: rgba(20,22,26,0.12);
+    }
+    html, body { margin: 0; height: 100%; background: #E9E4D8; font-family: var(--font-display); color: var(--ink); }
+    #root { height: 100%; }
+
+    /* Backplate treatments used inside artboards. */
+    .bp-ink    { background: #0A0B0E; color: #F5F2EC; }
+    .bp-paper  { background: #F5F2EC; color: #14161A; }
+    .bp-cream  { background: #FBF8F2; color: #14161A; }
+    .bp-grid   {
+      background:
+        radial-gradient(circle at 50% 40%, rgba(201,242,74,0.05), transparent 60%),
+        #0A0B0E;
+      color: #F5F2EC;
+    }
+    .bp-studio {
+      background:
+        radial-gradient(circle at 30% 20%, rgba(255,255,255,0.10), transparent 55%),
+        linear-gradient(180deg, #1E1F23 0%, #0A0B0E 100%);
+      color: #F5F2EC;
+    }
+
+    .stamp {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      font-weight: 500;
+    }
+    .rule { height: 1px; background: currentColor; opacity: 0.15; }
+    .pill {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      font-weight: 600;
+      border: 1px solid currentColor;
+      opacity: 0.8;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel" src="./badges/design-canvas.jsx"></script>
+  <script type="text/babel" src="./badges/badge-primitives.jsx"></script>
+
+  <script type="text/babel">
+    const { DesignCanvas, DCSection, DCArtboard } = window;
+    const { BadgeMedallion } = window;
+
+    // ---------- Full badge catalog (mirrors data.js) ----------
+    const BADGES_ALL = [
+      // Milestone — auto-issued at 100 / 300 / 600 / 900
+      { code: 'MIL-BRZ', name: 'Bronze Builder',     subtitle: '100 points milestone', category: 'milestone', color: '#CD7F32', surface: 'metal-bronze',   earned: true  },
+      { code: 'MIL-SLV', name: 'Silver Strategist',  subtitle: '300 points milestone', category: 'milestone', color: '#A8B4BE', surface: 'metal-silver',   earned: true  },
+      { code: 'MIL-GLD', name: 'Gold Innovator',     subtitle: '600 points milestone', category: 'milestone', color: '#D4A84A', surface: 'metal-gold',     earned: false },
+      { code: 'MIL-PLT', name: 'Platinum Disruptor', subtitle: '900 points milestone', category: 'milestone', color: '#C9D7DF', surface: 'metal-platinum', earned: false },
+
+      // Track — 7 tracks, ink with track accent. Only the Exonaut's own track is earnable.
+      { code: 'TRK-AIS', name: 'AI Strategist',    subtitle: 'AI Strategy Track',     category: 'track', color: '#C9F24A', surface: 'ink', earned: false },
+      { code: 'TRK-VB',  name: 'Venture Builder',  subtitle: 'Venture Track',         category: 'track', color: '#B14CFF', surface: 'ink', earned: false },
+      { code: 'TRK-LD',  name: 'L&D Champion',     subtitle: 'L&D Track',             category: 'track', color: '#C6B8FF', surface: 'ink', earned: false },
+      { code: 'TRK-XM',  name: 'Experience Maker', subtitle: 'Experience Track',      category: 'track', color: '#F59E0B', surface: 'ink', earned: false },
+      { code: 'TRK-AID', name: 'AI Dev Builder',   subtitle: 'AI Dev Track',          category: 'track', color: '#8BE8FF', surface: 'ink', earned: false },
+      { code: 'TRK-POL', name: 'Policy Analyst',   subtitle: 'Policy Track',          category: 'track', color: '#CD7F32', surface: 'ink', earned: false },
+      { code: 'TRK-CC',  name: 'Content Creator',  subtitle: 'Content Track',         category: 'track', color: '#3DDC84', surface: 'ink', earned: false },
+
+      // Pillar — rare. Ink + strong accent.
+      { code: 'PIL-DLV', name: 'Delivery Machine',    subtitle: 'Max Project score',     category: 'pillar', color: '#C9F24A', surface: 'ink', earned: false },
+      { code: 'PIL-INN', name: 'Innovation Catalyst', subtitle: 'Breakthrough work',     category: 'pillar', color: '#B14CFF', surface: 'ink', earned: false },
+      { code: 'PIL-CLT', name: 'Client Champion',     subtitle: 'Max Client score',      category: 'pillar', color: '#8BE8FF', surface: 'ink', earned: false },
+      { code: 'PIL-TAL', name: 'Talent Scout',        subtitle: 'Max Recruitment score', category: 'pillar', color: '#FFB7D5', surface: 'ink', earned: false },
+
+      // Special — mixed. Trifecta/MVP/Disruptor are legendary → metal. Others → ink with accent.
+      { code: 'SPL-TRI', name: 'Perfect Trifecta',      subtitle: 'All three pillars maxed', category: 'special', color: '#F4C542', surface: 'metal-gold',   earned: false },
+      { code: 'SPL-MVP', name: 'Track MVP',             subtitle: 'Top of your track',       category: 'special', color: '#C9F24A', surface: 'metal-platinum', earned: false },
+      { code: 'SPL-IOW', name: 'Intern of the Week',    subtitle: 'Community-voted weekly',  category: 'special', color: '#FFB020', surface: 'ink', earned: true  },
+      { code: 'SPL-DIS', name: 'Most Likely to Disrupt', subtitle: 'Program-end award',      category: 'special', color: '#FF5B5B', surface: 'metal-silver', earned: false },
+      { code: 'SPL-CLT', name: 'Culture Carrier',       subtitle: 'Most kudos received',     category: 'special', color: '#B095C5', surface: 'ink', earned: false },
+      { code: 'SPL-FUL', name: 'Full Cycle',            subtitle: 'All rituals attended',    category: 'special', color: '#22C55E', surface: 'ink', earned: false },
+      { code: 'SPL-PIP', name: 'Pipeline Builder',      subtitle: '3+ recruits placed',      category: 'special', color: '#8BE8FF', surface: 'ink', earned: false },
+    ];
+
+    // ---------- Card wrapper ----------
+    function BadgeCard({ badge, locked = false, lightBp = false }) {
+      const s = badge.surface;
+      const bpClass = lightBp ? 'bp-cream'
+        : s === 'ink' ? 'bp-grid'
+        : s === 'paper' ? 'bp-cream'
+        : 'bp-studio';
+
+      const cohortLabel = 'COHORT 04 · 2026';
+      const holder = 'Maya Okonkwo';
+      const issueId = 'EXO-BDG-' + badge.code.replace('-', '');
+      const dateLabel = badge.earned ? 'OCT 2026' : 'TO BE EARNED';
+
+      return (
+        <div className={bpClass} style={{
+          width: '100%', height: '100%',
+          display: 'grid',
+          gridTemplateRows: 'auto 1fr auto',
+          padding: '26px 28px',
+          boxSizing: 'border-box',
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="stamp" style={{ opacity: 0.55 }}>{badge.category.toUpperCase()}</div>
+            <div className="pill" style={{
+              opacity: locked ? 0.5 : 0.85,
+              borderColor: locked ? 'currentColor' : badge.color,
+              color: locked ? 'currentColor' : badge.color,
+            }}>
+              {locked ? 'Locked' : 'Earned'}
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', placeItems: 'center', padding: '12px 0' }}>
+            <BadgeMedallion
+              code={badge.code}
+              name={badge.name}
+              subtitle={badge.subtitle}
+              cohortLabel={cohortLabel}
+              holder={holder}
+              issueId={issueId}
+              dateLabel={dateLabel}
+              color={badge.color}
+              surface={badge.surface}
+              locked={locked}
+              size={380}
+            />
+          </div>
+
+          <div>
+            <div className="rule" style={{ marginBottom: 12 }} />
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16 }}>
+              <div>
+                <div className="stamp" style={{ opacity: 0.5, marginBottom: 3 }}>Code</div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 500 }}>{badge.code}</div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div className="stamp" style={{ opacity: 0.5, marginBottom: 3 }}>{locked ? 'Unlock at' : 'Issued'}</div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 500 }}>
+                  {locked ? '—' : 'Oct 22, 2026'}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ---------- App ----------
+    function App() {
+      const byCat = (c) => BADGES_ALL.filter(b => b.category === c);
+      const CARD_W = 460, CARD_H = 620;
+
+      return (
+        <DesignCanvas
+          title="Exonaut — Badge System"
+          subtitle="22 badges · 4 categories · ink / paper / metal surfaces"
+        >
+          {/* Hero sample — one badge, three surface treatments */}
+          <DCSection id="hero" title="Sample · AI Strategist · three surface treatments">
+            <DCArtboard id="hero-ink" label="Ink — primary (dashboard, share)" width={CARD_W} height={CARD_H}>
+              <BadgeCard badge={{ ...BADGES_ALL.find(b => b.code === 'TRK-AIS'), surface: 'ink', earned: true }} />
+            </DCArtboard>
+            <DCArtboard id="hero-paper" label="Paper — print / certificate" width={CARD_W} height={CARD_H}>
+              <BadgeCard badge={{ ...BADGES_ALL.find(b => b.code === 'TRK-AIS'), surface: 'paper', earned: true }} lightBp />
+            </DCArtboard>
+            <DCArtboard id="hero-metal" label="Metal — anniversary edition" width={CARD_W} height={CARD_H}>
+              <BadgeCard badge={{ ...BADGES_ALL.find(b => b.code === 'TRK-AIS'), surface: 'metal-gold', earned: true }} />
+            </DCArtboard>
+          </DCSection>
+
+          {/* Milestone */}
+          <DCSection id="milestone" title="Milestone Tiers · auto-issued at 100 / 300 / 600 / 900 points (4)">
+            {byCat('milestone').map(b => (
+              <DCArtboard key={b.code} id={b.code} label={b.name} width={CARD_W} height={CARD_H}>
+                <BadgeCard badge={b} locked={!b.earned} />
+              </DCArtboard>
+            ))}
+          </DCSection>
+
+          {/* Track */}
+          <DCSection id="track" title="Track Completion · awarded when all missions in a track are approved (7)">
+            {byCat('track').map(b => (
+              <DCArtboard key={b.code} id={b.code} label={b.name} width={CARD_W} height={CARD_H}>
+                <BadgeCard badge={b} locked />
+              </DCArtboard>
+            ))}
+          </DCSection>
+
+          {/* Pillar */}
+          <DCSection id="pillar" title="Pillar Badges · earned by maxing a scoring pillar (4)">
+            {byCat('pillar').map(b => (
+              <DCArtboard key={b.code} id={b.code} label={b.name} width={CARD_W} height={CARD_H}>
+                <BadgeCard badge={b} locked />
+              </DCArtboard>
+            ))}
+          </DCSection>
+
+          {/* Special */}
+          <DCSection id="special" title="Special Awards · recognition, legends, and cohort-wide moments (7)">
+            {byCat('special').map(b => (
+              <DCArtboard key={b.code} id={b.code} label={b.name} width={CARD_W} height={CARD_H}>
+                <BadgeCard badge={b} locked={!b.earned} />
+              </DCArtboard>
+            ))}
+          </DCSection>
+
+          {/* Locked states overview */}
+          <DCSection id="locked" title="Locked state · visible but dimmed to motivate">
+            <DCArtboard id="locked-1" label="Gold Innovator (locked)" width={CARD_W} height={CARD_H}>
+              <BadgeCard badge={BADGES_ALL.find(b => b.code === 'MIL-GLD')} locked />
+            </DCArtboard>
+            <DCArtboard id="locked-2" label="Perfect Trifecta (locked)" width={CARD_W} height={CARD_H}>
+              <BadgeCard badge={BADGES_ALL.find(b => b.code === 'SPL-TRI')} locked />
+            </DCArtboard>
+            <DCArtboard id="locked-3" label="Venture Builder (locked)" width={CARD_W} height={CARD_H}>
+              <BadgeCard badge={BADGES_ALL.find(b => b.code === 'TRK-VB')} locked />
+            </DCArtboard>
+          </DCSection>
+        </DesignCanvas>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>

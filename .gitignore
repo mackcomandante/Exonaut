@@ -1,0 +1,19 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Claude
+.claude/
+
+# Screenshots / local dev artifacts
+screenshots/
+uploads/
+.chrome-test/
+.chrome-test-*/
+
+# Logs
+*.log
+
+# Node (if added later)
+node_modules/
