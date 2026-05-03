@@ -101,6 +101,7 @@ function Profile({ onOpenMission, onTriggerBadge }) {
   }
 
   const { total: livePoints, delta: liveDelta } = useComputedPoints(ME_ID);
+  const pillarScores = window.usePillarScores ? window.usePillarScores(ME_ID) : { missions: ME.p1, client: ME.p2, recruitment: ME.p3 };
   const liveBadges = useLiveBadges();
   const earnedBadges = liveBadges.filter(b => b.earned);
 
@@ -253,7 +254,7 @@ function Profile({ onOpenMission, onTriggerBadge }) {
           <div className="v">{earnedBadges.length}<span style={{ color: 'var(--off-white-40)', fontSize: 14, marginLeft: 4 }}>/ 22</span></div>
         </div>
         <div className="profile-stat">
-          <div className="k">Missions Approved</div>
+          <div className="k">Track Tasks Approved</div>
           <div className="v">{approvedMissions.length}<span style={{ color: 'var(--off-white-40)', fontSize: 14, marginLeft: 4 }}>/ 7</span></div>
         </div>
         <div className="profile-stat">
@@ -268,7 +269,7 @@ function Profile({ onOpenMission, onTriggerBadge }) {
         <div className={'lb-tab' + (tab === 'badges' ? ' active' : '')} onClick={() => setTab('badges')}>
           Badges <span style={{ opacity: 0.5, marginLeft: 6 }}>{earnedBadges.length}/22</span>
         </div>
-        <div className={'lb-tab' + (tab === 'missions' ? ' active' : '')} onClick={() => setTab('missions')}>Mission History</div>
+        <div className={'lb-tab' + (tab === 'missions' ? ' active' : '')} onClick={() => setTab('missions')}>Track History</div>
       </div>
 
       {tab === 'overview' && (
@@ -280,9 +281,9 @@ function Profile({ onOpenMission, onTriggerBadge }) {
               <span className="section-meta">WEIGHTED · PROGRAM TO DATE</span>
             </div>
             {[
-              { k: 'Project', v: ME.p1, max: 400, color: 'var(--ink)', label: 'P1 · 40%' },
-              { k: 'Client',  v: ME.p2, max: 350, color: 'var(--platinum)', label: 'P2 · 35%' },
-              { k: 'Recruitment', v: ME.p3, max: 250, color: 'var(--lavender)', label: 'P3 · 25%' },
+              { k: 'Missions', v: pillarScores.missions, max: 400, color: 'var(--ink)', label: 'P1 · 40%' },
+              { k: 'Client',  v: pillarScores.client, max: 350, color: 'var(--platinum)', label: 'P2 · 35%' },
+              { k: 'Recruitment', v: pillarScores.recruitment, max: 250, color: 'var(--lavender)', label: 'P3 · 25%' },
             ].map(p => (
               <div key={p.k} className="card-flat" style={{ marginBottom: 10 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
@@ -357,7 +358,7 @@ function Profile({ onOpenMission, onTriggerBadge }) {
       {tab === 'missions' && (
         <div>
           <div className="section-head">
-            <h2 style={{ fontSize: 16 }}>Mission History · Chronological</h2>
+            <h2 style={{ fontSize: 16 }}>Track History · Chronological</h2>
             <span className="section-meta">{approvedMissions.length} COMPLETED</span>
           </div>
           <div>

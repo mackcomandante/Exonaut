@@ -8,15 +8,18 @@
   function save(data) {
     try { localStorage.setItem(STORE_KEY, JSON.stringify(data)); } catch {}
   }
+  const listeners = new Set();
+  function notify() { listeners.forEach(fn => fn()); }
 
   // Source catalogue — canonical point sources mapped from POINTS_RUBRIC
   const POINT_SOURCES = {
     'onboarding.pledge':          { label: 'Pledge Signed',                  pts: 50,  oneTime: true  },
     'onboarding.linkedin':        { label: 'LinkedIn Post Published',         pts: 20,  oneTime: true  },
     'profile.complete':           { label: 'Profile Fully Completed',         pts: 30,  oneTime: true  },
-    'mission.submit':             { label: 'Mission Submitted On Time',       pts: null               }, // variable
-    'mission.good':               { label: 'Mission Graded Good',             pts: 10                 },
-    'mission.excellent':          { label: 'Mission Graded Excellent',        pts: 20                 },
+    'mission.submit':             { label: 'Track Submitted On Time',         pts: null               }, // variable
+    'mission.good':               { label: 'Track Graded Good',               pts: 10                 },
+    'mission.excellent':          { label: 'Track Graded Excellent',          pts: 20                 },
+    'project.task':               { label: 'Project Task Approved',           pts: null               },
     'client.pipeline':            { label: 'Prospect Pipeline (10 qualified)',pts: 20,  oneTime: true  },
     'client.concept_paper':       { label: 'Concept Paper Submitted',         pts: 30                 },
     'client.discovery':           { label: 'Discovery Meeting Completed',     pts: 25                 },
@@ -61,6 +64,7 @@
       };
       data[userId].push(entry);
       save(data);
+      notify();
       return entry;
     },
 
@@ -104,7 +108,10 @@
       const data = load();
       delete data[userId];
       save(data);
+      notify();
     },
+
+    subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
   };
 
   // Tier helper (shared between store and auto-score)

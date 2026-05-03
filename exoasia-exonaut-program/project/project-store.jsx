@@ -1,4 +1,4 @@
-// Project management flow: First Officer ownership, Second Officer track boards,
+﻿// Project management flow: Project Lead ownership, Track Lead / First Officer boards,
 // roster submissions, review comments, and project point awards.
 (function () {
   if (window.__projectStore) return;
@@ -17,13 +17,54 @@
   };
 
   const KANBAN_COLUMNS = [
+    { id: 'backlog', label: 'Backlog', icon: 'fa-box-archive' },
     { id: 'assigned', label: 'To Do', icon: 'fa-list-check' },
     { id: 'in_progress', label: 'In Progress', icon: 'fa-spinner' },
     { id: 'submitted', label: 'Done', icon: 'fa-circle-check' },
     { id: 'approved', label: 'Approved', icon: 'fa-award' },
   ];
 
-  const PRIORITIES = ['low', 'medium', 'high', 'urgent'];
+  const TASK_CLASSES = {
+    critical: { label: 'CRITICAL', color: 'red', points: 2 },
+    urgent: { label: 'URGENT', color: 'blue', points: 1 },
+    important: { label: 'IMPORTANT', color: 'yellow', points: 3 },
+  };
+
+  const PROJECT_ROSTER_KEY = 'exo:project-rosters:v1';
+
+  function loadProjectRosters() {
+    try { return JSON.parse(localStorage.getItem(PROJECT_ROSTER_KEY) || '{}'); } catch { return {}; }
+  }
+
+  function saveProjectRosters(rosters) {
+    try { localStorage.setItem(PROJECT_ROSTER_KEY, JSON.stringify(rosters)); } catch {}
+  }
+
+  function projectRoster(projectId) {
+    return loadProjectRosters()[projectId] || [];
+  }
+
+  function setProjectRoster(projectId, userIds) {
+    const rosters = loadProjectRosters();
+    rosters[projectId] = [...new Set(userIds || [])];
+    saveProjectRosters(rosters);
+    notify();
+  }
+
+  function classifyTask({ urgent, important }) {
+    if (urgent && important) return { key: 'critical', status: 'assigned', sortOrder: -1000, ...TASK_CLASSES.critical };
+    if (urgent && !important) return { key: 'urgent', status: 'assigned', sortOrder: 0, ...TASK_CLASSES.urgent };
+    return { key: 'important', status: 'backlog', sortOrder: 1000, ...TASK_CLASSES.important };
+  }
+
+  function deadlineState(task) {
+    if (!task?.dueDate || task.status === 'approved') return 'On Track';
+    const today = new Date().toISOString().slice(0, 10);
+    if (['assigned', 'in_progress'].includes(task.status) && task.dueDate <= today) return 'Critical';
+    if (task.status === 'backlog' && task.taskClass === 'important' && task.dueDate <= today) return 'Critical';
+    if (task.status === 'backlog' && task.taskClass === 'important' && task.dueDate > today) return 'At Risk';
+    return 'On Track';
+  }
 
   function notify() {
     listeners.forEach(fn => fn());
@@ -58,10 +99,18 @@
       title: row.title,
       brief: row.brief || '',
       trackCode: row.track_code,
+      firstOfficerId: row.track_lead_id || row.second_officer_id,
       secondOfficerId: row.second_officer_id,
+      trackLeadId: row.track_lead_id || row.second_officer_id,
       createdBy: row.created_by,
       status: row.status || 'assigned',
-      priority: row.priority || 'medium',
+      priority: row.priority || row.task_class || 'important',
+      urgent: !!row.urgent,
+      important: row.important !== false,
+      taskClass: row.task_class || row.priority || 'important',
+      accountableId: row.accountable_id || null,
+      consultedId: row.consulted_id || null,
+      informedIds: row.informed_ids || [],
       deliverableType: row.deliverable_type || 'file',
       points: Number(row.points) || 2,
       dueDate: row.due_date || '',
@@ -121,32 +170,13 @@
     };
   }
 
-  function toDelegation(row) {
-    return {
-      id: row.id,
-      projectId: row.project_id,
-      trackCode: row.track_code,
-      firstOfficerId: row.first_officer_id,
-      secondOfficerId: row.second_officer_id,
-      title: row.title,
-      instructions: row.instructions || '',
-      expectedOutput: row.expected_output || '',
-      priority: row.priority || 'medium',
-      status: row.status || 'draft',
-      dueDate: row.due_date || '',
-      notes: row.notes || '',
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-    };
-  }
-
   async function actorId() {
     if (!window.__db || !window.__db.auth) return localStorage.getItem('exo:userId') || null;
     const session = await window.__db.auth.getSession();
     return session?.data?.session?.user?.id || localStorage.getItem('exo:userId') || null;
   }
 
-  function secondOfficerForTrack(trackCode) {
+  function trackLeadForTrack(trackCode) {
     return window.__crownStore?.getActiveCrownForTrack(trackCode)?.userId || null;
   }
 
@@ -169,17 +199,16 @@
       return state;
     }
     try {
-      const [projectsResult, tasksResult, assigneesResult, submissionsResult, commentsResult, activityResult, delegationsResult] = await Promise.all([
+      const [projectsResult, tasksResult, assigneesResult, submissionsResult, commentsResult, activityResult] = await Promise.all([
         window.__db.from('projects').select('*').order('created_at', { ascending: false }),
         window.__db.from('project_tasks').select('*').order('sort_order', { ascending: true }).order('created_at', { ascending: false }),
         window.__db.from('project_task_assignees').select('*').order('created_at', { ascending: false }),
         window.__db.from('project_task_submissions').select('*').order('created_at', { ascending: false }),
         window.__db.from('project_task_comments').select('*').order('created_at', { ascending: false }),
         window.__db.from('project_task_activity').select('*').order('created_at', { ascending: false }),
-        window.__db.from('project_delegations').select('*').order('created_at', { ascending: false }),
       ]);
 
-      const error = projectsResult.error || tasksResult.error || assigneesResult.error || submissionsResult.error || commentsResult.error || activityResult.error || delegationsResult.error;
+      const error = projectsResult.error || tasksResult.error || assigneesResult.error || submissionsResult.error || commentsResult.error || activityResult.error;
       if (error) throw error;
 
       state = {
@@ -189,7 +218,7 @@
         submissions: (submissionsResult.data || []).map(toSubmission),
         comments: (commentsResult.data || []).map(toComment),
         activity: (activityResult.data || []).map(toActivity),
-        delegations: (delegationsResult.data || []).map(toDelegation),
+        delegations: [],
         loaded: true,
         error: '',
       };
@@ -222,30 +251,69 @@
 
   async function saveTask(data) {
     const createdBy = await actorId();
+    const classified = classifyTask({
+      urgent: data.urgent !== undefined ? data.urgent : data.priority === 'critical' || data.priority === 'urgent',
+      important: data.important !== undefined ? data.important : data.priority !== 'urgent',
+    });
+    const status = data.status || classified.status;
     const row = {
       id: data.id || 'ptask-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
       project_id: data.projectId,
       title: data.title || 'Untitled task',
       brief: data.brief || '',
       track_code: data.trackCode,
-      second_officer_id: data.secondOfficerId || secondOfficerForTrack(data.trackCode),
+      second_officer_id: data.trackLeadId || data.secondOfficerId || trackLeadForTrack(data.trackCode),
+      track_lead_id: data.trackLeadId || data.secondOfficerId || trackLeadForTrack(data.trackCode),
       created_by: data.createdBy || createdBy,
-      status: data.status || 'assigned',
-      priority: data.priority || 'medium',
+      status,
+      priority: classified.key,
+      urgent: !!data.urgent,
+      important: data.important !== false,
+      task_class: classified.key,
+      accountable_id: data.accountableId || null,
+      consulted_id: data.consultedId || null,
+      informed_ids: data.informedIds || [],
       deliverable_type: data.deliverableType || 'file',
-      points: Number(data.points || 2),
+      points: Number(data.points || classified.points),
       due_date: data.dueDate || null,
-      sort_order: Number(data.sortOrder || 0),
+      sort_order: Number(data.sortOrder ?? classified.sortOrder),
     };
     const { error } = await window.__db.from('project_tasks').upsert(row, { onConflict: 'id' });
     if (error) throw error;
-    await logActivity(row.id, data.id ? 'task_updated' : 'task_created', { title: row.title, status: row.status });
+    await logActivity(row.id, data.id ? 'task_updated' : 'task_created', {
+      title: row.title,
+      status: row.status,
+      class: row.task_class,
+      deadlineState: deadlineState(toTask(row)),
+    });
+    if (!data.id && row.task_class === 'critical' && data.responsibleId && window.__notifStore) {
+      window.__notifStore.add({
+        toUserId: data.responsibleId,
+        type: 'project-task',
+        title: 'CRITICAL TASK ASSIGNED',
+        sub: `${row.title} needs acceptance ASAP.`,
+        icon: 'fa-bolt',
+      });
+    }
+    if (!data.id && data.consultedId && window.__notifStore) {
+      window.__notifStore.add({
+        toUserId: data.consultedId,
+        type: 'project-feed',
+        title: 'CONSULTED ON PROJECT TASK',
+        sub: row.title,
+        icon: 'fa-comments',
+      });
+    }
     await refresh();
+    return row.id;
   }
 
   window.__projectStore = {
     KANBAN_COLUMNS,
-    PRIORITIES,
+    TASK_CLASSES,
+    PRIORITIES: Object.keys(TASK_CLASSES),
+    classifyTask,
+    deadlineState,
     subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
     all() { return state; },
     refresh,
@@ -255,36 +323,36 @@
     firstOfficerProjects(userId) {
       return state.projects.filter(p => p.firstOfficerId === userId && p.status !== 'archived');
     },
-    secondOfficerTasks(userId) {
-      return state.tasks.filter(t => t.secondOfficerId === userId);
-    },
-    userIsSecondOfficer(userId) {
-      return state.delegations.some(d => d.secondOfficerId === userId && d.status !== 'completed')
-        || state.tasks.some(t => t.secondOfficerId === userId && t.status !== 'approved');
+    firstOfficerTasks(userId) {
+      return state.tasks.filter(t => t.trackLeadId === userId || t.secondOfficerId === userId);
     },
     visibleDelegations(profile) {
       if (!profile) return [];
-      if (profile.role === 'admin' || profile.role === 'commander') return state.delegations;
-      return state.delegations.filter(d => d.firstOfficerId === profile.id || d.secondOfficerId === profile.id);
+      return [];
     },
     projectAccess(userId, projectId) {
       const project = state.projects.find(p => p.id === projectId);
       if (!project) return 'none';
       if (project.firstOfficerId === userId) return 'first';
-      if (state.delegations.some(d => d.projectId === projectId && d.secondOfficerId === userId)) return 'second';
-      if (state.tasks.some(t => t.projectId === projectId && t.secondOfficerId === userId)) return 'second';
+      if (state.tasks.some(t => t.projectId === projectId && (t.trackLeadId === userId || t.secondOfficerId === userId))) return 'track-lead';
+      if (project.trackCodes.some(code => window.__crownStore?.getActiveCrownForTrack(code)?.userId === userId)) return 'track-lead';
       if (state.assignees.some(a => a.userId === userId && state.tasks.some(t => t.id === a.taskId && t.projectId === projectId))) return 'member';
+      if (projectRoster(projectId).includes(userId)) return 'member';
       return 'none';
     },
     visibleProjects(profile) {
       if (!profile) return [];
       if (profile.role === 'admin' || profile.role === 'commander') return state.projects;
       return state.projects.filter(project => this.projectAccess(profile.id, project.id) !== 'none'
-        || project.trackCodes.includes(profile.trackCode));
+        || projectRoster(project.id).includes(profile.id));
     },
-    secondOfficerForTrack,
+    trackLeadForTrack,
+    secondOfficerForTrack: trackLeadForTrack,
+    projectRoster,
+    setProjectRoster,
     async createProject(data) {
       await upsertProject(data);
+      if (data.id || data.memberIds?.length) setProjectRoster(data.id || state.projects[0]?.id, data.memberIds || []);
     },
     async archiveProject(projectId) {
       const { error } = await window.__db.from('projects').update({ status: 'archived' }).eq('id', projectId);
@@ -292,38 +360,11 @@
       await refresh();
     },
     async saveTask(data) {
-      await saveTask(data);
+      return await saveTask(data);
     },
-    async saveDelegation(data) {
-      const actor = await actorId();
-      const row = {
-        id: data.id || 'pdel-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
-        project_id: data.projectId,
-        track_code: data.trackCode,
-        first_officer_id: data.firstOfficerId || actor,
-        second_officer_id: data.secondOfficerId || secondOfficerForTrack(data.trackCode),
-        title: data.title || 'Untitled delegation',
-        instructions: data.instructions || '',
-        expected_output: data.expectedOutput || '',
-        priority: data.priority || 'medium',
-        status: data.status || 'delegated',
-        due_date: data.dueDate || null,
-        notes: data.notes || '',
-      };
-      const { error } = await window.__db.from('project_delegations').upsert(row, { onConflict: 'id' });
-      if (error) throw error;
-      await refresh();
-    },
-    async deleteDelegation(id) {
-      const { error } = await window.__db.from('project_delegations').delete().eq('id', id);
-      if (error) throw error;
-      await refresh();
-    },
-    async acknowledgeDelegation(id) {
-      const { error } = await window.__db.from('project_delegations').update({ status: 'acknowledged' }).eq('id', id);
-      if (error) throw error;
-      await refresh();
-    },
+    async saveDelegation() {},
+    async deleteDelegation() {},
+    async acknowledgeDelegation() {},
     async deleteTask(taskId) {
       const { error } = await window.__db.from('project_tasks').delete().eq('id', taskId);
       if (error) throw error;
@@ -405,7 +446,7 @@
       if (!task) return;
       const reviewer = await actorId();
       const assignees = state.assignees.filter(a => a.taskId === taskId);
-      const recipients = assignees.length ? assignees.map(a => a.userId) : [task.secondOfficerId].filter(Boolean);
+      const recipients = assignees.length ? assignees.map(a => a.userId) : [task.trackLeadId || task.secondOfficerId].filter(Boolean);
       const [taskResult] = await Promise.all([
         window.__db.from('project_tasks').update({
           status: 'approved',
@@ -423,7 +464,7 @@
         source_id: taskId,
         cohort_id: 'c2627',
         track_code: task.trackCode,
-        pillar: 'project',
+        pillar: 'missions',
         points: task.points,
         note: task.title,
         awarded_by: reviewer,
@@ -431,6 +472,22 @@
       if (rows.length) {
         const { error } = await window.__db.from('point_ledger').upsert(rows, { onConflict: 'id' });
         if (error) throw error;
+      }
+      if (window.__pointsStore) {
+        recipients.forEach(userId => {
+          window.__pointsStore.award({
+            id: 'pts-project-' + taskId + '-' + userId,
+            userId,
+            sourceType: 'project',
+            sourceId: taskId,
+            cohortId: 'c2627',
+            trackCode: task.trackCode,
+            pillar: 'missions',
+            points: task.points,
+            note: task.title,
+            awardedBy: reviewer,
+          });
+        });
       }
       await logActivity(taskId, 'approved', { recipients: recipients.length, points: task.points });
       await refresh();
@@ -450,7 +507,7 @@
         .on('postgres_changes', { event: '*', schema: 'public', table: 'project_task_assignees' }, refresh)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'project_task_submissions' }, refresh)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'project_task_comments' }, refresh)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'project_delegations' }, refresh)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'project_task_activity' }, refresh)
         .subscribe();
       return () => {
         unsub();
@@ -467,21 +524,67 @@ function ProjectBuilderPage() {
   const { profiles } = useUserProfiles();
   const { projects, tasks, loaded, error } = useProjects();
   useCrownState();
-  const [draft, setDraft] = React.useState({ title: '', description: '', trackCodes: [], firstOfficerId: '', startDate: '', dueDate: '' });
+  const tracks = typeof useAdminTracks === 'function' ? useAdminTracks() : TRACKS;
+  const [draft, setDraft] = React.useState({ title: '', description: '', trackCodes: [], firstOfficerId: '', memberIds: [], startDate: '', dueDate: '' });
+  const [memberTrackFilter, setMemberTrackFilter] = React.useState('');
   const [saving, setSaving] = React.useState(false);
-  const officers = profiles.filter(p => ['exonaut', 'lead', 'commander'].includes(p.role || 'exonaut'));
+  const selectedTrackCodes = draft.trackCodes;
+  const selectedRoster = profiles.filter(p => selectedTrackCodes.includes(p.trackCode || 'AIS'));
+  const trackLeadIds = selectedTrackCodes
+    .map(code => window.__crownStore?.getActiveCrownForTrack(code)?.userId)
+    .filter(Boolean);
+  const officers = selectedRoster.length ? selectedRoster : profiles.filter(p => ['exonaut', 'lead', 'commander'].includes(p.role || 'exonaut'));
+  const exonauts = selectedRoster.filter(p => (p.role || 'exonaut') === 'exonaut');
+  const currentMemberTrack = selectedTrackCodes.includes(memberTrackFilter) ? memberTrackFilter : (selectedTrackCodes[0] || '');
+  const currentTrackExonauts = exonauts.filter(p => (p.trackCode || 'AIS') === currentMemberTrack);
+  const autoMemberIds = [...new Set([draft.firstOfficerId, ...trackLeadIds].filter(Boolean))];
   const nameOf = id => profiles.find(p => p.id === id)?.fullName || profiles.find(p => p.id === id)?.email || 'Unassigned';
+  const trackName = code => tracks.find(t => t.code === code)?.short || code || 'TRACK';
 
   function toggleTrack(code) {
-    setDraft(d => ({ ...d, trackCodes: d.trackCodes.includes(code) ? d.trackCodes.filter(c => c !== code) : [...d.trackCodes, code] }));
+    setDraft(d => {
+      const trackCodes = d.trackCodes.includes(code) ? d.trackCodes.filter(c => c !== code) : [...d.trackCodes, code];
+      const allowed = new Set(profiles.filter(p => trackCodes.includes(p.trackCode || 'AIS')).map(p => p.id));
+      return {
+        ...d,
+        trackCodes,
+        firstOfficerId: allowed.has(d.firstOfficerId) ? d.firstOfficerId : '',
+        memberIds: d.memberIds.filter(id => allowed.has(id)),
+      };
+    });
+  }
+
+  React.useEffect(() => {
+    if (!selectedTrackCodes.length) {
+      if (memberTrackFilter) setMemberTrackFilter('');
+      return;
+    }
+    if (!selectedTrackCodes.includes(memberTrackFilter)) setMemberTrackFilter(selectedTrackCodes[0]);
+  }, [selectedTrackCodes.join('|'), memberTrackFilter]);
+
+  function updateCurrentTrackMembers(selectedIds) {
+    const currentTrackIds = new Set(currentTrackExonauts.map(p => p.id));
+    setDraft(d => ({
+      ...d,
+      memberIds: [
+        ...d.memberIds.filter(id => !currentTrackIds.has(id)),
+        ...selectedIds,
+      ],
+    }));
+  }
+
+  function removeMember(userId) {
+    setDraft(d => ({ ...d, memberIds: d.memberIds.filter(id => id !== userId) }));
   }
 
   async function createProject() {
     if (!draft.title.trim() || !draft.firstOfficerId || draft.trackCodes.length === 0) return;
     setSaving(true);
     try {
-      await window.__projectStore.createProject({ ...draft, title: draft.title.trim(), description: draft.description.trim(), status: 'active' });
-      setDraft({ title: '', description: '', trackCodes: [], firstOfficerId: '', startDate: '', dueDate: '' });
+      const id = 'proj-' + Date.now();
+      const memberIds = [...new Set([...draft.memberIds, ...autoMemberIds])];
+      await window.__projectStore.createProject({ ...draft, memberIds, id, title: draft.title.trim(), description: draft.description.trim(), status: 'active' });
+      setDraft({ title: '', description: '', trackCodes: [], firstOfficerId: '', memberIds: [], startDate: '', dueDate: '' });
     } finally {
       setSaving(false);
     }
@@ -491,9 +594,9 @@ function ProjectBuilderPage() {
     <div className="enter">
       <div className="section-head">
         <div>
-          <div className="t-label" style={{ marginBottom: 8, color: 'var(--sky)' }}>PLATFORM ADMIN · PROJECTS</div>
+          <div className="t-label" style={{ marginBottom: 8, color: 'var(--sky)' }}>PLATFORM ADMIN Â· PROJECTS</div>
           <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>Project Builder</h1>
-          <div className="t-body" style={{ marginTop: 6 }}>Create projects, assign a First Officer, and open track boards for Second Officers.</div>
+          <div className="t-body" style={{ marginTop: 6 }}>Create projects, assign a Project Lead, and open track boards for Track Leads / First Officers.</div>
         </div>
       </div>
 
@@ -507,13 +610,42 @@ function ProjectBuilderPage() {
           <textarea className="textarea" rows={4} value={draft.description} onChange={e => setDraft(d => ({ ...d, description: e.target.value }))} />
           <label className="t-label-muted">TRACKS</label>
           <div className="track-chip-row">
-            {TRACKS.map(t => <button key={t.code} className={'lb-filter' + (draft.trackCodes.includes(t.code) ? ' active' : '')} onClick={() => toggleTrack(t.code)}>{t.short}</button>)}
+            {tracks.map(t => <button key={t.code} className={'lb-filter' + (draft.trackCodes.includes(t.code) ? ' active' : '')} onClick={() => toggleTrack(t.code)}>{t.short}</button>)}
           </div>
-          <label className="t-label-muted">FIRST OFFICER</label>
+          <label className="t-label-muted">PROJECT LEAD</label>
           <select className="select" value={draft.firstOfficerId} onChange={e => setDraft(d => ({ ...d, firstOfficerId: e.target.value }))}>
             <option value="">Select officer</option>
-            {officers.map(p => <option key={p.id} value={p.id}>{p.fullName || p.email}</option>)}
+            {officers.map(p => <option key={p.id} value={p.id}>{p.fullName || p.email} · {tracks.find(t => t.code === (p.trackCode || 'AIS'))?.short || p.trackCode}</option>)}
           </select>
+          <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', margin: '6px 0 10px' }}>
+            Auto First Officers: {[...new Set(trackLeadIds)].map(nameOf).join(', ') || 'none until track leads are assigned'}
+          </div>
+          <label className="t-label-muted">PROJECT EXONAUTS</label>
+          <select className="select" value={currentMemberTrack} disabled={!selectedTrackCodes.length} onChange={e => setMemberTrackFilter(e.target.value)} style={{ marginBottom: 8 }}>
+            {!selectedTrackCodes.length && <option value="">Select tracks first</option>}
+            {selectedTrackCodes.map(code => <option key={code} value={code}>{trackName(code)} roster</option>)}
+          </select>
+          <select multiple className="select assignee-select" disabled={!currentMemberTrack}
+            value={draft.memberIds.filter(id => currentTrackExonauts.some(p => p.id === id))}
+            onChange={e => updateCurrentTrackMembers(Array.from(e.target.selectedOptions).map(o => o.value))}>
+            {currentTrackExonauts.map(p => <option key={p.id} value={p.id}>{p.fullName || p.email} · {trackName(p.trackCode || 'AIS')}</option>)}
+          </select>
+          {currentMemberTrack && currentTrackExonauts.length === 0 && (
+            <div className="empty-line">No exonauts found under {trackName(currentMemberTrack)}.</div>
+          )}
+          {draft.memberIds.length > 0 && (
+            <div className="selected-member-list">
+              {draft.memberIds.map(id => (
+                <button key={id} type="button" className="selected-member-pill" onClick={() => removeMember(id)}>
+                  {nameOf(id)} <span>{trackName(profiles.find(p => p.id === id)?.trackCode || '')}</span>
+                  <i className="fa-solid fa-xmark" />
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', marginTop: 6 }}>
+            Project Lead and selected Track Leads are included automatically.
+          </div>
           <div className="project-date-grid">
             <input className="input" type="date" value={draft.startDate} onChange={e => setDraft(d => ({ ...d, startDate: e.target.value }))} />
             <input className="input" type="date" value={draft.dueDate} onChange={e => setDraft(d => ({ ...d, dueDate: e.target.value }))} />
@@ -527,18 +659,21 @@ function ProjectBuilderPage() {
           {!loaded && <div className="card-panel">Loading projects...</div>}
           {projects.map(project => {
             const projectTasks = tasks.filter(t => t.projectId === project.id);
+            const roster = window.__projectStore.projectRoster(project.id);
             return (
               <div key={project.id} className="card-panel project-summary-card">
                 <div className="project-summary-main">
                   <div>
-                    <div className="t-label" style={{ color: 'var(--sky)', marginBottom: 6 }}>{project.trackCodes.join(' · ')} · {project.status}</div>
+                    <div className="t-label" style={{ color: 'var(--sky)', marginBottom: 6 }}>{project.trackCodes.join(' Â· ')} Â· {project.status}</div>
                     <h2 className="t-heading project-title">{project.title}</h2>
                     <div className="t-body">{project.description || 'No description yet.'}</div>
                   </div>
                   <button className="btn btn-ghost btn-sm" onClick={() => window.__projectStore.archiveProject(project.id)}>Archive</button>
                 </div>
                 <div className="project-stat-grid">
-                  <ProjectStat label="First Officer" value={nameOf(project.firstOfficerId)} />
+                  <ProjectStat label="Project Lead" value={nameOf(project.firstOfficerId)} />
+                  <ProjectStat label="Exonauts" value={roster.length} />
+                  <ProjectStat label="First Officers" value={[project.firstOfficerId, ...project.trackCodes.map(code => window.__crownStore?.getActiveCrownForTrack(code)?.userId)].filter(Boolean).length} />
                   <ProjectStat label="Tasks" value={projectTasks.length} />
                   <ProjectStat label="Done" value={projectTasks.filter(t => t.status === 'submitted').length} />
                   <ProjectStat label="Approved" value={projectTasks.filter(t => t.status === 'approved').length} />
@@ -574,7 +709,7 @@ function ProjectWorkspacePage({ mode = 'member' }) {
   const officerTracks = project ? project.trackCodes.filter(code =>
     projectAccess === 'first'
     || profile.role === 'admin'
-    || tasks.some(t => t.projectId === project.id && t.trackCode === code && t.secondOfficerId === profile.id)
+    || tasks.some(t => t.projectId === project.id && t.trackCode === code && (t.trackLeadId === profile.id || t.secondOfficerId === profile.id))
     || window.__crownStore?.getActiveCrownForTrack(code)?.userId === profile.id
   ) : [];
   const allowedTracks = project
@@ -587,10 +722,11 @@ function ProjectWorkspacePage({ mode = 'member' }) {
   const access = projectAccess;
   const canOfficer = profile.role === 'admin'
     || access === 'first'
-    || projectTasks.some(t => t.secondOfficerId === profile.id)
+    || projectTasks.some(t => t.trackLeadId === profile.id || t.secondOfficerId === profile.id)
     || window.__crownStore?.getActiveCrownForTrack(activeTrack)?.userId === profile.id;
   const [selectedTaskId, setSelectedTaskId] = React.useState(null);
   const selectedTask = tasks.find(t => t.id === selectedTaskId);
+  const modeLabel = mode === 'project-lead' ? 'PROJECT LEAD' : mode === 'first-officer' ? 'FIRST OFFICER' : 'ROSTER';
 
   React.useEffect(() => {
     if (project && !allowedTracks.includes(activeTrack)) setTrackCode(allowedTracks[0] || '');
@@ -608,10 +744,10 @@ function ProjectWorkspacePage({ mode = 'member' }) {
     <div className="enter">
       <div className="section-head project-workspace-head">
         <div>
-          <div className="t-label" style={{ marginBottom: 8, color: 'var(--platinum)' }}>PROJECTS · {mode === 'first' ? 'FIRST OFFICER' : mode === 'second' ? 'SECOND OFFICER' : 'ROSTER'}</div>
+          <div className="t-label" style={{ marginBottom: 8, color: 'var(--platinum)' }}>PROJECTS · {modeLabel}</div>
           <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>{project.title}</h1>
           <div className="t-body" style={{ marginTop: 6 }}>
-            {mode === 'first' ? 'Choose a project and track to inspect or manage its execution board.' : (project.description || 'Track task board and submissions.')}
+            {mode === 'project-lead' ? 'Choose a project and track to inspect or manage its execution board.' : (project.description || 'Track task board and submissions.')}
           </div>
         </div>
         <select className="select project-switcher" value={project.id} onChange={e => { setProjectId(e.target.value); setTrackCode(''); }}>
@@ -658,22 +794,31 @@ function ProjectWorkspacePage({ mode = 'member' }) {
 
 function TaskComposer({ project, trackCode, profiles }) {
   const [open, setOpen] = React.useState(false);
-  const [draft, setDraft] = React.useState({ title: '', brief: '', priority: 'medium', deliverableType: 'file', dueDate: '' });
+  const [draft, setDraft] = React.useState({ title: '', brief: '', urgent: false, important: true, deliverableType: 'file', dueDate: '', responsibleId: '', consultedId: '' });
   const crown = window.__crownStore?.getActiveCrownForTrack(trackCode);
+  const roster = profiles.filter(p => (p.role || 'exonaut') === 'exonaut' && (p.trackCode || 'AIS') === trackCode && (p.cohortId || 'c2627') === (project.cohortId || 'c2627'));
+  const projectLead = profiles.find(p => p.id === project.firstOfficerId);
+  const commander = profiles.find(p => p.role === 'commander') || { id: 'commander', fullName: 'Mission Commander' };
 
   async function save() {
     if (!draft.title.trim()) return;
-    await window.__projectStore.saveTask({
+    const taskId = await window.__projectStore.saveTask({
       projectId: project.id,
       trackCode,
-      secondOfficerId: crown?.userId,
+      trackLeadId: crown?.userId,
       title: draft.title.trim(),
       brief: draft.brief.trim(),
-      priority: draft.priority,
+      urgent: draft.urgent,
+      important: draft.important,
+      responsibleId: draft.responsibleId,
+      accountableId: project.firstOfficerId,
+      consultedId: draft.consultedId || null,
+      informedIds: [commander.id, crown?.userId].filter(Boolean),
       deliverableType: draft.deliverableType,
       dueDate: draft.dueDate,
     });
-    setDraft({ title: '', brief: '', priority: 'medium', deliverableType: 'file', dueDate: '' });
+    if (draft.responsibleId) await window.__projectStore.assignTaskTeam(taskId, [draft.responsibleId]);
+    setDraft({ title: '', brief: '', urgent: false, important: true, deliverableType: 'file', dueDate: '', responsibleId: '', consultedId: '' });
     setOpen(false);
   }
 
@@ -685,9 +830,21 @@ function TaskComposer({ project, trackCode, profiles }) {
       <input className="input" placeholder="Task title" value={draft.title} onChange={e => setDraft(d => ({ ...d, title: e.target.value }))} />
       <textarea className="textarea" placeholder="Brief, evidence needed, and expectations" value={draft.brief} onChange={e => setDraft(d => ({ ...d, brief: e.target.value }))} />
       <div className="task-composer-grid">
-        <select className="select" value={draft.priority} onChange={e => setDraft(d => ({ ...d, priority: e.target.value }))}>
-          {window.__projectStore.PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
+        <select className="select" value={draft.responsibleId} onChange={e => setDraft(d => ({ ...d, responsibleId: e.target.value }))}>
+          <option value="">Responsible Exonaut</option>
+          {roster.map(p => <option key={p.id} value={p.id}>{p.fullName || p.email}</option>)}
         </select>
+        <select className="select" value={project.firstOfficerId} disabled>
+          <option>{projectLead?.fullName || projectLead?.email || 'Project Lead'} accountable</option>
+        </select>
+        <select className="select" value={draft.consultedId} onChange={e => setDraft(d => ({ ...d, consultedId: e.target.value }))}>
+          <option value="">Consulted person</option>
+          {profiles.map(p => <option key={p.id} value={p.id}>{p.fullName || p.email}</option>)}
+        </select>
+      </div>
+      <div className="task-composer-grid">
+        <label className="task-check"><input type="checkbox" checked={draft.urgent} onChange={e => setDraft(d => ({ ...d, urgent: e.target.checked }))} /> Urgent</label>
+        <label className="task-check"><input type="checkbox" checked={draft.important} onChange={e => setDraft(d => ({ ...d, important: e.target.checked }))} /> Important</label>
         <select className="select" value={draft.deliverableType} onChange={e => setDraft(d => ({ ...d, deliverableType: e.target.value }))}>
           <option value="file">File</option>
           <option value="link">Link</option>
@@ -713,7 +870,7 @@ function KanbanBoard({ tasks, profile, profiles, assignees, canOfficer, onOpen }
   return (
     <div className="kanban-board">
       {window.__projectStore.KANBAN_COLUMNS.map(col => {
-        const colTasks = tasks.filter(t => t.status === col.id);
+        const colTasks = tasks.filter(t => t.status === col.id).sort((a, b) => (a.sortOrder - b.sortOrder) || String(a.dueDate || '').localeCompare(String(b.dueDate || '')));
         return (
           <div key={col.id} className="kanban-column" onDragOver={e => e.preventDefault()} onDrop={e => {
             const taskId = e.dataTransfer.getData('text/plain');
@@ -728,11 +885,12 @@ function KanbanBoard({ tasks, profile, profiles, assignees, canOfficer, onOpen }
               {colTasks.map(task => {
                 const team = assignees.filter(a => a.taskId === task.id);
                 return (
-                  <div key={task.id} className={'kanban-card priority-' + task.priority} draggable={canOfficer || team.some(a => a.userId === profile.id)} onDragStart={e => e.dataTransfer.setData('text/plain', task.id)} onClick={() => onOpen(task.id)}>
+                  <div key={task.id} className={'kanban-card task-' + task.taskClass} draggable={canOfficer || team.some(a => a.userId === profile.id)} onDragStart={e => e.dataTransfer.setData('text/plain', task.id)} onClick={() => onOpen(task.id)}>
                     <div className="kanban-card-title">{task.title}</div>
                     <div className="kanban-card-brief">{task.brief || 'No brief.'}</div>
                     <div className="kanban-card-meta">
-                      <span>{task.priority}</span>
+                      <span>{window.__projectStore.TASK_CLASSES[task.taskClass]?.label || task.taskClass}</span>
+                      <span>{window.__projectStore.deadlineState(task)}</span>
                       <span>{team.length} assigned</span>
                       {task.dueDate && <span>{task.dueDate}</span>}
                     </div>
@@ -752,12 +910,33 @@ function TaskDetailModal({ task, project, profile, profiles, assignees, submissi
   const [team, setTeam] = React.useState(assignees.map(a => a.userId));
   const [submission, setSubmission] = React.useState({ note: '', linkUrl: '', fileUrl: '' });
   const [review, setReview] = React.useState('');
-  const [edit, setEdit] = React.useState({ title: task.title, brief: task.brief, priority: task.priority, dueDate: task.dueDate || '', deliverableType: task.deliverableType });
+  const [edit, setEdit] = React.useState({
+    title: task.title,
+    brief: task.brief,
+    urgent: !!task.urgent,
+    important: task.important !== false,
+    dueDate: task.dueDate || '',
+    deliverableType: task.deliverableType,
+    consultedId: task.consultedId || '',
+  });
   const nameOf = id => profiles.find(p => p.id === id)?.fullName || profiles.find(p => p.id === id)?.email || 'Unknown';
   const isAssigned = assignees.some(a => a.userId === profile.id);
+  const projectLead = profiles.find(p => p.id === project.firstOfficerId);
+  const commander = profiles.find(p => p.role === 'commander') || { id: 'commander', fullName: 'Mission Commander' };
+  const trackLeadId = task.trackLeadId || task.secondOfficerId || window.__projectStore.trackLeadForTrack(task.trackCode);
+  const classInfo = window.__projectStore.TASK_CLASSES[task.taskClass] || window.__projectStore.classifyTask(task);
 
   async function saveTask() {
-    await window.__projectStore.saveTask({ ...task, ...edit, id: task.id, projectId: task.projectId, trackCode: task.trackCode });
+    await window.__projectStore.saveTask({
+      ...task,
+      ...edit,
+      id: task.id,
+      projectId: task.projectId,
+      trackCode: task.trackCode,
+      trackLeadId,
+      accountableId: project.firstOfficerId,
+      informedIds: [commander.id, trackLeadId].filter(Boolean),
+    });
   }
 
   async function submitWork() {
@@ -777,7 +956,7 @@ function TaskDetailModal({ task, project, profile, profiles, assignees, submissi
       <div className="task-modal card-panel" onClick={e => e.stopPropagation()}>
         <div className="task-modal-head">
           <div>
-            <div className="t-label" style={{ color: 'var(--platinum)', marginBottom: 6 }}>{TRACKS.find(t => t.code === task.trackCode)?.short || task.trackCode} · {task.status}</div>
+            <div className="t-label" style={{ color: 'var(--platinum)', marginBottom: 6 }}>{TRACKS.find(t => t.code === task.trackCode)?.short || task.trackCode} Â· {task.status}</div>
             <h2 className="t-title">{task.title}</h2>
           </div>
           <button className="btn btn-ghost btn-sm" onClick={onClose}><i className="fa-solid fa-xmark" /></button>
@@ -791,10 +970,15 @@ function TaskDetailModal({ task, project, profile, profiles, assignees, submissi
                 <input className="input" value={edit.title} onChange={e => setEdit(d => ({ ...d, title: e.target.value }))} />
                 <textarea className="textarea" value={edit.brief} onChange={e => setEdit(d => ({ ...d, brief: e.target.value }))} />
                 <div className="task-composer-grid">
-                  <select className="select" value={edit.priority} onChange={e => setEdit(d => ({ ...d, priority: e.target.value }))}>{window.__projectStore.PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}</select>
+                  <label className="task-check"><input type="checkbox" checked={edit.urgent} onChange={e => setEdit(d => ({ ...d, urgent: e.target.checked }))} /> Urgent</label>
+                  <label className="task-check"><input type="checkbox" checked={edit.important} onChange={e => setEdit(d => ({ ...d, important: e.target.checked }))} /> Important</label>
                   <select className="select" value={edit.deliverableType} onChange={e => setEdit(d => ({ ...d, deliverableType: e.target.value }))}><option value="file">File</option><option value="link">Link</option><option value="note">Note</option></select>
                   <input className="input" type="date" value={edit.dueDate} onChange={e => setEdit(d => ({ ...d, dueDate: e.target.value }))} />
                 </div>
+                <select className="select" value={edit.consultedId} onChange={e => setEdit(d => ({ ...d, consultedId: e.target.value }))}>
+                  <option value="">Consulted person</option>
+                  {profiles.map(p => <option key={p.id} value={p.id}>{p.fullName || p.email}</option>)}
+                </select>
                 <button className="btn btn-primary btn-sm" onClick={saveTask}>Save Changes</button>
               </div>
             ) : (
@@ -828,6 +1012,21 @@ function TaskDetailModal({ task, project, profile, profiles, assignees, submissi
 
           <div className="task-side-pane">
             <div className="task-section">
+              <div className="t-label-muted">RACI</div>
+              <div className="name-stack">
+                <span><strong>Responsible:</strong> {team.map(nameOf).join(', ') || 'Unassigned'}</span>
+                <span><strong>Accountable:</strong> {projectLead?.fullName || projectLead?.email || 'Project Lead'}</span>
+                <span><strong>Consulted:</strong> {task.consultedId ? nameOf(task.consultedId) : 'None'}</span>
+                <span><strong>Informed:</strong> {[commander.id, trackLeadId].filter(Boolean).map(nameOf).join(', ')}</span>
+              </div>
+              <div className="kanban-card-meta" style={{ marginTop: 10 }}>
+                <span>{classInfo.label || task.taskClass}</span>
+                <span>{window.__projectStore.deadlineState(task)}</span>
+                <span>+{task.points || classInfo.points} pts</span>
+              </div>
+            </div>
+
+            <div className="task-section">
               <div className="t-label-muted">ASSIGNEES</div>
               {canOfficer ? (
                 <>
@@ -846,7 +1045,7 @@ function TaskDetailModal({ task, project, profile, profiles, assignees, submissi
                 <div className="t-label-muted">REVIEW</div>
                 <textarea className="textarea" placeholder="Approval or revision comment" value={review} onChange={e => setReview(e.target.value)} />
                 <div className="review-actions">
-                  <button className="btn btn-primary btn-sm" onClick={() => window.__projectStore.approveTask(task.id, review || 'Approved')}>Approve +2</button>
+                  <button className="btn btn-primary btn-sm" onClick={() => window.__projectStore.approveTask(task.id, review || 'Approved')}>Approve +{task.points || classInfo.points}</button>
                   <button className="btn btn-ghost btn-sm" onClick={() => window.__projectStore.requestRevision(task.id, review || 'Needs revision')}>Request Revision</button>
                 </div>
               </div>
@@ -872,7 +1071,7 @@ function TaskDetailModal({ task, project, profile, profiles, assignees, submissi
 function ProjectsPage() {
   const { profile } = useCurrentUserProfile();
   const { profiles } = useUserProfiles();
-  const { projects, delegations, loaded, error } = useProjects();
+  const { projects, tasks, loaded, error } = useProjects();
   useCrownState();
   const [selectedId, setSelectedId] = React.useState(null);
   const visible = window.__projectStore.visibleProjects(profile).filter(p => p.status !== 'archived');
@@ -880,17 +1079,16 @@ function ProjectsPage() {
   const nameOf = id => profiles.find(p => p.id === id)?.fullName || profiles.find(p => p.id === id)?.email || 'Unassigned';
   const trackName = code => TRACKS.find(t => t.code === code)?.short || code;
 
-  function secondOfficerName(project, trackCode) {
-    const explicit = delegations.find(d => d.projectId === project.id && d.trackCode === trackCode)?.secondOfficerId;
+  function trackLeadName(trackCode) {
     const crown = window.__crownStore?.getActiveCrownForTrack(trackCode)?.userId;
-    return nameOf(explicit || crown);
+    return nameOf(crown);
   }
 
   if (selected) {
     const access = window.__projectStore.projectAccess(profile.id, selected.id);
     const visibleTracks = profile.role === 'admin' || access === 'first'
       ? selected.trackCodes
-      : selected.trackCodes.filter(code => code === profile.trackCode || delegations.some(d => d.projectId === selected.id && d.trackCode === code && d.secondOfficerId === profile.id));
+      : selected.trackCodes.filter(code => code === profile.trackCode || tasks.some(t => t.projectId === selected.id && t.trackCode === code && (t.trackLeadId === profile.id || t.secondOfficerId === profile.id)));
     return (
       <div className="enter">
         <div className="section-head">
@@ -905,7 +1103,7 @@ function ProjectsPage() {
         <div className="project-detail-grid">
           <ProjectInfoTile label="Status" value={selected.status} />
           <ProjectInfoTile label="Cohort" value={selected.cohortId} />
-          <ProjectInfoTile label="First Officer" value={nameOf(selected.firstOfficerId)} />
+          <ProjectInfoTile label="Project Lead" value={nameOf(selected.firstOfficerId)} />
           <ProjectInfoTile label="Due Date" value={selected.dueDate || 'Not set'} />
         </div>
 
@@ -913,14 +1111,14 @@ function ProjectsPage() {
           <div className="t-label" style={{ marginBottom: 12 }}>ASSIGNED TRACKS</div>
           <div className="project-track-detail-list">
             {visibleTracks.map(code => {
-              const trackDelegations = delegations.filter(d => d.projectId === selected.id && d.trackCode === code);
+              const trackTasks = tasks.filter(t => t.projectId === selected.id && t.trackCode === code);
               return (
                 <div key={code} className="project-track-detail">
                   <div>
                     <div className="t-heading" style={{ fontSize: 15, textTransform: 'none', letterSpacing: 0 }}>{trackName(code)}</div>
-                    <div className="t-body" style={{ fontSize: 12, marginTop: 4 }}>Second Officer: {secondOfficerName(selected, code)}</div>
+                    <div className="t-body" style={{ fontSize: 12, marginTop: 4 }}>First Officer / Track Lead: {trackLeadName(code)}</div>
                   </div>
-                  <span className="status-pill status-submitted">{trackDelegations.length} delegation{trackDelegations.length === 1 ? '' : 's'}</span>
+                  <span className="status-pill status-submitted">{trackTasks.length} task{trackTasks.length === 1 ? '' : 's'}</span>
                 </div>
               );
             })}
@@ -945,7 +1143,7 @@ function ProjectsPage() {
       <div className="project-card-grid">
         {visible.map(project => (
           <button key={project.id} className="project-card-button" onClick={() => setSelectedId(project.id)}>
-            <div className="t-label" style={{ color: 'var(--lime)', marginBottom: 8 }}>{project.status} · {project.trackCodes.map(trackName).join(' · ')}</div>
+            <div className="t-label" style={{ color: 'var(--lime)', marginBottom: 8 }}>{project.status} Â· {project.trackCodes.map(trackName).join(' Â· ')}</div>
             <h2>{project.title}</h2>
             <p>{project.description || 'Open project details.'}</p>
             <div className="project-card-meta">
@@ -1024,7 +1222,7 @@ function FirstOfficerDelegationsPage() {
     <div className="enter">
       <div className="section-head">
         <div>
-          <div className="t-label" style={{ marginBottom: 8, color: 'var(--lime)' }}>FIRST OFFICER · DELEGATIONS</div>
+          <div className="t-label" style={{ marginBottom: 8, color: 'var(--lime)' }}>FIRST OFFICER Â· DELEGATIONS</div>
           <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>Delegations</h1>
           <div className="t-body" style={{ marginTop: 6 }}>Create detailed briefs for Second Officers before work is broken down into project tasks.</div>
         </div>
@@ -1043,7 +1241,7 @@ function FirstOfficerDelegationsPage() {
               {myProjects.map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
             </select>
             <select className="select" value={draft.trackCode} onChange={e => setDraft(d => ({ ...d, trackCode: e.target.value }))}>
-              {availableTracks.map(code => <option key={code} value={code}>{TRACKS.find(t => t.code === code)?.short || code} · {nameOf(window.__projectStore.secondOfficerForTrack(code))}</option>)}
+              {availableTracks.map(code => <option key={code} value={code}>{TRACKS.find(t => t.code === code)?.short || code} Â· {nameOf(window.__projectStore.secondOfficerForTrack(code))}</option>)}
             </select>
             <input className="input" placeholder="Delegation title" value={draft.title} onChange={e => setDraft(d => ({ ...d, title: e.target.value }))} />
             <textarea className="textarea" placeholder="Detailed instructions" value={draft.instructions} onChange={e => setDraft(d => ({ ...d, instructions: e.target.value }))} />
@@ -1083,7 +1281,7 @@ function SecondOfficerDelegationInboxPage() {
     <div className="enter">
       <div className="section-head">
         <div>
-          <div className="t-label" style={{ marginBottom: 8, color: 'var(--platinum)' }}>SECOND OFFICER · INBOX</div>
+          <div className="t-label" style={{ marginBottom: 8, color: 'var(--platinum)' }}>SECOND OFFICER Â· INBOX</div>
           <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>Delegation Inbox</h1>
           <div className="t-body" style={{ marginTop: 6 }}>Read First Officer briefs, then distribute work on Project Tasks.</div>
         </div>
@@ -1113,7 +1311,7 @@ function DelegationCard({ delegation, profiles, projects, onOpen, onEdit, onDele
         <span>{delegation.priority}</span>
       </div>
       <h2>{delegation.title}</h2>
-      <p>{project?.title || 'Project'} · {TRACKS.find(t => t.code === delegation.trackCode)?.short || delegation.trackCode}</p>
+      <p>{project?.title || 'Project'} Â· {TRACKS.find(t => t.code === delegation.trackCode)?.short || delegation.trackCode}</p>
       <div className="project-card-meta">
         <span><i className="fa-solid fa-user-tie" /> {nameOf(delegation.firstOfficerId)}</span>
         <span><i className="fa-solid fa-calendar" /> {delegation.dueDate || 'No due date'}</span>
@@ -1136,7 +1334,7 @@ function DelegationDetail({ delegation, profiles, projects, onBack }) {
     <div className="card-panel delegation-detail">
       <div className="section-head" style={{ marginBottom: 16 }}>
         <div>
-          <div className="t-label" style={{ color: 'var(--platinum)', marginBottom: 8 }}>{project?.title || 'Project'} · {TRACKS.find(t => t.code === delegation.trackCode)?.short || delegation.trackCode}</div>
+          <div className="t-label" style={{ color: 'var(--platinum)', marginBottom: 8 }}>{project?.title || 'Project'} Â· {TRACKS.find(t => t.code === delegation.trackCode)?.short || delegation.trackCode}</div>
           <h2 className="t-title" style={{ fontSize: 28, margin: 0 }}>{delegation.title}</h2>
         </div>
         <button className="btn btn-ghost btn-sm" onClick={onBack}>Back</button>
@@ -1164,13 +1362,13 @@ function DelegationDetail({ delegation, profiles, projects, onBack }) {
 }
 
 function FirstOfficerProjectsPage() {
-  return <FirstOfficerDelegationsPage />;
+  return <ProjectWorkspacePage mode="project-lead" />;
 }
 
 function ProjectTasksPage() {
   const { profile } = useCurrentUserProfile();
   const isFirstOfficer = window.__projectStore.userIsFirstOfficer(profile.id);
-  return <ProjectWorkspacePage mode={isFirstOfficer ? 'first' : 'second'} />;
+  return <ProjectWorkspacePage mode={isFirstOfficer ? 'project-lead' : 'first-officer'} />;
 }
 
 function CertificatesBadgesPage() {
@@ -1183,7 +1381,7 @@ function CertificatesBadgesPage() {
     <div className="enter">
       <div className="section-head">
         <div>
-          <div className="t-label" style={{ marginBottom: 8 }}>EXONAUT · CERTIFICATES & BADGES</div>
+          <div className="t-label" style={{ marginBottom: 8 }}>EXONAUT Â· CERTIFICATES & BADGES</div>
           <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>Credentials</h1>
           <div className="t-body" style={{ marginTop: 6 }}>Track your certificate status, badge progress, and approved point total.</div>
         </div>
@@ -1202,7 +1400,7 @@ function CertificatesBadgesPage() {
           <div className="t-title" style={{ fontSize: 34, margin: 0 }}>{total}</div>
           <div className="t-body" style={{ marginTop: 8 }}>Approved mission and project points only.</div>
           <div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)', marginTop: 12 }}>
-            PROJECT {breakdown.project || 0} · CLIENT {breakdown.client || 0} · RECRUITMENT {breakdown.recruitment || 0}
+            PROJECT {breakdown.project || 0} Â· CLIENT {breakdown.client || 0} Â· RECRUITMENT {breakdown.recruitment || 0}
           </div>
           {next && <div className="t-body" style={{ marginTop: 10, color: 'var(--lime)' }}>{next.at - total} points to {next.name}</div>}
         </div>

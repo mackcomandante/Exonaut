@@ -151,10 +151,10 @@ function PlatformAdminSidebar({ current, onNavigate, onSignOut }) {
   ];
   const links = [
     { id: 'pa-cohorts',  label: 'Cohort Management',  icon: 'fa-layer-group' },
-    { id: 'pa-managers', label: 'Manager Management', icon: 'fa-user-tie' },
+    { id: 'pa-managers', label: 'Track Creation',     icon: 'fa-route' },
     { id: 'pa-assign',   label: 'Exonaut Assignment', icon: 'fa-user-gear' },
+    { id: 'pa-projects', label: 'Project Builder',    icon: 'fa-diagram-project' },
     { id: 'pa-users',    label: 'User Directory',     icon: 'fa-address-book' },
-    { id: 'pa-projects', label: 'Projects',           icon: 'fa-diagram-project' },
     { id: 'pa-console',  label: 'System Console',     icon: 'fa-shield-halved' },
     { id: 'pa-announce', label: 'Announcements',      icon: 'fa-bullhorn' },
     { id: 'kudos',       label: 'Kudos',              icon: 'fa-hand-sparkles' },
@@ -251,7 +251,7 @@ function AdminCohorts() {
           </div>
         </div>
         <button className="btn btn-primary" onClick={() => setCreating(true)}>
-          <i className="fa-solid fa-plus" /> NEW COHORT
+          <i className="fa-solid fa-plus" /> Add Cohort
         </button>
       </div>
 
@@ -350,6 +350,7 @@ function AdminAssign() {
   const registeredUsers = useRegisteredUsers();
   const [, setTick] = React.useState(0);
   const [search, setSearch] = React.useState('');
+  const [commanderId, setCommanderId] = React.useState(() => localStorage.getItem('exo:commander-id') || 'cmdr-01');
 
   const leadsByTrack = React.useMemo(() => {
     const map = {};
@@ -367,6 +368,19 @@ function AdminAssign() {
   });
 
   const scopeLabel = scope === 'all' ? 'All Cohorts' : (all.find(c => c.id === scope)?.name || '—');
+  const deployPredefinedMissions = () => {
+    localStorage.setItem('exo:missions-deployed:' + scopeLabel, String(Date.now()));
+    if (window.__notifStore) {
+      filtered.forEach(u => window.__notifStore.add({
+        toUserId: u.userId,
+        type: 'track',
+        title: 'PREDEFINED MISSIONS DEPLOYED',
+        sub: `Track missions are ready for ${scopeLabel}.`,
+        icon: 'fa-rocket',
+      }));
+    }
+    setTick(t => t + 1);
+  };
 
   const selectStyle = {
     padding: '6px 8px', background: 'var(--deep-black)', color: 'var(--off-white)',
@@ -384,12 +398,21 @@ function AdminAssign() {
           </div>
           <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>Assign Exonauts</h1>
           <div className="t-body" style={{ marginTop: 6 }}>
-            Set Cohort, Track, and Manager for each Exonaut. Changes take effect immediately.
+            Set Commander, Cohort, Track, and Track Lead for each Exonaut. Changes take effect immediately.
           </div>
         </div>
       </div>
 
       <div className="card-panel" style={{ padding: 16, marginBottom: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 10, marginBottom: 12 }}>
+          <select value={commanderId} onChange={e => { setCommanderId(e.target.value); localStorage.setItem('exo:commander-id', e.target.value); }} style={selectStyle}>
+            <option value="cmdr-01">Mission Commander · Mack Comandante</option>
+            {registeredUsers.filter(u => u.role === 'commander').map(u => <option key={u.userId} value={u.userId}>{u.name}</option>)}
+          </select>
+          <button className="btn btn-primary btn-sm" onClick={deployPredefinedMissions}>
+            <i className="fa-solid fa-rocket" /> Deploy Predefined Missions
+          </button>
+        </div>
         <div style={{ position: 'relative' }}>
           <i className="fa-solid fa-magnifying-glass" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--off-white-40)', fontSize: 11 }} />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by name…"
@@ -416,7 +439,7 @@ function AdminAssign() {
       ) : (
         <div className="lb-table">
           <div className="lb-header" style={{ gridTemplateColumns: '48px 1.4fr 160px 180px 200px' }}>
-            <div></div><div>EXONAUT</div><div>COHORT</div><div>TRACK</div><div>MANAGER</div>
+            <div></div><div>EXONAUT</div><div>COHORT</div><div>TRACK</div><div>TRACK LEAD</div>
           </div>
           {filtered.map(u => {
             const uid = u.userId;
@@ -808,17 +831,17 @@ function AdminManagers() {
       <div className="section-head">
         <div>
           <div className="t-label" style={{ marginBottom: 8, color: 'var(--sky)' }}>
-            PLATFORM ADMIN · MANAGER MANAGEMENT · {scopeLabel.toUpperCase()}
+            PLATFORM ADMIN · TRACK CREATION · {scopeLabel.toUpperCase()}
           </div>
-          <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>Managers</h1>
+          <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>Track Creation</h1>
           <div className="t-body" style={{ marginTop: 6 }}>
-            Create, assign to cohorts, and remove Mission Leads. {scope === 'all'
-              ? `${managers.length} manager${managers.length === 1 ? '' : 's'} on platform.`
+            Create tracks, assign Track Leads to cohorts, and manage rosters. {scope === 'all'
+              ? `${managers.length} track lead${managers.length === 1 ? '' : 's'} on platform.`
               : `${scopedManagers.length} of ${managers.length} assigned to ${scopeLabel}.`}
           </div>
         </div>
         <button className="btn btn-primary" onClick={() => setCreating(true)}>
-          <i className="fa-solid fa-user-plus" /> NEW MANAGER
+          <i className="fa-solid fa-route" /> Create Track
         </button>
       </div>
 

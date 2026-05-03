@@ -41,17 +41,48 @@
     return baseline + subDelta + ledger;
   }
 
+  function computePillarScores(userId, subs) {
+    const user = USERS.find(u => u.id === userId) || {};
+    const events = window.__pointsStore ? window.__pointsStore.getAll(userId) : [];
+    const approvedTrack = subs
+      ? subs.filter(s => s.exonautId === userId && s.state === 'approved' && s.pointsAwarded)
+            .reduce((sum, s) => sum + s.pointsAwarded, 0)
+      : 0;
+    const sumSource = (prefixes) => events
+      .filter(e => prefixes.some(prefix => String(e.source || '').startsWith(prefix)))
+      .reduce((sum, e) => sum + (Number(e.pts) || 0), 0);
+    return {
+      missions: (user.p1 || 0) + approvedTrack + sumSource(['mission.', 'project.task']),
+      client: (user.p2 || 0) + sumSource(['client.']),
+      recruitment: (user.p3 || 0) + sumSource(['recruit.']),
+    };
+  }
+
+  function usePillarScores(userId = ME_ID) {
+    const subs = useSubs();
+    const [ledgerTick, setLedgerTick] = React.useState(0);
+    React.useEffect(() => {
+      const unsub = window.__pointsStore?.subscribe ? window.__pointsStore.subscribe(() => setLedgerTick(t => t + 1)) : null;
+      return () => { if (unsub) unsub(); };
+    }, []);
+    return React.useMemo(() => computePillarScores(userId, subs), [userId, subs, ledgerTick]);
+  }
+
   // ---- Live hook: returns { total, delta, baseline } ----
   function useComputedPoints(userId = ME_ID) {
     const subs = useSubs();
     // Re-render when pointsStore changes (tick from usePointsLedger if mounted, or manual)
     const [ledgerTick, setLedgerTick] = React.useState(0);
     React.useEffect(() => {
+      const unsub = window.__pointsStore?.subscribe ? window.__pointsStore.subscribe(() => setLedgerTick(t => t + 1)) : null;
       function onStorage(e) {
         if (e.key === 'exo:points:v1') setLedgerTick(t => t + 1);
       }
       window.addEventListener('storage', onStorage);
-      return () => window.removeEventListener('storage', onStorage);
+      return () => {
+        window.removeEventListener('storage', onStorage);
+        if (unsub) unsub();
+      };
     }, []);
 
     return React.useMemo(() => {
@@ -135,6 +166,8 @@
   Object.assign(window, {
     MILESTONES,
     computeTotal,
+    computePillarScores,
+    usePillarScores,
     useComputedPoints,
     useComputedMilestones,
     useAutoBadgeFire,

@@ -2,6 +2,8 @@
 
 function Leaderboard({ onBack }) {
   const { profile } = useCurrentUserProfile();
+  const activeCohort = window.getActiveCohort?.(profile) || COHORT;
+  const demoDay = window.getCohortDemoDay?.(activeCohort) || COHORT.demoDay;
   const rowsBase = useSupabaseExonautRows();
   const [tab, setTab] = React.useState('cohort');
   const [trackFilter, setTrackFilter] = React.useState('all');
@@ -33,7 +35,7 @@ function Leaderboard({ onBack }) {
           <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>Leaderboard</h1>
         </div>
         <div className="t-mono" style={{ color: 'var(--off-white-40)', fontSize: 11, letterSpacing: '0.1em' }}>
-          {COHORT.code} · {filtered.length} EXONAUTS
+          {(activeCohort?.code || COHORT.code)} · {filtered.length} EXONAUTS
         </div>
       </div>
 
@@ -75,7 +77,7 @@ function Leaderboard({ onBack }) {
         <div className="card-panel" style={{ textAlign: 'center', padding: 64 }}>
           <i className="fa-solid fa-lock" style={{ fontSize: 32, color: 'var(--lavender)', marginBottom: 16 }} />
           <div className="t-heading" style={{ fontSize: 18, marginBottom: 8 }}>Alumni Hall Opens Post-Demo Day</div>
-          <div className="t-body" style={{ maxWidth: 420, margin: '0 auto' }}>The first Exonaut Corps will be inducted on <span style={{ color: 'var(--ink)' }}>JAN 29 2027</span>.</div>
+          <div className="t-body" style={{ maxWidth: 420, margin: '0 auto' }}>The first Exonaut Corps will be inducted on <span style={{ color: 'var(--ink)' }}>{demoDay}</span>.</div>
         </div>
       ) : (
         <div className="lb-table">
@@ -90,7 +92,7 @@ function Leaderboard({ onBack }) {
             return (
               <div key={u.id} className={'lb-row' + (u.id === profile.id ? ' me' : '') + top}>
                 <div className="lb-rank">{rank <= 3 && <i className="fa-solid fa-crown" />}#{rank}</div>
-                <AvatarWithRing name={u.name} size={36} tier={u.tier} />
+                <AvatarWithRing name={u.name} avatarUrl={u.avatarUrl} size={36} tier={u.tier} />
                 <div className="lb-name">{u.name}<TierCrest tier={u.tier} /></div>
                 <div className="lb-track col-track">{track?.short}</div>
                 <div className="col-bars">

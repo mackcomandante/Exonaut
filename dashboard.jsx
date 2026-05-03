@@ -1,4 +1,4 @@
-// Dashboard screen — hero stats, pillars, rituals, missions, activity
+// Dashboard screen — hero stats, pillars, rituals, track work, project feed
 
 function StatCell({ label, icon, value, unit, meta, metaDir, lime }) {
   return (
@@ -24,6 +24,7 @@ function StatCell({ label, icon, value, unit, meta, metaDir, lime }) {
 function HeroStats() {
   const { total: livePoints, delta: liveDelta } = useComputedPoints(ME_ID);
   const liveBadges = useLiveBadges();
+  const projectState = window.useProjects ? window.useProjects() : { projects: [] };
   const earnedCount = liveBadges.filter(b => b.earned).length;
 
   const tierOrder = ['entry', 'builder', 'prime', 'elite', 'apex', 'corps'];
@@ -44,8 +45,10 @@ function HeroStats() {
         value={`#${ME_RANK}`} unit={`of ${COHORT.size}`} />
       <StatCell label="TIER" icon="fa-shield-halved"
         value={tierLabel} meta={tierMeta} metaDir="flat" />
-      <StatCell label="MISSIONS" icon="fa-bullseye"
+      <StatCell label="TRACK" icon="fa-bullseye"
         value={activeMissions.length} unit={`of ${MISSIONS.length}`} />
+      <StatCell label="PROJECT" icon="fa-diagram-project"
+        value={(projectState.projects || []).filter(p => p.status !== 'archived').length} />
       <StatCell label="BADGES" icon="fa-medal"
         value={earnedCount} unit="of 22" />
     </div>
@@ -71,28 +74,29 @@ function PillarCard({ idx, klass, title, weight, current, max, caption, children
 }
 
 function PillarGrid() {
+  const pillars = window.usePillarScores ? window.usePillarScores(ME_ID) : { missions: ME.p1, client: ME.p2, recruitment: ME.p3 };
   return (
     <div className="pillar-grid">
-      <PillarCard idx="01" klass="p1" title="Project" weight={40}
-        current={ME.p1} max={400} caption="40% WEIGHT">
+      <PillarCard idx="01" klass="p1" title="Missions" weight={40}
+        current={pillars.missions} max={400} caption="40% WEIGHT">
         <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--off-white-40)', letterSpacing: '0.05em', marginBottom: 10 }}>RECENT SUBMISSIONS</div>
-        {ME.p1 === 0
+        {pillars.missions === 0
           ? <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--off-white-40)' }}>No submissions yet.</div>
           : null}
       </PillarCard>
 
       <PillarCard idx="02" klass="p2" title="Client" weight={35}
-        current={ME.p2} max={350} caption="35% WEIGHT">
+        current={pillars.client} max={350} caption="35% WEIGHT">
         <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--off-white-40)', letterSpacing: '0.05em', marginBottom: 10 }}>CLIENT STATUS</div>
-        {ME.p2 === 0
+        {pillars.client === 0
           ? <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--off-white-40)' }}>No client assigned yet.</div>
           : null}
       </PillarCard>
 
       <PillarCard idx="03" klass="p3" title="Recruitment" weight={25}
-        current={ME.p3} max={250} caption="25% WEIGHT">
+        current={pillars.recruitment} max={250} caption="25% WEIGHT">
         <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--off-white-40)', letterSpacing: '0.05em', marginBottom: 10 }}>PIPELINE STATUS</div>
-        {ME.p3 === 0
+        {pillars.recruitment === 0
           ? <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--off-white-40)', marginBottom: 14 }}>No recruits submitted yet.</div>
           : null}
         <button className="btn btn-ghost btn-sm" onClick={() => window.__openKudos?.()}>
@@ -125,9 +129,9 @@ function RitualTracker() {
       <div className="ritual-row">
         {RITUALS.map(r => {
           const state = weekData[r.id]?.state || 'not-started';
-          const iconCls = state === 'confirmed' ? 'fa-circle-check' : state === 'submitted' ? 'fa-circle-half-stroke' : 'fa-circle-dot';
-          const cCls = state === 'confirmed' ? 'done-c' : state === 'submitted' ? 'done-c' : 'pend-c';
-          const label = state === 'confirmed' ? 'CONFIRMED' : state === 'submitted' ? 'SUBMITTED' : 'PENDING';
+          const iconCls = state === 'logged' || state === 'confirmed' ? 'fa-circle-check' : state === 'submitted' ? 'fa-circle-half-stroke' : 'fa-circle-dot';
+          const cCls = state === 'logged' || state === 'confirmed' ? 'done-c' : state === 'submitted' ? 'done-c' : 'pend-c';
+          const label = state === 'logged' || state === 'confirmed' ? 'LOGGED' : state === 'submitted' ? 'SUBMITTED' : 'PENDING';
           return (
             <div key={r.id} className={'ritual-cell ' + (state === 'not-started' ? 'not-started' : 'done')}>
               <div className="ritual-head">
@@ -149,7 +153,7 @@ function MissionFeed({ onOpenMission }) {
   return (
     <div>
       <div className="section-head">
-        <h2>Mission Feed</h2>
+        <h2>Track Feed</h2>
         <span className="section-meta">{upcoming.length} ACTIVE · SORTED BY DUE DATE</span>
       </div>
       <div>
@@ -187,13 +191,47 @@ function MissionFeed({ onOpenMission }) {
   );
 }
 
-function ActivityFeed() {
+function ProjectFeed() {
+  const projectState = window.useProjects ? window.useProjects() : { tasks: [], activity: [] };
+  const deadlineItems = (projectState.tasks || [])
+    .map(task => ({ task, state: window.__projectStore?.deadlineState(task) || 'On Track' }))
+    .filter(item => item.state !== 'On Track')
+    .slice(0, 6);
+  const taskById = id => (projectState.tasks || []).find(t => t.id === id);
+  const projectActivity = (projectState.activity || []).slice(0, Math.max(0, 6 - deadlineItems.length));
+
   return (
     <div className="card-panel">
       <div className="section-head" style={{ marginBottom: 8 }}>
-        <h2 style={{ fontSize: 16 }}>Activity</h2>
-        <span className="section-meta">LAST 48H</span>
+        <h2 style={{ fontSize: 16 }}>Project Feed</h2>
+        <span className="section-meta">DEADLINES + ACTIVITY</span>
       </div>
+      {deadlineItems.length === 0 && projectActivity.length === 0 && ACTIVITY.length === 0 && (
+        <div className="t-body" style={{ color: 'var(--off-white-40)', fontSize: 12 }}>Everything is on track.</div>
+      )}
+      {deadlineItems.map(({ task, state }) => (
+        <div key={task.id} className="activity-item">
+          <div className={'activity-icon type-' + (state === 'Critical' ? 'danger' : 'warn')}><i className="fa-solid fa-triangle-exclamation" /></div>
+          <div className="activity-body">
+            <div><strong>{state}</strong> · {task.title}</div>
+            <div className="muted" style={{ marginTop: 2 }}>{task.status.replaceAll('_', ' ')} · due {task.dueDate}</div>
+          </div>
+          <div className="activity-time">{task.points} pts</div>
+        </div>
+      ))}
+      {projectActivity.map(a => {
+        const task = taskById(a.taskId);
+        return (
+          <div key={a.id} className="activity-item">
+            <div className="activity-icon type-info"><i className="fa-solid fa-diagram-project" /></div>
+            <div className="activity-body">
+              <div><strong>{String(a.action || 'project update').replaceAll('_', ' ')}</strong>{task ? ` · ${task.title}` : ''}</div>
+              {a.metadata?.deadlineState && <div className="muted" style={{ marginTop: 2 }}>{a.metadata.deadlineState}</div>}
+            </div>
+            <div className="activity-time">{a.createdAt ? new Date(a.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'now'}</div>
+          </div>
+        );
+      })}
       {ACTIVITY.map((a, i) => (
         <div key={i} className="activity-item">
           <div className={'activity-icon type-' + a.type}><i className={'fa-solid ' + a.icon} /></div>
@@ -299,7 +337,7 @@ function Dashboard({ onNavigate, onOpenMission }) {
 
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 24 }} className="dash-split">
         <div className="enter enter-d4"><MissionFeed onOpenMission={onOpenMission} /></div>
-        <div className="enter enter-d4"><ActivityFeed /></div>
+        <div className="enter enter-d4"><ProjectFeed /></div>
       </div>
 
       <div className="enter enter-d5"><LeaderboardSnapshot onView={() => onNavigate('leaderboard')} /></div>

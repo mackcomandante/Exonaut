@@ -33,7 +33,7 @@ function MissionBriefsView() {
           <div>
             <div className="t-heading" style={{ fontSize: 14, textTransform: 'none', letterSpacing: 0, margin: 0 }}>{title}</div>
             <div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)', marginTop: 3, letterSpacing: '0.05em' }}>
-              {universal ? 'UNIVERSAL · ALL TRACKS' : track?.short} · {missions.length} MISSION{missions.length === 1 ? '' : 'S'}
+              {universal ? 'UNIVERSAL · ALL TRACKS' : track?.short} · {missions.length} TRACK TASK{missions.length === 1 ? '' : 'S'}
               {badgeEligible && ' · ' + badgeEligible.toUpperCase()}
             </div>
           </div>
@@ -42,7 +42,7 @@ function MissionBriefsView() {
         </div>
         {open && (
           <div style={{ padding: '18px 22px 22px', borderTop: '1px solid var(--off-white-07)' }}>
-            <div className="t-label-muted" style={{ marginBottom: 10 }}>MISSIONS</div>
+            <div className="t-label-muted" style={{ marginBottom: 10 }}>TRACK TASKS</div>
             <div style={{ display: 'grid', gap: 8, marginBottom: 18 }}>
               {missions.map((m, i) => {
                 const isObj = typeof m === 'object';
@@ -95,7 +95,7 @@ function MissionBriefsView() {
           </div>
           <div className="t-body" style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--off-white-68)' }}>{track?.objective}</div>
           <div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)', marginTop: 10, letterSpacing: '0.05em' }}>
-            MISSION LEAD · {track?.leadTitle?.toUpperCase()} &nbsp;·&nbsp; CLIENT · {track?.clientType?.toUpperCase()}
+            TRACK LEAD · {track?.leadTitle?.toUpperCase()} &nbsp;·&nbsp; CLIENT · {track?.clientType?.toUpperCase()}
           </div>
         </div>
       </div>
@@ -206,8 +206,8 @@ function MissionsList({ onOpenMission }) {
     <div className="enter">
       <div className="section-head">
         <div>
-          <div className="t-label" style={{ marginBottom: 8 }}>YOUR MISSION QUEUE · BATCH 2026–2027</div>
-          <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>Missions</h1>
+          <div className="t-label" style={{ marginBottom: 8 }}>YOUR TRACK QUEUE · BATCH 2026-2027</div>
+          <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>Track</h1>
         </div>
         <div className="t-mono" style={{ color: 'var(--off-white-40)', fontSize: 11 }}>
           WEEK {COHORT.week} OF {COHORT.weekTotal} · DEMO DAY {COHORT.demoDay}
@@ -220,7 +220,7 @@ function MissionsList({ onOpenMission }) {
           <i className="fa-solid fa-bullseye" style={{ marginRight: 6 }} /> Active Queue
         </div>
         <div className={'lb-tab' + (view === 'briefs' ? ' active' : '')} onClick={() => setView('briefs')}>
-          <i className="fa-solid fa-book-open" style={{ marginRight: 6 }} /> Mission Briefs · All 12 Weeks
+          <i className="fa-solid fa-book-open" style={{ marginRight: 6 }} /> Track Briefs · All 12 Weeks
         </div>
         <div className={'lb-tab' + (view === 'rubric' ? ' active' : '')} onClick={() => setView('rubric')}>
           <i className="fa-solid fa-scale-balanced" style={{ marginRight: 6 }} /> Points Rubric
@@ -412,7 +412,7 @@ function RitualComposer({ ritual, weekNum, onClose, onDone }) {
           </button>
         </div>
         <div className="t-body" style={{ color: 'var(--off-white-68)', marginBottom: 16, fontSize: 13 }}>
-          Share your update. This will post to Message Board — General with {ritual.hashtag}. Points awarded once your Mission Lead confirms.
+          Share your proof. This will post to Message Board — General with {ritual.hashtag}, log the ritual, and award points automatically.
         </div>
         <textarea
           autoFocus
@@ -471,23 +471,24 @@ function RitualsPage() {
             <div className="ritual-row">
               {RITUALS.map(r => {
                 const state = weekData[r.id]?.state || 'not-started';
-                const isDone = state === 'confirmed';
+                const isDone = state === 'confirmed' || state === 'logged';
                 const isSubmitted = state === 'submitted';
                 const iconCls = isDone ? 'fa-circle-check' : isSubmitted ? 'fa-circle-half-stroke' : 'fa-circle-dot';
                 const cCls = (isDone || isSubmitted) ? 'done-c' : 'pend-c';
                 return (
                   <div key={r.id} className={'ritual-cell ' + (isDone || isSubmitted ? 'done' : 'not-started')}
-                    style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    onClick={() => { if (!isDone && !isSubmitted) setComposing(r); }}
+                    style={{ display: 'flex', flexDirection: 'column', gap: 8, cursor: (!isDone && !isSubmitted) ? 'pointer' : 'default' }}>
                     <div className="ritual-head">
                       <div className="ritual-name">{r.name}</div>
                       <i className={'fa-solid ' + iconCls + ' ritual-icon ' + cCls} />
                     </div>
                     <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--off-white-40)', letterSpacing: '0.05em' }}>
-                      {isDone ? 'CONFIRMED' : isSubmitted ? 'SUBMITTED · PENDING LEAD' : 'PENDING'}
+                      {isDone ? 'LOGGED' : isSubmitted ? 'SUBMITTED' : 'PENDING'}
                     </div>
                     <div className="ritual-points">+{r.points} PTS</div>
                     {!isDone && !isSubmitted && (
-                      <button className="btn btn-primary btn-sm" style={{ marginTop: 4, fontSize: 11 }} onClick={() => setComposing(r)}>
+                      <button className="btn btn-primary btn-sm" style={{ marginTop: 4, fontSize: 11 }} onClick={(e) => { e.stopPropagation(); setComposing(r); }}>
                         <i className="fa-solid fa-pen-to-square" style={{ marginRight: 5 }} />POST
                       </button>
                     )}
@@ -523,8 +524,8 @@ function RitualsPage() {
                 <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                   {RITUALS.map(r => {
                     const st = wData[r.id]?.state || 'not-started';
-                    const color = st === 'confirmed' ? 'var(--ink)' : st === 'submitted' ? 'var(--amber)' : 'var(--off-white-40)';
-                    const icon = st === 'confirmed' ? 'fa-circle-check' : st === 'submitted' ? 'fa-circle-half-stroke' : 'fa-circle-xmark';
+                    const color = (st === 'confirmed' || st === 'logged') ? 'var(--ink)' : st === 'submitted' ? 'var(--amber)' : 'var(--off-white-40)';
+                    const icon = (st === 'confirmed' || st === 'logged') ? 'fa-circle-check' : st === 'submitted' ? 'fa-circle-half-stroke' : 'fa-circle-xmark';
                     return (
                       <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--off-white-68)' }}>
                         <i className={'fa-solid ' + icon} style={{ color, fontSize: 13 }} />
@@ -709,7 +710,7 @@ function AdminPanel() {
             <div className="t-mono" style={{ fontSize: 11, color: 'var(--off-white-40)' }}>
               REVIEW QUEUE · 4 AWAITING GRADE
             </div>
-            <button className="btn btn-primary btn-sm"><i className="fa-solid fa-plus" /> NEW MISSION</button>
+            <button className="btn btn-primary btn-sm"><i className="fa-solid fa-plus" /> NEW TRACK TASK</button>
           </div>
           {MISSIONS.map(m => (
             <div key={m.id} className="mission-row">
@@ -845,7 +846,7 @@ function SettingsPage() {
         <div className="card-panel">
           <div className="t-label" style={{ marginBottom: 14 }}>NOTIFICATIONS</div>
           {[
-            { k: 'emailMissions', label: 'New mission email' },
+            { k: 'emailMissions', label: 'New track email' },
             { k: 'emailWeekly', label: 'Weekly summary (Sunday)' },
             { k: 'inApp', label: 'In-app real-time' },
           ].map(x => (
@@ -1686,6 +1687,7 @@ function PointsLedger({ userId }) {
   const groupMeta = {
     onboarding: { label: 'Onboarding', icon: 'fa-flag-checkered' },
     mission:    { label: 'Missions',   icon: 'fa-bullseye' },
+    project:    { label: 'Missions',   icon: 'fa-diagram-project' },
     client:     { label: 'Client',     icon: 'fa-handshake' },
     recruit:    { label: 'Recruitment',icon: 'fa-user-plus' },
     ritual:     { label: 'Rituals',    icon: 'fa-calendar-check' },
@@ -1698,7 +1700,7 @@ function PointsLedger({ userId }) {
     return (
       <div className="card-panel" style={{ textAlign: 'center', padding: 40 }}>
         <i className="fa-solid fa-bolt" style={{ fontSize: 24, color: 'var(--off-white-40)', marginBottom: 12 }} />
-        <div className="t-body" style={{ color: 'var(--off-white-68)' }}>No points logged yet. Give kudos, complete rituals, and submit missions to earn points.</div>
+        <div className="t-body" style={{ color: 'var(--off-white-68)' }}>No points logged yet. Give kudos, complete rituals, and submit track tasks to earn points.</div>
       </div>
     );
   }

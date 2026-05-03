@@ -490,8 +490,8 @@ function CommanderEOW() {
   const { all, cohortId } = useCohort();
   const [weekNumber, setWeekNumber] = React.useState(() => EOW.currentWeek());
   const [share, setShare] = React.useState(null);   // { entry, cohort, weekNumber, window }
-
-  const totalWeeks = (typeof COHORT !== 'undefined' ? COHORT.weekTotal : 12) || 12;
+  const selectedCohort = all.find(c => c.id === cohortId) || all[0] || (typeof COHORT !== 'undefined' ? COHORT : null);
+  const totalWeeks = window.getCohortWeekTotal?.(selectedCohort) || (typeof COHORT !== 'undefined' ? COHORT.weekTotal : 12) || 12;
 
   // Show all cohorts — but float the Commander's currently-selected cohort to the top.
   const cohorts = [...all].sort((a, b) => {

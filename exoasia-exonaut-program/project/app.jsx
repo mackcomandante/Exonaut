@@ -19,6 +19,11 @@ function App() {
   const [tweaks, setTweaks] = React.useState(() => {
     try { return JSON.parse(localStorage.getItem('exo:tweaks')) || {}; } catch { return {}; }
   });
+  const ExtrasCelebration = window.Celebration || (() => null);
+  const ExtrasKudosModal = window.KudosModal || (() => null);
+  const ExtrasToastStack = window.ToastStack || (() => null);
+  const ExtrasTweaksFab = window.TweaksFab || (() => null);
+  const ExtrasTweaksPanel = window.TweaksPanel || (() => null);
 
   const mergedTweaks = {
     density: 'default', accent: 'lime', dashVariant: 'default',
@@ -110,9 +115,9 @@ function App() {
   };
 
   const routeAllowedForRole = (role, routeId) => {
-    const exonautRoutes = ['dashboard', 'leaderboard', 'profile', 'mission', 'missions', 'credentials', 'projects', 'first-projects', 'delegation-inbox', 'project-tasks', 'community', 'kudos', 'rituals', 'announce', 'notifications', 'alumni', 'settings'];
+    const exonautRoutes = ['dashboard', 'leaderboard', 'profile', 'mission', 'missions', 'credentials', 'projects', 'first-projects', 'project-tasks', 'community', 'kudos', 'rituals', 'announce', 'notifications', 'alumni', 'settings'];
     const trackOpsRoutes = ['lead-home', 'lead-roster', 'lead-queue', 'lead-grade', 'lead-announce', 'lead-removals', 'crown-pass'];
-    const leadRoutes = ['lead-home', 'lead-roster', 'lead-queue', 'lead-grade', 'lead-announce', 'lead-removals', 'lead-projects', 'lead-first-delegations', 'lead-delegation-inbox', 'lead-project-tasks', 'lead-profile', 'community', 'kudos', 'notifications', 'settings'];
+    const leadRoutes = ['lead-home', 'lead-roster', 'lead-queue', 'lead-grade', 'lead-announce', 'lead-removals', 'lead-projects', 'lead-project-tasks', 'lead-profile', 'community', 'kudos', 'notifications', 'settings'];
     const commanderRoutes = ['cmdr-home', 'cmdr-profile', 'cmdr-leads', 'cmdr-projects', 'cmdr-exonauts', 'cmdr-esc', 'cmdr-health', 'cmdr-eow', 'cmdr-crowns', 'cmdr-removals', 'cmdr-announce', 'community', 'kudos', 'notifications', 'settings'];
     const adminRoutes = ['pa-cohorts', 'pa-missions', 'pa-projects', 'pa-managers', 'pa-assign', 'pa-users', 'pa-console', 'pa-removals', 'pa-announce', 'pa-profile', 'community', 'kudos', 'notifications', 'settings'];
     const routeBase = (routeId || '').split(':')[0];
@@ -171,12 +176,11 @@ function App() {
     dashboard:   ['EXONAUT', 'Dashboard'],
     leaderboard: ['EXONAUT', 'Leaderboard'],
     profile:     ['EXONAUT', 'Profile', currentProfileName],
-    mission:     ['EXONAUT', 'Missions', missionId || ''],
-    missions:    ['EXONAUT', 'Missions'],
+    mission:     ['EXONAUT', 'Track', missionId || ''],
+    missions:    ['EXONAUT', 'Track'],
     credentials: ['EXONAUT', 'Certificates & Badges'],
     projects: ['PROJECTS', 'Assigned Projects'],
-    'first-projects': ['PROJECTS', 'Delegations'],
-    'delegation-inbox': ['PROJECTS', 'Delegation Inbox'],
+    'first-projects': ['PROJECTS', 'Project Lead Board'],
     'project-tasks': ['PROJECTS', 'Project Tasks'],
     community:   ['EXONAUT', 'Community'],
     kudos:       ['EXONAUT', 'Kudos'],
@@ -192,8 +196,6 @@ function App() {
     'lead-grade':  ['LEAD', 'Grade Submission'],
     'lead-announce': ['LEAD', 'Announcements'],
     'lead-projects': ['LEAD', 'Projects'],
-    'lead-first-delegations': ['LEAD', 'Delegations'],
-    'lead-delegation-inbox': ['LEAD', 'Delegation Inbox'],
     'lead-project-tasks': ['LEAD', 'Project Tasks'],
     'lead-removals': ['TRACK OPS', 'Removals'],
     'crown-pass': ['TRACK OPS', 'Pass the Crown'],
@@ -212,7 +214,7 @@ function App() {
     'cmdr-announce': ['COMMANDER', 'Announcements'],
     // Platform Admin
     'pa-cohorts':  ['PLATFORM ADMIN', 'Cohort Management'],
-    'pa-missions': ['PLATFORM ADMIN', 'Mission Builder'],
+    'pa-missions': ['PLATFORM ADMIN', 'Track Creation'],
     'pa-projects': ['PLATFORM ADMIN', 'Project Builder'],
     'pa-managers': ['PLATFORM ADMIN', 'Track Management'],
     'pa-assign':   ['PLATFORM ADMIN', 'Exonaut Assignment'],
@@ -232,17 +234,16 @@ function App() {
     if (route === 'dashboard')        page = <Dashboard onNavigate={navigate} onOpenMission={openMission} />;
     else if (route === 'leaderboard') page = <Leaderboard onBack={() => navigate('dashboard')} />;
     else if (route === 'profile')     page = <Profile onOpenMission={openMission} onTriggerBadge={(b) => onCelebrate('badge', { badge: b })} />;
-    else if (route === 'mission')     page = <MissionDetail missionId={missionId} onBack={() => navigate('missions')} onSubmitted={() => pushToast({ title: 'SUBMISSION RECEIVED', sub: 'Mission Lead has 48h to review', icon: 'fa-paper-plane' })} />;
+    else if (route === 'mission')     page = <MissionDetail missionId={missionId} onBack={() => navigate('missions')} onSubmitted={() => pushToast({ title: 'SUBMISSION RECEIVED', sub: 'Track Lead has 48h to review', icon: 'fa-paper-plane' })} />;
     else if (route === 'missions') {
       const MissionsComponent = window.MissionsList;
       page = MissionsComponent
         ? <MissionsComponent onOpenMission={openMission} />
-        : <div className="enter"><div className="card-panel" style={{ padding: 32 }}>Loading missions...</div></div>;
+        : <div className="enter"><div className="card-panel" style={{ padding: 32 }}>Loading track tasks...</div></div>;
     }
     else if (route === 'credentials') page = <CertificatesBadgesPage />;
     else if (route === 'projects') page = <ProjectsPage />;
     else if (route === 'first-projects') page = <FirstOfficerProjectsPage />;
-    else if (route === 'delegation-inbox') page = <SecondOfficerDelegationInboxPage />;
     else if (route === 'project-tasks') page = <ProjectTasksPage />;
     else if (route === 'community')   page = <CommunityPage />;
     else if (route === 'kudos')       page = <KudosFeed onGive={() => setKudosOpen(true)} />;
@@ -270,8 +271,6 @@ function App() {
     else if (route === 'lead-announce') page = <LeadAnnounce />;
     else if (route === 'lead-removals') page = <LeadRemovalsPanel />;
     else if (route === 'lead-projects') page = <ProjectsPage />;
-    else if (route === 'lead-first-delegations') page = <FirstOfficerDelegationsPage />;
-    else if (route === 'lead-delegation-inbox') page = <SecondOfficerDelegationInboxPage />;
     else if (route === 'lead-project-tasks') page = <ProjectTasksPage />;
     else if (route === 'lead-profile') page = <RoleProfile roleKey="lead" />;
     else if (route === 'community')   page = <CommunityPage />;
@@ -325,13 +324,13 @@ function App() {
         <div className="content" style={{ paddingTop: 48 }}>{page}</div>
       </main>
 
-      {celebration && <Celebration kind={celebration.kind} payload={celebration.payload} onClose={() => setCelebration(null)} />}
-      {kudosOpen && <KudosModal onClose={() => setKudosOpen(false)}
-                                onSent={(k) => { const rec = USERS.find(u => u.id === k.recipient); pushToast({ title: 'KUDOS SENT', sub: `+2 pts to you · to ${rec?.name}`, icon: 'fa-hand-sparkles' }); }} />}
-      <ToastStack toasts={toasts} />
+      {celebration && <ExtrasCelebration kind={celebration.kind} payload={celebration.payload} onClose={() => setCelebration(null)} />}
+      {kudosOpen && <ExtrasKudosModal onClose={() => setKudosOpen(false)}
+                                onSent={(k) => { pushToast({ title: 'KUDOS SENT', sub: `+${Number(k.giverPoints || 0)} to you · +${Number(k.receiverPoints || 0.25)} to ${k.recipientName || 'recipient'}`, icon: 'fa-hand-sparkles' }); }} />}
+      <ExtrasToastStack toasts={toasts} />
 
-      <TweaksFab onClick={() => setTweaksOpen(v => !v)} />
-      <TweaksPanel open={tweaksOpen} onClose={() => setTweaksOpen(false)}
+      <ExtrasTweaksFab onClick={() => setTweaksOpen(v => !v)} />
+      <ExtrasTweaksPanel open={tweaksOpen} onClose={() => setTweaksOpen(false)}
                    tweaks={mergedTweaks}
                    setTweak={(k, v) => setTweaks(t => ({ ...t, [k]: v }))}
                    onCelebrate={onCelebrate} />
@@ -358,14 +357,22 @@ function LeadSidebar({ current, onNavigate, onSignOut }) {
   const { profiles } = useUserProfiles();
   useProjects();
   const isFirstOfficer = window.__projectStore.userIsFirstOfficer(profile.id);
+  const hasProjectTasks = window.__projectStore.firstOfficerTasks(profile.id).length > 0;
   const displayName = profile.fullName || 'Mission Lead';
   const allSubs = useSubs();
+  React.useEffect(() => { window.refreshSubs?.(); }, []);
   const lead = LEADS.find(l => l.track === profile.trackCode) || LEADS.find(l => l.id === 'lead-ais') || LEADS[0];
   const leadTrack = profile.trackCode || 'AIS';
   const myExonautIds = new Set((profiles || [])
     .filter(p => p.role === 'exonaut' && (p.trackCode || 'AIS') === leadTrack && (!profile.cohortId || (p.cohortId || 'c2627') === profile.cohortId))
     .map(p => p.id));
-  const pendingCount = allSubs.filter(s => s.state === 'pending' && myExonautIds.has(s.exonautId)).length;
+  const pendingCount = allSubs.filter(s => {
+    if (s.state !== 'pending') return false;
+    if (myExonautIds.has(s.exonautId)) return true;
+    const mission = window.__missionStore?.all?.().find(m => m.id === s.missionId);
+    const missionTrack = mission?.track || mission?.trackCode || '';
+    return !missionTrack || missionTrack === leadTrack;
+  }).length;
   const me = [
     { id: 'lead-profile', label: 'My Profile', icon: 'fa-id-badge' },
     { id: 'community',   label: 'Community',     icon: 'fa-users-rectangle' },
@@ -375,9 +382,7 @@ function LeadSidebar({ current, onNavigate, onSignOut }) {
     { id: 'lead-queue',  label: 'Review Queue',  icon: 'fa-clipboard-check', count: pendingCount },
     { id: 'lead-roster', label: 'Roster',        icon: 'fa-users' },
     { id: 'lead-projects', label: 'Projects',    icon: 'fa-diagram-project' },
-    ...(isFirstOfficer ? [{ id: 'lead-first-delegations', label: 'Delegations', icon: 'fa-user-tie' }] : []),
-    { id: 'lead-delegation-inbox', label: 'Delegation Inbox', icon: 'fa-inbox' },
-    ...(isFirstOfficer || window.__projectStore.userIsSecondOfficer(profile.id) ? [{ id: 'lead-project-tasks', label: 'Project Tasks', icon: 'fa-list-check' }] : []),
+    ...(isFirstOfficer || hasProjectTasks ? [{ id: 'lead-project-tasks', label: 'Project Tasks', icon: 'fa-list-check' }] : []),
     { id: 'lead-announce', label: 'Announcements', icon: 'fa-bullhorn' },
     { id: 'kudos',       label: 'Kudos',         icon: 'fa-hand-sparkles' },
   ];
@@ -388,7 +393,7 @@ function LeadSidebar({ current, onNavigate, onSignOut }) {
         <div className="sidebar-tag" style={{ color: 'var(--platinum)' }}>LEAD CONSOLE · v2.0</div>
       </div>
       <div className="sidebar-user" style={{ cursor: 'pointer' }} onClick={() => onNavigate('lead-profile')} title="Open my profile">
-        <AvatarWithRing name={displayName} size={36} tier="corps" />
+        <AvatarWithRing name={displayName} avatarUrl={profile.avatarUrl} size={36} tier="corps" />
         <div className="sidebar-user-info">
           <div className="sidebar-user-name">{displayName}</div>
           <div className="sidebar-user-tier" style={{ color: 'var(--platinum)' }}>MANAGER · AI-STRAT</div>
@@ -453,7 +458,7 @@ function CommanderSidebar({ current, onNavigate, onSignOut }) {
         <div className="sidebar-tag" style={{ color: 'var(--amber)' }}>COMMAND · v2.0</div>
       </div>
       <div className="sidebar-user" style={{ cursor: 'pointer' }} onClick={() => onNavigate('cmdr-profile')} title="Open my profile">
-        <AvatarWithRing name={displayName} size={36} tier="corps" />
+        <AvatarWithRing name={displayName} avatarUrl={profile.avatarUrl} size={36} tier="corps" />
         <div className="sidebar-user-info">
           <div className="sidebar-user-name">{displayName}</div>
           <div className="sidebar-user-tier" style={{ color: 'var(--amber)' }}>DIRECTOR · FOUNDER</div>

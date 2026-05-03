@@ -11,7 +11,7 @@ function Sidebar({ current, onNavigate, onSignOut, mobileOpen, onMobileClose }) 
   ];
   const links = [
     { id: 'dashboard',   label: 'Dashboard',   icon: 'fa-gauge-high' },
-    { id: 'missions',    label: 'Missions',    icon: 'fa-bullseye', count: 3 },
+    { id: 'missions',    label: 'Track',       icon: 'fa-bullseye', count: 3 },
     { id: 'projects',    label: 'Projects',    icon: 'fa-table-columns' },
     { id: 'leaderboard', label: 'Leaderboard', icon: 'fa-ranking-star' },
   ];

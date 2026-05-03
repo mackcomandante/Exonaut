@@ -327,7 +327,7 @@ img, svg { display: block; max-width: 100%; }
 }
 .project-stat-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   gap: 8px;
   margin-top: 14px;
 }
@@ -547,10 +547,22 @@ img, svg { display: block; max-width: 100%; }
 .kanban-card:active {
   cursor: grabbing;
 }
-.kanban-card.priority-low { border-left-color: var(--ink-muted); }
-.kanban-card.priority-medium { border-left-color: var(--sky); }
-.kanban-card.priority-high { border-left-color: var(--amber); }
-.kanban-card.priority-urgent { border-left-color: var(--coral); }
+.kanban-card.task-critical { border-left-color: var(--coral); }
+.kanban-card.task-urgent { border-left-color: var(--sky); }
+.kanban-card.task-important { border-left-color: var(--amber); }
+.task-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 10px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  color: var(--ink-muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
 .kanban-card-title {
   color: var(--ink);
   font-weight: 800;
@@ -595,6 +607,11 @@ img, svg { display: block; max-width: 100%; }
   max-height: min(840px, calc(100vh - 40px));
   overflow: auto;
 }
+.ritual-proof-modal {
+  width: min(560px, 100%);
+  max-height: min(760px, calc(100vh - 40px));
+  overflow: auto;
+}
 .task-modal-head {
   display: flex;
   justify-content: space-between;
@@ -622,6 +639,36 @@ img, svg { display: block; max-width: 100%; }
 }
 .assignee-select {
   min-height: 136px;
+}
+.selected-member-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+.selected-member-pill {
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  color: var(--ink);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 5px 8px;
+  text-transform: uppercase;
+}
+.selected-member-pill span {
+  color: var(--ink-muted);
+  font-weight: 600;
+}
+.selected-member-pill i {
+  color: var(--ink-muted);
+  font-size: 9px;
 }
 .submission-row,
 .comment-row {
@@ -964,7 +1011,7 @@ img, svg { display: block; max-width: 100%; }
    ============================================================ */
 .stat-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   gap: 14px;
   background: transparent;
   border: none;
@@ -1193,6 +1240,10 @@ img, svg { display: block; max-width: 100%; }
 .activity-icon.type-points   { background: var(--lime-wash); color: var(--ink); }
 .activity-icon.type-rank     { background: var(--cyan-wash); color: var(--platinum); }
 .activity-icon.type-announce { background: var(--orange-wash); color: var(--orange); }
+.activity-icon.type-critical { background: rgba(210, 65, 65, 0.12); color: var(--red); }
+.activity-icon.type-at-risk  { background: var(--orange-wash); color: var(--orange); }
+.activity-icon.type-on-track { background: var(--lime-wash); color: var(--ink); }
+.activity-icon.type-project  { background: var(--cyan-wash); color: var(--platinum); }
 
 .activity-body {
   font-family: var(--font-display);

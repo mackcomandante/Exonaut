@@ -72,8 +72,8 @@ function MissionDetail({ missionId, onBack, onSubmitted }) {
 
         {/* Brief */}
         <div className="brief-body" style={{ marginBottom: 20 }}>
-          <strong>Mission Brief</strong>
-          {(mission.description || 'Full brief will be attached by your Mission Lead.').split('\n').map((p, i) =>
+          <strong>Track Brief</strong>
+          {(mission.description || 'Full brief will be attached by your Track Lead.').split('\n').map((p, i) =>
             p.startsWith('•')
               ? <div key={i} style={{ paddingLeft: 16, marginBottom: 6 }} dangerouslySetInnerHTML={{ __html: p }} />
               : <p key={i} dangerouslySetInnerHTML={{ __html: p }} />
@@ -98,7 +98,7 @@ function MissionDetail({ missionId, onBack, onSubmitted }) {
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
               <i className="fa-solid fa-comment-dots" style={{ color: mySub?.state === 'needs-revision' ? 'var(--amber)' : 'var(--green)' }} />
-              <span className="t-label" style={{ color: mySub?.state === 'needs-revision' ? 'var(--amber)' : 'var(--green)' }}>MISSION LEAD FEEDBACK</span>
+              <span className="t-label" style={{ color: mySub?.state === 'needs-revision' ? 'var(--amber)' : 'var(--green)' }}>TRACK LEAD FEEDBACK</span>
               <span className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)', marginLeft: 'auto' }}>GRADE · {effectiveGrade?.toUpperCase().replace('-', ' ')}</span>
             </div>
             <div className="t-body" style={{ color: 'var(--off-white)' }}>{effectiveFeedback}</div>
@@ -123,7 +123,7 @@ function MissionDetail({ missionId, onBack, onSubmitted }) {
                 <i className="fa-solid fa-check-to-slot" style={{ fontSize: 32, color: 'var(--platinum)', marginBottom: 12 }} />
                 <div className="t-heading" style={{ fontSize: 16, marginBottom: 4 }}>Submission Received</div>
                 <div className="t-body" style={{ fontSize: 14, marginBottom: 16 }}>
-                  Your Mission Lead has <span style={{ color: 'var(--ink)' }}>48 hours</span> to review. You'll get a notification the moment it's graded.
+                  Your Track Lead has <span style={{ color: 'var(--ink)' }}>48 hours</span> to review. You'll get a notification the moment it's graded.
                 </div>
                 <div className="file-attached" style={{ maxWidth: 420, margin: '0 auto' }}>
                   <i className="fa-solid fa-file-lines f-icon" />
@@ -131,7 +131,7 @@ function MissionDetail({ missionId, onBack, onSubmitted }) {
                   <div className="f-size">{file?.size || '412 KB'}</div>
                 </div>
                 <div className="t-mono" style={{ marginTop: 14, fontSize: 10, color: 'var(--off-white-40)', letterSpacing: '0.1em' }}>
-                  VISIBLE TO · DR. NADIA OYELARAN · MISSION LEAD · AI-STRAT
+                  VISIBLE TO · DR. NADIA OYELARAN · TRACK LEAD · AI-STRAT
                 </div>
               </div>
             ) : (
@@ -155,7 +155,7 @@ function MissionDetail({ missionId, onBack, onSubmitted }) {
                 <div style={{ marginTop: 16 }}>
                   <label className="t-label-muted" style={{ display: 'block', marginBottom: 8 }}>NOTE TO REVIEWER (OPTIONAL)</label>
                   <textarea className="textarea" rows={3} value={note} onChange={(e) => setNote(e.target.value)}
-                    placeholder="Anything your Mission Lead should know?" />
+                    placeholder="Anything your Track Lead should know?" />
                 </div>
 
                 <div style={{ display: 'flex', gap: 10, marginTop: 20, justifyContent: 'flex-end' }}>
@@ -198,7 +198,7 @@ function MissionDetail({ missionId, onBack, onSubmitted }) {
         </div>
 
         <div className="card-panel">
-          <div className="t-label" style={{ marginBottom: 12 }}>MISSION LEAD</div>
+          <div className="t-label" style={{ marginBottom: 12 }}>TRACK LEAD</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <AvatarWithRing name="Mack Comandante" size={40} tier="corps" />
             <div>
@@ -312,7 +312,7 @@ function InlineSubmitCard({ missionId, compact = false }) {
       <div style={{ marginTop: 12 }}>
         <label className="t-label-muted" style={{ display: 'block', marginBottom: 6 }}>NOTE TO REVIEWER (OPTIONAL)</label>
         <textarea className="textarea" rows={2} value={note} onChange={(e) => setNote(e.target.value)}
-          placeholder="Anything your Mission Lead should know?" />
+          placeholder="Anything your Track Lead should know?" />
       </div>
 
       <div style={{ display: 'flex', gap: 10, marginTop: 14, justifyContent: 'flex-end' }}>

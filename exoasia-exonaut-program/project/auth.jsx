@@ -201,7 +201,7 @@ function Onboarding({ onComplete }) {
                 { t: 'Leaderboard', d: 'Real-time cohort ranking. Your row is always highlighted, even at #28.', icon: 'fa-ranking-star' },
                 { t: 'Badges', d: '22 possible badges per cohort. Most Exonauts earn 4–10. All 22 is legend.', icon: 'fa-medal' },
                 { t: 'Missions', d: 'Submit, get graded within 48h, earn bonus for Excellent work.', icon: 'fa-bullseye' },
-                { t: 'Kudos', d: 'Lift before you climb. 3 kudos/week given. Unlimited received.', icon: 'fa-hand-sparkles' },
+                { t: 'Kudos', d: 'Lift before you climb. 4 giver-point kudos/week. Unlimited received.', icon: 'fa-hand-sparkles' },
               ].map((s, i) => (
                 <div key={i} style={{
                   padding: '24px 28px',

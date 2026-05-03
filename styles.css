@@ -330,7 +330,7 @@ img, svg { display: block; max-width: 100%; }
 }
 .project-stat-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
   gap: 8px;
   margin-top: 14px;
 }
@@ -421,10 +421,22 @@ img, svg { display: block; max-width: 100%; }
 .kanban-card:active {
   cursor: grabbing;
 }
-.kanban-card.priority-low { border-left-color: var(--ink-muted); }
-.kanban-card.priority-medium { border-left-color: var(--sky); }
-.kanban-card.priority-high { border-left-color: var(--amber); }
-.kanban-card.priority-urgent { border-left-color: var(--coral); }
+.kanban-card.task-critical { border-left-color: var(--coral); }
+.kanban-card.task-urgent { border-left-color: var(--sky); }
+.kanban-card.task-important { border-left-color: var(--amber); }
+.task-check {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+}
 .kanban-card-title {
   color: var(--ink);
   font-weight: 800;
@@ -822,7 +834,7 @@ img, svg { display: block; max-width: 100%; }
    ============================================================ */
 .stat-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   gap: 14px;
   background: transparent;
   border: none;
@@ -1051,6 +1063,9 @@ img, svg { display: block; max-width: 100%; }
 .activity-icon.type-points   { background: var(--lime-wash); color: var(--ink); }
 .activity-icon.type-rank     { background: var(--cyan-wash); color: var(--platinum); }
 .activity-icon.type-announce { background: var(--orange-wash); color: var(--orange); }
+.activity-icon.type-info     { background: var(--cyan-wash); color: var(--platinum); }
+.activity-icon.type-danger   { background: rgba(239,68,68,0.12); color: var(--coral); }
+.activity-icon.type-warn     { background: var(--orange-wash); color: var(--orange); }
 
 .activity-body {
   font-family: var(--font-display);

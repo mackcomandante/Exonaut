@@ -163,9 +163,9 @@ const ROLE_IDENTITIES = {
 const POINTS_RUBRIC = [
   { group: 'Onboarding',       label: 'Pledge signed (Day 1)',                pts: '+50', note: 'One-time onboarding bonus' },
   { group: 'Onboarding',       label: 'LinkedIn post published',              pts: '+20', note: 'Verified by link' },
-  { group: 'Mission submission', label: 'Mission submitted on time',           pts: '+10 to +50', note: 'Set per mission by ML' },
-  { group: 'Mission submission', label: 'Mission graded Good',                 pts: '+10', note: 'Bonus on top' },
-  { group: 'Mission submission', label: 'Mission graded Excellent',            pts: '+20', note: 'Bonus on top' },
+  { group: 'Track submission', label: 'Track submitted on time',               pts: '+10 to +50', note: 'Set per track by TL' },
+  { group: 'Track submission', label: 'Track graded Good',                     pts: '+10', note: 'Bonus on top' },
+  { group: 'Track submission', label: 'Track graded Excellent',                pts: '+20', note: 'Bonus on top' },
   { group: 'Client',           label: 'Prospect pipeline (10 qualified)',    pts: '+20', note: 'Wk 1 · in CRM' },
   { group: 'Client',           label: 'Concept paper submitted (per paper)', pts: '+30', note: 'Wk 2 · 1 per prospect · 10 total' },
   { group: 'Client',           label: 'Discovery meeting completed',          pts: '+25', note: 'Per verified meeting' },

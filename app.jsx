@@ -92,8 +92,8 @@ function App() {
     dashboard:   ['EXONAUT', 'Dashboard'],
     leaderboard: ['EXONAUT', 'Leaderboard'],
     profile:     ['EXONAUT', 'Profile', ME.name],
-    mission:     ['EXONAUT', 'Missions', missionId || ''],
-    missions:    ['EXONAUT', 'Missions'],
+    mission:     ['EXONAUT', 'Track', missionId || ''],
+    missions:    ['EXONAUT', 'Track'],
     community:   ['EXONAUT', 'Community'],
     'message-board': ['EXONAUT', 'Message Board'],
     certs:       ['EXONAUT', 'Certs & Badges'],
@@ -123,11 +123,11 @@ function App() {
     'cmdr-announce': ['COMMANDER', 'Announcements'],
     // Platform Admin
     'pa-cohorts':  ['PLATFORM ADMIN', 'Cohort Management'],
-    'pa-managers': ['PLATFORM ADMIN', 'Manager Management'],
+    'pa-managers': ['PLATFORM ADMIN', 'Track Creation'],
     'pa-assign':   ['PLATFORM ADMIN', 'Exonaut Assignment'],
     'pa-users':    ['PLATFORM ADMIN', 'User Directory'],
     'pa-console':  ['PLATFORM ADMIN', 'System Console'],
-    'pa-projects': ['PLATFORM ADMIN', 'Projects'],
+    'pa-projects': ['PLATFORM ADMIN', 'Project Builder'],
     'pa-announce': ['PLATFORM ADMIN', 'Announcements'],
     'pa-profile':  ['PLATFORM ADMIN', 'Profile'],
   };
@@ -139,7 +139,7 @@ function App() {
     if (route === 'dashboard')        page = <Dashboard onNavigate={navigate} onOpenMission={openMission} />;
     else if (route === 'leaderboard') page = <Leaderboard onBack={() => navigate('dashboard')} />;
     else if (route === 'profile')     page = <Profile onOpenMission={openMission} onTriggerBadge={(b) => onCelebrate('badge', { badge: b })} />;
-    else if (route === 'mission')     page = <MissionDetail missionId={missionId} onBack={() => navigate('missions')} onSubmitted={() => pushToast({ title: 'SUBMISSION RECEIVED', sub: 'Mission Lead has 48h to review', icon: 'fa-paper-plane' })} />;
+    else if (route === 'mission')     page = <MissionDetail missionId={missionId} onBack={() => navigate('missions')} onSubmitted={() => pushToast({ title: 'SUBMISSION RECEIVED', sub: 'Track Lead has 48h to review', icon: 'fa-paper-plane' })} />;
     else if (route === 'missions')    page = <MissionsList onOpenMission={openMission} />;
     else if (route === 'certs')           page = <CertsBadgesPage />;
     else if (route === 'projects')        page = <ProjectWorkspacePage mode="member" />;
@@ -161,7 +161,7 @@ function App() {
     else if (route === 'lead-roster') page = <LeadRoster />;
     else if (route === 'lead-queue')  page = <LeadQueue onNavigate={navigate} />;
     else if (route === 'lead-announce') page = <LeadAnnounce />;
-    else if (route === 'lead-projects') page = <ProjectWorkspacePage mode="second" />;
+    else if (route === 'lead-projects') page = <ProjectWorkspacePage mode="first-officer" />;
     else if (route === 'lead-profile') page = <RoleProfile roleKey="lead" />;
     else if (route === 'community')   page = <CommunityPage />;
     else if (route === 'kudos')       page = <KudosFeed onGive={() => setKudosOpen(true)} />;

@@ -164,13 +164,13 @@ const ROLE_IDENTITIES = {
   commander: { id: 'commander',    name: 'Mission Commander', role: 'director',  label: 'Mission Commander',home: 'cmdr-home' },
 };
 
-// ==== POINTS RUBRIC (from Exonaut Mission Briefs) ====
+// ==== POINTS RUBRIC (from Exonaut Track Briefs) ====
 const POINTS_RUBRIC = [
   { group: 'Onboarding',       label: 'Pledge signed (Day 1)',                pts: '+50', note: 'One-time onboarding bonus' },
   { group: 'Onboarding',       label: 'LinkedIn post published',              pts: '+20', note: 'Verified by link' },
-  { group: 'Mission submission', label: 'Mission submitted on time',           pts: '+10 to +50', note: 'Set per mission by ML' },
-  { group: 'Mission submission', label: 'Mission graded Good',                 pts: '+10', note: 'Bonus on top' },
-  { group: 'Mission submission', label: 'Mission graded Excellent',            pts: '+20', note: 'Bonus on top' },
+  { group: 'Track submissions', label: 'Track task submitted on time',          pts: '+10 to +50', note: 'Set per track task by Track Lead' },
+  { group: 'Track submissions', label: 'Track task graded Good',                pts: '+10', note: 'Bonus on top' },
+  { group: 'Track submissions', label: 'Track task graded Excellent',           pts: '+20', note: 'Bonus on top' },
   { group: 'Client',           label: 'Prospect pipeline (10 qualified)',    pts: '+20', note: 'Wk 1 · in CRM' },
   { group: 'Client',           label: 'Concept paper submitted (per paper)', pts: '+30', note: 'Wk 2 · 1 per prospect · 10 total' },
   { group: 'Client',           label: 'Discovery meeting completed',          pts: '+25', note: 'Per verified meeting' },
@@ -187,8 +187,8 @@ const POINTS_RUBRIC = [
   { group: 'Rituals',          label: 'Attend Monday Ignition',               pts: '+5',  note: 'Per session' },
   { group: 'Rituals',          label: 'Post Mid-Week Pulse',                  pts: '+3',  note: 'Per week' },
   { group: 'Rituals',          label: 'Post Friday Win Wall',                 pts: '+5',  note: 'Per week' },
-  { group: 'Culture',          label: 'Give peer kudos',                      pts: '+2',  note: 'Max 3/week' },
-  { group: 'Culture',          label: 'Receive peer kudos',                   pts: '+3',  note: 'Uncapped' },
+  { group: 'Culture',          label: 'Give peer kudos',                      pts: '+0.5', note: 'Max 4/week' },
+  { group: 'Culture',          label: 'Receive peer kudos',                   pts: '+0.25', note: 'Uncapped' },
   { group: 'Culture',          label: 'Teach-Back session conducted',         pts: '+15', note: 'Verified by ML' },
   { group: 'Milestones',       label: 'Intern of the Week win',               pts: '+25', note: 'Weekly award' },
   { group: 'Milestones',       label: 'Midpoint Fire Check completed',        pts: '+10', note: 'Week 6 1:1' },
@@ -342,7 +342,7 @@ const TRACK_BRIEFS = {
   ],
 };
 
-// Normal missions are created by Platform Admin through Mission Builder.
+// Normal track tasks are created by Platform Admin through Track Creation.
 // Keep this array live and empty until the Admin creates missions.
 MISSIONS.splice(0, MISSIONS.length);
 RITUALS.forEach((r, i) => { r.state = i < 2 ? 'done' : 'not-started'; });

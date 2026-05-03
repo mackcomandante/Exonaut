@@ -18,6 +18,10 @@ function profileToClient(row, user) {
   };
 }
 
+function setProfileDirectory(profiles) {
+  window.__profileDirectory = Array.isArray(profiles) ? profiles : [];
+}
+
 function useCurrentUserProfile() {
   const [profile, setProfile] = React.useState(() => ({
     id: ME_ID,
@@ -56,6 +60,8 @@ function useCurrentUserProfile() {
       ME.name = nextProfile.fullName;
       ME.track = nextProfile.trackCode;
       ME.cohort = nextProfile.cohortId;
+      const existing = Array.isArray(window.__profileDirectory) ? window.__profileDirectory : [];
+      setProfileDirectory([nextProfile, ...existing.filter(p => p.id !== nextProfile.id)]);
       setProfile(nextProfile);
       return nextProfile;
     } catch (err) {
@@ -104,11 +110,34 @@ function useCurrentUserProfile() {
     ME.name = nextProfile.fullName;
     ME.track = nextProfile.trackCode;
     ME.cohort = nextProfile.cohortId;
+    const existing = Array.isArray(window.__profileDirectory) ? window.__profileDirectory : [];
+    setProfileDirectory([nextProfile, ...existing.filter(p => p.id !== nextProfile.id)]);
     setProfile(nextProfile);
     return nextProfile;
   }, []);
 
   return { profile, loading, error, refresh, save };
+}
+
+async function uploadProfileAvatar(file) {
+  if (!window.__db || !window.__db.auth) throw new Error('Supabase is not loaded.');
+  if (!file) return '';
+  if (!String(file.type || '').startsWith('image/')) throw new Error('Please choose an image file.');
+  if (file.size > 3 * 1024 * 1024) throw new Error('Profile photo must be 3MB or smaller.');
+
+  const sessionResult = await window.__db.auth.getSession();
+  const user = sessionResult && sessionResult.data && sessionResult.data.session && sessionResult.data.session.user;
+  if (!user) throw new Error('You must be signed in to upload a profile photo.');
+
+  const ext = (file.name || 'avatar.png').split('.').pop().toLowerCase().replace(/[^a-z0-9]/g, '') || 'png';
+  const path = `${user.id}/avatar-${Date.now()}.${ext}`;
+  const { error } = await window.__db.storage
+    .from('profile-avatars')
+    .upload(path, file, { upsert: true, contentType: file.type || 'image/png' });
+  if (error) throw error;
+
+  const { data } = window.__db.storage.from('profile-avatars').getPublicUrl(path);
+  return data?.publicUrl || '';
 }
 
 function useUserProfiles() {
@@ -127,6 +156,7 @@ function useUserProfiles() {
         .order('created_at', { ascending: true });
       if (profilesError) throw profilesError;
       const nextProfiles = (data || []).map(row => profileToClient(row, null));
+      setProfileDirectory(nextProfiles);
       setProfiles(nextProfiles);
       return nextProfiles;
     } catch (err) {
@@ -160,11 +190,14 @@ function useUserProfiles() {
     if (updateError) throw updateError;
 
     const nextProfile = profileToClient(data, null);
-    setProfiles(prev => prev.map(p => p.id === id ? nextProfile : p));
+    const baseProfiles = profiles.some(p => p.id === id) ? profiles : [nextProfile, ...profiles];
+    const nextProfiles = baseProfiles.map(p => p.id === id ? nextProfile : p);
+    setProfileDirectory(nextProfiles);
+    setProfiles(nextProfiles);
     return nextProfile;
-  }, []);
+  }, [profiles]);
 
   return { profiles, loading, error, refresh, updateProfile };
 }
 
-Object.assign(window, { useCurrentUserProfile, useUserProfiles });
+Object.assign(window, { useCurrentUserProfile, useUserProfiles, uploadProfileAvatar });

@@ -13,6 +13,7 @@ function useBoardIdentity() {
     id: profile.id || ME_ID,
     name: profile.fullName || ME.name || 'You',
     role,
+    avatarUrl: profile.avatarUrl || '',
     badge: role === 'exonaut' ? null : role.toUpperCase(),
   };
 }
@@ -28,11 +29,13 @@ function roleBadgeStyle(role) {
 }
 
 function resolveAuthor(authorId, authorName) {
+  const p = (window.__profileDirectory || []).find(x => x.id === authorId);
+  if (p) return { name: authorName || p.fullName || p.email || 'Exonaut', tier: p.role === 'exonaut' ? 'gold' : 'corps', avatarUrl: p.avatarUrl || '' };
   // If a name is stored on the thread/comment, trust it (covers alumni + custom cases).
-  if (authorName) return { name: authorName, tier: 'gold' };
+  if (authorName) return { name: authorName, tier: 'gold', avatarUrl: '' };
   const U = (typeof USERS !== 'undefined') ? USERS : [];
   const u = U.find(x => x.id === authorId);
-  if (u) return { name: u.name, tier: u.tier || 'gold' };
+  if (u) return { name: u.name, tier: u.tier || 'gold', avatarUrl: '' };
   // Special system authors
   if (authorId === 'cmdr-mack') return { name: 'Mission Commander', tier: 'corps' };
   if (authorId === 'admin-ops') return { name: 'Platform Admin', tier: 'corps' };
@@ -40,7 +43,7 @@ function resolveAuthor(authorId, authorName) {
     const L = LEADS.find(l => l.id === authorId);
     if (L) return { name: L.name, tier: 'corps' };
   }
-  return { name: 'Anonymous', tier: 'bronze' };
+  return { name: 'Anonymous', tier: 'bronze', avatarUrl: '' };
 }
 
 // ============================================================================
@@ -436,7 +439,7 @@ function CommentNode({ threadId, comment, me, depth }) {
       borderRadius: 2, marginLeft: depth * 14,
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
-        <AvatarWithRing name={author.name} size={22} tier={author.tier} />
+        <AvatarWithRing name={author.name} avatarUrl={author.avatarUrl} size={22} tier={author.tier} />
         <span className="t-heading" style={{ fontSize: 12, textTransform: 'none', letterSpacing: 0, color: 'var(--off-white)' }}>
           {author.name}
         </span>

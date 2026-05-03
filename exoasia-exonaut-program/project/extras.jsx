@@ -3,6 +3,7 @@
 // ---- Celebration overlay (tier upgrade + badge earned) ----
 function Celebration({ kind, payload, onClose }) {
   const [show, setShow] = React.useState(false);
+  const activeCohort = window.getActiveCohort?.() || COHORT;
   React.useEffect(() => {
     requestAnimationFrame(() => setShow(true));
     const id = setTimeout(() => setShow(true), 10);
@@ -44,7 +45,7 @@ function Celebration({ kind, payload, onClose }) {
         <div className="celebration-kicker">TIER UPGRADE UNLOCKED</div>
         <h1 className="celebration-title">You are now {t.label}</h1>
         <div className="celebration-sub">The first 300 points are gone. The next 300 remember you.</div>
-        <div className="celebration-meta">EXO-TIER-{t.short} · {COHORT.code}</div>
+        <div className="celebration-meta">EXO-TIER-{t.short} · {activeCohort?.code || COHORT.code}</div>
       </>
     );
   } else if (kind === 'badge') {
@@ -57,7 +58,7 @@ function Celebration({ kind, payload, onClose }) {
         <div className="celebration-kicker">NEW BADGE EARNED</div>
         <h1 className="celebration-title">{b.name}</h1>
         <div className="celebration-sub">{b.subtitle}</div>
-        <div className="celebration-meta">EXO-BADGE-{b.code} · {COHORT.code}</div>
+        <div className="celebration-meta">EXO-BADGE-{b.code} · {activeCohort?.code || COHORT.code}</div>
       </>
     );
   } else if (kind === 'rank') {
@@ -123,7 +124,7 @@ function ToastStack({ toasts }) {
 }
 
 // ---- Kudos modal ----
-function KudosModal({ onClose, onSent }) {
+function LegacyKudosModal({ onClose, onSent }) {
   const [recipient, setRecipient] = React.useState('');
   const [message, setMessage] = React.useState('');
   const [pillar, setPillar] = React.useState('project');
@@ -310,6 +311,174 @@ function TweaksFab({ onClick }) {
       }} title="Tweaks">
       <i className="fa-solid fa-sliders" />
     </button>
+  );
+}
+
+// Cohort-scoped Kudos modal. This declaration intentionally overrides the
+// legacy community-wide modal above while keeping the rest of extras.jsx intact.
+function KudosModal({ onClose, onSent }) {
+  const [recipient, setRecipient] = React.useState('');
+  const [message, setMessage] = React.useState('');
+  const [pillar, setPillar] = React.useState('culture');
+  const [search, setSearch] = React.useState('');
+  const [sending, setSending] = React.useState(false);
+  const [sendError, setSendError] = React.useState('');
+
+  const kudos = useKudos();
+  const { profile } = useCurrentUserProfile();
+  const { profiles } = useUserProfiles();
+
+  const me = React.useMemo(() => {
+    const role = profile.role || 'exonaut';
+    return {
+      id: profile.id || ME_ID,
+      name: profile.fullName || ME.name || 'You',
+      role,
+      badge: role === 'exonaut' ? null : role.toUpperCase(),
+    };
+  }, [profile.id, profile.fullName, profile.role]);
+
+  const myCohort = profile.cohortId || ME.cohort || 'c2627';
+  const currentWeek = React.useMemo(() => {
+    const cohort = window.__cohortStore?.getAll?.().find(c => c.id === myCohort);
+    return window.EOW?.currentWeek ? window.EOW.currentWeek(cohort) : ((typeof COHORT !== 'undefined' ? COHORT.week : 1) || 1);
+  }, [myCohort]);
+  const weeklyUsed = kudos.weeklyUsage(me.id, myCohort, currentWeek);
+
+  const pool = React.useMemo(() => {
+    const fromProfiles = (profiles || []).map(p => ({
+      id: p.id,
+      name: p.fullName || p.email || 'Exonaut',
+      email: p.email || '',
+      track: p.trackCode || '',
+      cohort: p.cohortId || 'c2627',
+      role: p.role || 'exonaut',
+    }));
+    const fallback = (typeof USERS !== 'undefined' ? USERS : []).map(u => ({
+      id: u.id,
+      name: u.name,
+      email: u.email || '',
+      track: window.getUserTrack?.(u.id) || u.track || '',
+      cohort: window.getUserCohort?.(u.id) || u.cohort || 'c2627',
+      role: 'exonaut',
+    }));
+    const byId = new Map();
+    fallback.forEach(m => byId.set(m.id, m));
+    fromProfiles.forEach(m => byId.set(m.id, { ...(byId.get(m.id) || {}), ...m }));
+    return Array.from(byId.values()).filter(m => m.id !== me.id && (m.cohort || 'c2627') === myCohort);
+  }, [profiles, me.id, myCohort]);
+
+  const filteredPool = React.useMemo(() => {
+    if (!search.trim()) return pool;
+    const q = search.toLowerCase();
+    return pool.filter(m =>
+      m.name.toLowerCase().includes(q) ||
+      (m.email || '').toLowerCase().includes(q) ||
+      (m.track || '').toLowerCase().includes(q)
+    );
+  }, [pool, search]);
+  const selectedRecipient = pool.find(u => u.id === recipient);
+
+  const roleTagStyle = {
+    lead: { bg: 'rgba(192,192,192,0.15)', fg: 'var(--platinum)' },
+    commander: { bg: 'rgba(244,197,66,0.15)', fg: 'var(--amber)' },
+    admin: { bg: 'rgba(125,211,252,0.15)', fg: 'var(--sky)' },
+  }[me.role];
+
+  const handleSend = async () => {
+    if (!recipient || !message) return;
+    setSending(true);
+    setSendError('');
+    try {
+      const k = await kudos.give({
+        from: me.id,
+        fromName: me.name,
+        fromRole: me.role,
+        to: recipient,
+        toName: selectedRecipient?.name,
+        msg: message,
+        pillar,
+        cohortId: myCohort,
+        week: currentWeek,
+      });
+      onSent?.({ ...k, recipient, recipientName: selectedRecipient?.name });
+      onClose();
+    } catch (err) {
+      setSendError((err && err.message) || 'Could not send kudos.');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className="modal-scrim" onClick={onClose}>
+      <div className="modal-body" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-close" onClick={onClose}><i className="fa-solid fa-xmark" /></div>
+        <div className="t-label" style={{ marginBottom: 8 }}>
+          RECOGNIZE SOMEONE IN YOUR COHORT
+          {me.badge && (
+            <span style={{ marginLeft: 8, padding: '1px 6px', background: roleTagStyle?.bg, color: roleTagStyle?.fg, fontFamily: 'var(--font-mono)', fontSize: 8, letterSpacing: '0.1em', fontWeight: 700, borderRadius: 2 }}>
+              GIVING AS {me.badge}
+            </span>
+          )}
+        </div>
+        <h2 className="t-title" style={{ fontSize: 28, margin: '0 0 8px 0' }}>Give Kudos</h2>
+        <div className="t-body" style={{ marginBottom: 20 }}>
+          Lift before you climb. +0.5 pts to you for the first 4 kudos/week. +0.25 pts to them.
+          <span style={{ color: 'var(--off-white-40)', fontSize: 12 }}> ({weeklyUsed}/4 weekly giver points used)</span>
+        </div>
+
+        <label className="t-label-muted" style={{ display: 'block', marginBottom: 6 }}>RECIPIENT</label>
+        <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search cohort members by name or email..."
+          style={{
+            width: '100%', padding: '9px 12px', marginBottom: 8,
+            background: 'var(--deep-black)', color: 'var(--off-white)',
+            border: '1px solid var(--off-white-15)', borderRadius: 2,
+            fontFamily: 'var(--font-display)', fontSize: 13, outline: 'none',
+          }} />
+        <select className="select" value={recipient} onChange={(e) => setRecipient(e.target.value)} style={{ marginBottom: 14 }} size={filteredPool.length > 0 ? Math.min(6, filteredPool.length + 1) : 1}>
+          <option value="">{pool.length ? 'Select a cohort member...' : 'No cohort members available'}</option>
+          {filteredPool.map(u => {
+            const trackShort = (typeof TRACKS !== 'undefined') ? TRACKS.find(t => t.code === u.track)?.short : u.track;
+            const label = [u.name, u.email, trackShort].filter(Boolean).join(' · ');
+            return <option key={u.id} value={u.id}>{label}</option>;
+          })}
+        </select>
+        {sendError && (
+          <div className="t-body" style={{ margin: '-4px 0 12px', color: 'var(--danger)', fontSize: 12 }}>
+            {sendError}
+          </div>
+        )}
+
+        <label className="t-label-muted" style={{ display: 'block', marginBottom: 6 }}>MESSAGE</label>
+        <textarea className="textarea" rows={3} maxLength={200}
+          placeholder="Why this person, right now?"
+          value={message} onChange={(e) => setMessage(e.target.value)}
+          style={{ marginBottom: 6 }} />
+        <div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)', textAlign: 'right', marginBottom: 16 }}>
+          {message.length} / 200
+        </div>
+
+        <label className="t-label-muted" style={{ display: 'block', marginBottom: 6 }}>TAG A PILLAR</label>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
+          {['culture','client','recruitment'].map(p => (
+            <div key={p} className={'lb-filter' + (pillar === p ? ' active' : '')} onClick={() => setPillar(p)}>
+              {p}
+            </div>
+          ))}
+        </div>
+
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+          <button className="btn btn-ghost" onClick={onClose}>CANCEL</button>
+          <button className="btn btn-primary" onClick={handleSend}
+            disabled={!recipient || !message || sending}
+            style={{ opacity: (!recipient || !message || sending) ? 0.4 : 1 }}>
+            <i className="fa-solid fa-hand-sparkles" /> {sending ? 'SENDING...' : 'GIVE KUDOS'}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 

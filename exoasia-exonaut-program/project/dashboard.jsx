@@ -23,9 +23,12 @@ function StatCell({ label, icon, value, unit, meta, metaDir, lime }) {
 
 function HeroStats() {
   const { profile } = useCurrentUserProfile();
+  const activeCohort = window.getActiveCohort?.(profile) || COHORT;
+  const cohortMembers = window.getUsersForCohort?.(activeCohort?.id || profile.cohortId || ME.cohort) || [];
   const { total: livePoints, delta: liveDelta } = useComputedPoints(profile.id);
   const liveBadges = useLiveBadges(profile.id);
   const missions = useMissions();
+  const { projects, tasks, assignees } = useProjects();
   const earnedCount = liveBadges.filter(b => b.earned).length;
   const subs = useSubs();
   const completed = subs.filter(s => s.exonautId === profile.id && s.state === 'approved').length;
@@ -34,14 +37,18 @@ function HeroStats() {
       <StatCell label="TOTAL POINTS" icon="fa-bolt" value={livePoints} lime
         meta={liveDelta > 0 ? `AUTO · +${liveDelta} JUST GRADED` : 'AUTO · +85 THIS WEEK'} metaDir="up" />
       <StatCell label="RANK" icon="fa-ranking-star"
-        value={`#${ME_RANK}`} unit={`of ${COHORT.size}`}
+        value={`#${ME_RANK}`} unit={`of ${cohortMembers.length || COHORT.size}`}
         meta="+3 vs LAST WK" metaDir="up" />
       <StatCell label="TIER" icon="fa-shield-halved"
         value="PRIME" unit={`·\u00A0${livePoints - TIERS.prime.min} over`}
         meta={`${Math.max(0, 600 - livePoints)} TO ELITE`} metaDir="flat" />
-      <StatCell label="MISSIONS" icon="fa-bullseye"
+      <StatCell label="TRACK" icon="fa-bullseye"
         value={completed} unit={`of ${missions.length}`}
         meta={`${missions.filter(m => m.status !== 'approved').length} ACTIVE`} metaDir="flat" />
+      <StatCell label="PROJECT" icon="fa-diagram-project"
+        value={tasks.filter(t => assignees.some(a => a.taskId === t.id && a.userId === profile.id)).length}
+        unit={`of ${projects.length}`}
+        meta={`${tasks.filter(t => t.status !== 'approved').length} TASKS`} metaDir="flat" />
       <StatCell label="BADGES" icon="fa-medal"
         value={earnedCount} unit="of 22"
         meta="AUTO · SILVER STRATEGIST" metaDir="up" />
@@ -71,15 +78,16 @@ function PillarGrid() {
   const { profile } = useCurrentUserProfile();
   const { breakdown } = useUserPoints(profile.id);
   const missions = useMissions();
-  const projectMissions = missions.filter(m => m.pillar === 'project').slice(0, 3);
+  const projectMissions = missions.filter(m => m.pillar === 'project' || m.pillar === 'missions').slice(0, 3);
+  const missionPoints = (breakdown.missions || 0) + (breakdown.project || 0);
   return (
     <div className="pillar-grid">
-      <PillarCard idx="01" klass="p1" title="Project" weight={40}
-        current={breakdown.project || 0} max={400} caption="40% WEIGHT">
+      <PillarCard idx="01" klass="p1" title="Missions" weight={40}
+        current={missionPoints} max={400} caption="40% WEIGHT">
         <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--off-white-40)', letterSpacing: '0.05em', marginBottom: 10 }}>RECENT SUBMISSIONS</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {projectMissions.length === 0 && (
-            <div className="t-body" style={{ fontSize: 12, color: 'var(--off-white-40)' }}>No project missions yet.</div>
+            <div className="t-body" style={{ fontSize: 12, color: 'var(--off-white-40)' }}>No track tasks yet.</div>
           )}
           {projectMissions.map(m => (
             <div key={m.id} style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 600, letterSpacing: '0.05em', gap: 8 }}>
@@ -124,27 +132,32 @@ function PillarGrid() {
 }
 
 function RitualTracker() {
+  const { profile } = useCurrentUserProfile();
+  const { records } = useRitualState(profile.id);
+  const activeCohort = window.getActiveCohort?.(profile) || COHORT;
+  const weekLabel = window.getCohortWeekWindowLabel?.(activeCohort, COHORT.week) || '';
   return (
     <div style={{ marginBottom: 32 }}>
       <div className="section-head">
         <h2>Weekly Ritual Tracker</h2>
-        <span className="section-meta">WEEK {COHORT.week} · OCT 19 — OCT 25</span>
+        <span className="section-meta">WEEK {COHORT.week} · {weekLabel}</span>
       </div>
       <div className="ritual-row">
         {RITUALS.map(r => {
+          const state = records[r.id]?.state || 'not-started';
           const iconCls =
-            r.state === 'done' ? 'fa-circle-check' :
-            r.state === 'missed' ? 'fa-circle-xmark' :
+            state === 'done' ? 'fa-circle-check' :
+            state === 'missed' ? 'fa-circle-xmark' :
             'fa-circle-dot';
-          const cCls = r.state === 'done' ? 'done-c' : r.state === 'missed' ? 'miss-c' : 'pend-c';
+          const cCls = state === 'done' ? 'done-c' : state === 'missed' ? 'miss-c' : 'pend-c';
           return (
-            <div key={r.id} className={'ritual-cell ' + r.state}>
+            <div key={r.id} className={'ritual-cell ' + state} title={r.id === 'iotw' ? 'Auto-logged from leaderboard' : 'Open Rituals page to submit proof'}>
               <div className="ritual-head">
                 <div className="ritual-name">{r.name}</div>
                 <i className={'fa-solid ' + iconCls + ' ritual-icon ' + cCls} />
               </div>
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--off-white-40)', letterSpacing: '0.05em' }}>
-                {r.state === 'done' ? 'LOGGED' : r.state === 'missed' ? 'MISSED' : 'PENDING'}
+                {state === 'done' ? 'LOGGED' : state === 'missed' ? 'MISSED' : 'PENDING'}
               </div>
               <div className="ritual-points">+{r.points} PTS</div>
             </div>
@@ -175,8 +188,8 @@ function MissionFeed({ onOpenMission }) {
   return (
     <div>
       <div className="section-head">
-        <h2>Mission Feed</h2>
-        <span className="section-meta">WEEK {String(activeWeek || COHORT.week).padStart(2, '0')} - {upcoming.length} MISSIONS</span>
+        <h2>Track Feed</h2>
+        <span className="section-meta">WEEK {String(activeWeek || COHORT.week).padStart(2, '0')} - {upcoming.length} TRACK TASKS</span>
       </div>
       {weekOptions.length > 0 && (
         <div className="lb-filters" style={{ marginBottom: 14 }}>
@@ -195,9 +208,9 @@ function MissionFeed({ onOpenMission }) {
         {upcoming.length === 0 && (
           <div className="card-panel" style={{ padding: 32, textAlign: 'center' }}>
             <i className="fa-solid fa-inbox" style={{ fontSize: 28, color: 'var(--off-white-40)', marginBottom: 10 }} />
-            <div className="t-heading" style={{ fontSize: 14, marginBottom: 6 }}>No missions for this week</div>
+            <div className="t-heading" style={{ fontSize: 14, marginBottom: 6 }}>No track tasks for this week</div>
             <div className="t-body" style={{ fontSize: 12, color: 'var(--off-white-68)' }}>
-              Pick another week or wait for Platform Admin to publish this week's missions.
+              Pick another week or wait for Platform Admin to publish this week's track tasks.
             </div>
           </div>
         )}
@@ -247,14 +260,34 @@ function MissionFeed({ onOpenMission }) {
   );
 }
 
-function ActivityFeed() {
+function ProjectFeed() {
+  const { profile } = useCurrentUserProfile();
+  const { tasks, assignees, activity } = useProjects();
+  const myTaskIds = new Set([
+    ...assignees.filter(a => a.userId === profile.id).map(a => a.taskId),
+    ...tasks.filter(t => t.consultedId === profile.id || t.trackLeadId === profile.id || t.secondOfficerId === profile.id).map(t => t.id),
+  ]);
+  const rows = activity
+    .filter(a => myTaskIds.has(a.taskId))
+    .slice(0, 6)
+    .map(a => {
+      const task = tasks.find(t => t.id === a.taskId);
+      return {
+        type: window.__projectStore.deadlineState(task).toLowerCase().replace(' ', '-'),
+        icon: task?.taskClass === 'critical' ? 'fa-bolt' : 'fa-list-check',
+        body: `<strong>${task?.title || 'Project task'}</strong> ${a.action.replaceAll('_', ' ')}`,
+        sub: task ? `${window.__projectStore.deadlineState(task)} · ${task.status}` : '',
+        time: a.createdAt ? new Date(a.createdAt).toLocaleDateString() : '',
+      };
+    });
+  const fallback = rows.length ? rows : ACTIVITY;
   return (
     <div className="card-panel">
       <div className="section-head" style={{ marginBottom: 8 }}>
-        <h2 style={{ fontSize: 16 }}>Activity</h2>
+        <h2 style={{ fontSize: 16 }}>Project Feed</h2>
         <span className="section-meta">LAST 48H</span>
       </div>
-      {ACTIVITY.map((a, i) => (
+      {fallback.map((a, i) => (
         <div key={i} className="activity-item">
           <div className={'activity-icon type-' + a.type}><i className={'fa-solid ' + a.icon} /></div>
           <div className="activity-body">
@@ -298,7 +331,7 @@ function LeaderboardSnapshot({ onView }) {
                 {rank <= 3 && <i className="fa-solid fa-crown" />}
                 #{rank}
               </div>
-              <AvatarWithRing name={u.name} size={34} tier={u.tier} />
+              <AvatarWithRing name={u.name} avatarUrl={u.avatarUrl} size={34} tier={u.tier} />
               <div className="lb-name">
                 {u.name}
                 <TierCrest tier={u.tier} />
@@ -325,6 +358,11 @@ function LeaderboardSnapshot({ onView }) {
 function Dashboard({ onNavigate, onOpenMission }) {
   const { profile } = useCurrentUserProfile();
   const displayName = profile.fullName || ME.name;
+  const activeCohort = window.getActiveCohort?.(profile) || COHORT;
+  const demoDate = new Date(window.getCohortDemoDay?.(activeCohort) || COHORT.demoDay || '');
+  const daysToDemo = isNaN(demoDate.getTime())
+    ? Math.max(0, ((window.getCohortWeekTotal?.(activeCohort) || COHORT.weekTotal) * 7) - 11)
+    : Math.max(0, Math.ceil((demoDate.getTime() - Date.now()) / 86400000));
 
   return (
     <div>
@@ -341,7 +379,7 @@ function Dashboard({ onNavigate, onOpenMission }) {
           <div className="t-mono" style={{ fontSize: 40, color: 'var(--off-white)', fontWeight: 700, lineHeight: 1 }}>
             11<span style={{ color: 'var(--off-white-40)', fontSize: 22 }}>/84</span>
           </div>
-          <div className="t-micro" style={{ marginTop: 6 }}>{COHORT.weekTotal * 7 - 11} DAYS TO DEMO DAY</div>
+          <div className="t-micro" style={{ marginTop: 6 }}>{daysToDemo} DAYS TO DEMO DAY</div>
         </div>
       </div>
 
@@ -352,7 +390,7 @@ function Dashboard({ onNavigate, onOpenMission }) {
 
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 24 }} className="dash-split">
         <div className="enter enter-d4"><MissionFeed onOpenMission={onOpenMission} /></div>
-        <div className="enter enter-d4"><ActivityFeed /></div>
+        <div className="enter enter-d4"><ProjectFeed /></div>
       </div>
 
       <div className="enter enter-d5"><LeaderboardSnapshot onView={() => onNavigate('leaderboard')} /></div>

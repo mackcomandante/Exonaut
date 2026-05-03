@@ -10,6 +10,74 @@
 DELETE FROM public.mission_submissions;
 DELETE FROM public.missions;
 
+ALTER TABLE public.missions DROP CONSTRAINT IF EXISTS missions_pillar_check;
+ALTER TABLE public.missions
+  ADD CONSTRAINT missions_pillar_check
+  CHECK (pillar IN ('project', 'missions', 'client', 'recruitment'));
+
+CREATE TABLE IF NOT EXISTS public.tracks (
+  code text PRIMARY KEY,
+  name text NOT NULL,
+  short text NOT NULL,
+  emoji text,
+  objective text,
+  client_type text,
+  lead_title text,
+  track_badge text,
+  status text NOT NULL DEFAULT 'active'
+    CHECK (status IN ('active', 'archived')),
+  custom boolean NOT NULL DEFAULT true,
+  created_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.admin_user_cohort_assignments (
+  user_id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  cohort_id text,
+  unassigned boolean NOT NULL DEFAULT false,
+  updated_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_tracks_status ON public.tracks(status);
+CREATE INDEX IF NOT EXISTS idx_admin_user_cohort_assignments_cohort ON public.admin_user_cohort_assignments(cohort_id);
+
+DROP TRIGGER IF EXISTS trg_tracks_updated_at ON public.tracks;
+CREATE TRIGGER trg_tracks_updated_at
+BEFORE UPDATE ON public.tracks
+FOR EACH ROW
+EXECUTE FUNCTION public.set_updated_at();
+
+ALTER TABLE public.tracks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.admin_user_cohort_assignments ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "tracks_select_authenticated" ON public.tracks;
+CREATE POLICY "tracks_select_authenticated"
+ON public.tracks
+FOR SELECT
+USING (auth.uid() IS NOT NULL);
+
+DROP POLICY IF EXISTS "tracks_admin_all" ON public.tracks;
+CREATE POLICY "tracks_admin_all"
+ON public.tracks
+FOR ALL
+USING (public.has_role('admin'))
+WITH CHECK (public.has_role('admin'));
+
+DROP POLICY IF EXISTS "admin_user_cohort_assignments_select_authenticated" ON public.admin_user_cohort_assignments;
+CREATE POLICY "admin_user_cohort_assignments_select_authenticated"
+ON public.admin_user_cohort_assignments
+FOR SELECT
+USING (auth.uid() IS NOT NULL);
+
+DROP POLICY IF EXISTS "admin_user_cohort_assignments_admin_all" ON public.admin_user_cohort_assignments;
+CREATE POLICY "admin_user_cohort_assignments_admin_all"
+ON public.admin_user_cohort_assignments
+FOR ALL
+USING (public.has_role('admin'))
+WITH CHECK (public.has_role('admin'));
+
 ALTER TABLE public.mission_submissions DROP CONSTRAINT IF EXISTS mission_submissions_state_check;
 ALTER TABLE public.mission_submissions
   ADD CONSTRAINT mission_submissions_state_check
@@ -74,14 +142,19 @@ CREATE TABLE IF NOT EXISTS public.point_ledger (
   source_id text NOT NULL,
   cohort_id text NOT NULL DEFAULT 'c2627',
   track_code text,
-  pillar text NOT NULL DEFAULT 'project'
-    CHECK (pillar IN ('project', 'client', 'recruitment', 'culture', 'ritual', 'badge')),
+  pillar text NOT NULL DEFAULT 'missions'
+    CHECK (pillar IN ('missions', 'client', 'recruitment', 'culture', 'ritual', 'badge')),
   points numeric NOT NULL DEFAULT 0,
   note text,
   awarded_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,
   awarded_at timestamptz NOT NULL DEFAULT now(),
   created_at timestamptz NOT NULL DEFAULT now()
 );
+
+ALTER TABLE public.point_ledger DROP CONSTRAINT IF EXISTS point_ledger_pillar_check;
+ALTER TABLE public.point_ledger
+  ADD CONSTRAINT point_ledger_pillar_check
+  CHECK (pillar IN ('missions', 'project', 'client', 'recruitment', 'culture', 'ritual', 'rituals', 'badge'));
 
 CREATE INDEX IF NOT EXISTS idx_point_ledger_user ON public.point_ledger(user_id);
 CREATE INDEX IF NOT EXISTS idx_point_ledger_source ON public.point_ledger(source_type, source_id);
@@ -119,9 +192,10 @@ CREATE TABLE IF NOT EXISTS public.project_tasks (
   brief text,
   track_code text NOT NULL,
   second_officer_id uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  track_lead_id uuid REFERENCES auth.users(id) ON DELETE SET NULL,
   created_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,
   status text NOT NULL DEFAULT 'assigned'
-    CHECK (status IN ('assigned', 'in_progress', 'submitted', 'approved', 'rejected')),
+    CHECK (status IN ('backlog', 'assigned', 'in_progress', 'submitted', 'approved', 'rejected')),
   points numeric NOT NULL DEFAULT 2,
   due_date date,
   submitted_note text,
@@ -134,19 +208,38 @@ CREATE TABLE IF NOT EXISTS public.project_tasks (
 ALTER TABLE public.project_tasks
   ADD COLUMN IF NOT EXISTS priority text NOT NULL DEFAULT 'medium',
   ADD COLUMN IF NOT EXISTS deliverable_type text NOT NULL DEFAULT 'file',
-  ADD COLUMN IF NOT EXISTS sort_order integer NOT NULL DEFAULT 0;
+  ADD COLUMN IF NOT EXISTS sort_order integer NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS urgent boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS important boolean NOT NULL DEFAULT true,
+  ADD COLUMN IF NOT EXISTS task_class text NOT NULL DEFAULT 'important',
+  ADD COLUMN IF NOT EXISTS accountable_id uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS consulted_id uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS informed_ids uuid[] NOT NULL DEFAULT ARRAY[]::uuid[],
+  ADD COLUMN IF NOT EXISTS track_lead_id uuid REFERENCES auth.users(id) ON DELETE SET NULL;
 
 UPDATE public.project_tasks SET status = 'assigned' WHERE status = 'delegated';
+UPDATE public.project_tasks
+SET priority = CASE
+  WHEN priority IN ('critical', 'urgent', 'important') THEN priority
+  WHEN priority = 'urgent' THEN 'urgent'
+  WHEN priority IN ('high', 'medium') THEN 'critical'
+  ELSE 'important'
+END;
 
 ALTER TABLE public.project_tasks DROP CONSTRAINT IF EXISTS project_tasks_status_check;
 ALTER TABLE public.project_tasks
   ADD CONSTRAINT project_tasks_status_check
-  CHECK (status IN ('assigned', 'in_progress', 'submitted', 'approved', 'rejected'));
+  CHECK (status IN ('backlog', 'assigned', 'in_progress', 'submitted', 'approved', 'rejected'));
 
 ALTER TABLE public.project_tasks DROP CONSTRAINT IF EXISTS project_tasks_priority_check;
 ALTER TABLE public.project_tasks
   ADD CONSTRAINT project_tasks_priority_check
-  CHECK (priority IN ('low', 'medium', 'high', 'urgent'));
+  CHECK (priority IN ('critical', 'urgent', 'important'));
+
+ALTER TABLE public.project_tasks DROP CONSTRAINT IF EXISTS project_tasks_task_class_check;
+ALTER TABLE public.project_tasks
+  ADD CONSTRAINT project_tasks_task_class_check
+  CHECK (task_class IN ('critical', 'urgent', 'important'));
 
 ALTER TABLE public.project_tasks DROP CONSTRAINT IF EXISTS project_tasks_deliverable_type_check;
 ALTER TABLE public.project_tasks
@@ -155,6 +248,7 @@ ALTER TABLE public.project_tasks
 
 CREATE INDEX IF NOT EXISTS idx_project_tasks_project ON public.project_tasks(project_id);
 CREATE INDEX IF NOT EXISTS idx_project_tasks_second_officer ON public.project_tasks(second_officer_id);
+CREATE INDEX IF NOT EXISTS idx_project_tasks_track_lead ON public.project_tasks(track_lead_id);
 CREATE INDEX IF NOT EXISTS idx_project_tasks_track ON public.project_tasks(track_code);
 CREATE INDEX IF NOT EXISTS idx_project_tasks_status ON public.project_tasks(status);
 
@@ -208,29 +302,7 @@ CREATE TABLE IF NOT EXISTS public.project_task_activity (
 
 CREATE INDEX IF NOT EXISTS idx_project_task_activity_task ON public.project_task_activity(task_id);
 
-CREATE TABLE IF NOT EXISTS public.project_delegations (
-  id text PRIMARY KEY,
-  project_id text NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE,
-  track_code text NOT NULL,
-  first_officer_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  second_officer_id uuid REFERENCES auth.users(id) ON DELETE SET NULL,
-  title text NOT NULL,
-  instructions text,
-  expected_output text,
-  priority text NOT NULL DEFAULT 'medium'
-    CHECK (priority IN ('low', 'medium', 'high', 'urgent')),
-  status text NOT NULL DEFAULT 'delegated'
-    CHECK (status IN ('draft', 'delegated', 'acknowledged', 'in_progress', 'completed')),
-  due_date date,
-  notes text,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
-);
-
-CREATE INDEX IF NOT EXISTS idx_project_delegations_project ON public.project_delegations(project_id);
-CREATE INDEX IF NOT EXISTS idx_project_delegations_track ON public.project_delegations(track_code);
-CREATE INDEX IF NOT EXISTS idx_project_delegations_first_officer ON public.project_delegations(first_officer_id);
-CREATE INDEX IF NOT EXISTS idx_project_delegations_second_officer ON public.project_delegations(second_officer_id);
+DROP TABLE IF EXISTS public.project_delegations CASCADE;
 
 DROP TRIGGER IF EXISTS trg_projects_updated_at ON public.projects;
 CREATE TRIGGER trg_projects_updated_at
@@ -250,12 +322,6 @@ BEFORE UPDATE ON public.project_task_submissions
 FOR EACH ROW
 EXECUTE FUNCTION public.set_updated_at();
 
-DROP TRIGGER IF EXISTS trg_project_delegations_updated_at ON public.project_delegations;
-CREATE TRIGGER trg_project_delegations_updated_at
-BEFORE UPDATE ON public.project_delegations
-FOR EACH ROW
-EXECUTE FUNCTION public.set_updated_at();
-
 ALTER TABLE public.point_ledger ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.projects ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.project_tasks ENABLE ROW LEVEL SECURITY;
@@ -263,7 +329,6 @@ ALTER TABLE public.project_task_assignees ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.project_task_submissions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.project_task_comments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.project_task_activity ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.project_delegations ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "point_ledger_select_authenticated" ON public.point_ledger;
 CREATE POLICY "point_ledger_select_authenticated"
@@ -303,6 +368,7 @@ FOR INSERT
 WITH CHECK (
   public.has_role('admin')
   OR second_officer_id = auth.uid()
+  OR track_lead_id = auth.uid()
   OR EXISTS (
     SELECT 1 FROM public.crown_assignments ca
     WHERE ca.user_id = auth.uid()
@@ -323,6 +389,7 @@ FOR UPDATE
 USING (
   public.has_role('admin')
   OR second_officer_id = auth.uid()
+  OR track_lead_id = auth.uid()
   OR EXISTS (
     SELECT 1 FROM public.project_task_assignees pta
     WHERE pta.task_id = project_tasks.id
@@ -338,6 +405,7 @@ USING (
 WITH CHECK (
   public.has_role('admin')
   OR second_officer_id = auth.uid()
+  OR track_lead_id = auth.uid()
   OR EXISTS (
     SELECT 1 FROM public.project_task_assignees pta
     WHERE pta.task_id = project_tasks.id
@@ -498,60 +566,12 @@ ON public.project_task_activity
 FOR INSERT
 WITH CHECK (auth.uid() IS NOT NULL);
 
-DROP POLICY IF EXISTS "project_delegations_select_participants" ON public.project_delegations;
-CREATE POLICY "project_delegations_select_participants"
-ON public.project_delegations
-FOR SELECT
-USING (
-  public.has_any_role(ARRAY['commander', 'admin'])
-  OR first_officer_id = auth.uid()
-  OR second_officer_id = auth.uid()
-);
-
-DROP POLICY IF EXISTS "project_delegations_first_officer_insert" ON public.project_delegations;
-CREATE POLICY "project_delegations_first_officer_insert"
-ON public.project_delegations
-FOR INSERT
-WITH CHECK (
-  public.has_role('admin')
-  OR EXISTS (
-    SELECT 1 FROM public.projects p
-    WHERE p.id = project_id
-      AND p.first_officer_id = auth.uid()
-      AND first_officer_id = auth.uid()
-  )
-);
-
-DROP POLICY IF EXISTS "project_delegations_first_or_second_update" ON public.project_delegations;
-CREATE POLICY "project_delegations_first_or_second_update"
-ON public.project_delegations
-FOR UPDATE
-USING (
-  public.has_role('admin')
-  OR first_officer_id = auth.uid()
-  OR second_officer_id = auth.uid()
-)
-WITH CHECK (
-  public.has_role('admin')
-  OR first_officer_id = auth.uid()
-  OR second_officer_id = auth.uid()
-);
-
-DROP POLICY IF EXISTS "project_delegations_first_delete" ON public.project_delegations;
-CREATE POLICY "project_delegations_first_delete"
-ON public.project_delegations
-FOR DELETE
-USING (
-  public.has_role('admin')
-  OR first_officer_id = auth.uid()
-);
-
 -- Predefined weekly missions from the mission brief. Track-specific missions
 -- are expanded per track so each roster can submit and be graded by its crown holder.
 INSERT INTO public.missions
   (id, title, track_code, cohort_id, pillar, points, status, due_date, due_time, due_in, deliverable, week, description, criteria)
 VALUES
-  ('EXO-W01-ONBOARD', 'Week 1 Onboarding & Pledge', NULL, 'c2627', 'project', 50, 'not-started', 'Week 1 Friday', '23:59 SGT', 7, 'document', 1,
+  ('EXO-W01-ONBOARD', 'Week 1 Onboarding & Pledge', NULL, 'c2627', 'missions', 50, 'not-started', 'Week 1 Friday', '23:59 SGT', 7, 'document', 1,
    'Complete platform onboarding, sign the Exonaut pledge, and submit your Day 1 proof.',
    '["Profile complete","Pledge proof attached","Submitted within Week 1"]'::jsonb),
   ('EXO-W01-LINKEDIN', 'LinkedIn Announcement', NULL, 'c2627', 'client', 20, 'not-started', 'Week 1 Friday', '23:59 SGT', 7, 'link', 1,
@@ -575,7 +595,7 @@ SELECT
   'Week ' || w.week || ' Track Mission - ' || t.short,
   t.code,
   'c2627',
-  'project',
+  'missions',
   w.points,
   'not-started',
   'Week ' || w.week || ' Friday',

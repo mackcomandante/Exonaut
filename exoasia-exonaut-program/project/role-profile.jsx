@@ -40,11 +40,14 @@ function RoleProfile({ roleKey }) {
     school: profile.school || '',
     expertise: profile.expertise || '',
     avatarUrl: profile.avatarUrl || '',
+    avatarFile: null,
+    avatarPreview: '',
   });
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState('');
   const meta = roleProfileMeta(profile);
   const accentVar = 'var(--' + meta.accent + ')';
+  const activeCohort = window.getActiveCohort?.(profile);
 
   React.useEffect(() => {
     if (!editing) {
@@ -55,6 +58,8 @@ function RoleProfile({ roleKey }) {
         school: profile.school || '',
         expertise: profile.expertise || '',
         avatarUrl: profile.avatarUrl || '',
+        avatarFile: null,
+        avatarPreview: '',
       });
     }
   }, [profile, editing]);
@@ -68,13 +73,16 @@ function RoleProfile({ roleKey }) {
     setSaving(true);
     setError('');
     try {
+      const avatarUrl = draft.avatarFile
+        ? await uploadProfileAvatar(draft.avatarFile)
+        : draft.avatarUrl.trim();
       await save({
         fullName,
         bio: draft.bio.trim(),
         linkedinUrl: draft.linkedinUrl.trim(),
         school: draft.school.trim(),
         expertise: draft.expertise.trim(),
-        avatarUrl: draft.avatarUrl.trim(),
+        avatarUrl,
       });
       setEditing(false);
     } catch (err) {
@@ -99,7 +107,7 @@ function RoleProfile({ roleKey }) {
             <span><span className="meta-k">ROLE</span>{meta.title}</span>
             <span><span className="meta-k">EMAIL</span>{profile.email || '—'}</span>
             {profile.role === 'lead' && <span><span className="meta-k">TRACK</span>{profile.trackCode || '—'}</span>}
-            <span><span className="meta-k">COHORT</span>{profile.cohortId || '—'}</span>
+            <span><span className="meta-k">COHORT</span>{activeCohort?.name || profile.cohortId || '—'}</span>
             {profile.school && <span><span className="meta-k">SCHOOL</span>{profile.school}</span>}
             {profile.expertise && <span><span className="meta-k">EXPERTISE</span>{profile.expertise}</span>}
           </div>
@@ -166,8 +174,28 @@ function RoleProfile({ roleKey }) {
             </label>
           </div>
           <label style={{ display: 'block' }}>
-            <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.12em', marginBottom: 6, fontWeight: 700 }}>AVATAR URL</div>
-            <input className="input" value={draft.avatarUrl} onChange={(e) => setDraft(d => ({ ...d, avatarUrl: e.target.value }))} />
+            <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.12em', marginBottom: 6, fontWeight: 700 }}>PROFILE PHOTO</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <AvatarWithRing name={draft.fullName || displayName} avatarUrl={draft.avatarPreview || draft.avatarUrl} size={58} tier="corps" />
+              <input
+                className="input"
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0] || null;
+                  setDraft(d => ({
+                    ...d,
+                    avatarFile: file,
+                    avatarPreview: file ? URL.createObjectURL(file) : '',
+                  }));
+                }}
+              />
+            </div>
+            {draft.avatarUrl && !draft.avatarFile && (
+              <button type="button" className="btn btn-ghost btn-sm" style={{ marginTop: 8 }} onClick={() => setDraft(d => ({ ...d, avatarUrl: '', avatarFile: null, avatarPreview: '' }))}>
+                Remove current photo
+              </button>
+            )}
           </label>
           {error && <div className="t-body" style={{ color: 'var(--red)', fontSize: 12 }}>{error}</div>}
         </div>

@@ -186,6 +186,9 @@ function LegacyMissionsList({ onOpenMission }) {
   const missions = useMissions();
   const subs = useSubs();
   const { profile } = useCurrentUserProfile();
+  const activeCohort = window.getActiveCohort?.(profile) || COHORT;
+  const cohortName = activeCohort?.name || COHORT.name;
+  const cohortWeekTotal = window.getCohortWeekTotal?.(activeCohort) || COHORT.weekTotal;
   const myTrack = profile.trackCode || ME.track || 'AIS';
   const myCohort = profile.cohortId || ME.cohort || 'c2627';
   const [view, setView] = React.useState('queue'); // queue | briefs | rubric
@@ -217,11 +220,11 @@ function LegacyMissionsList({ onOpenMission }) {
     <div className="enter">
       <div className="section-head">
         <div>
-          <div className="t-label" style={{ marginBottom: 8 }}>YOUR MISSION QUEUE · BATCH 2026–2027</div>
-          <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>Missions</h1>
+          <div className="t-label" style={{ marginBottom: 8 }}>YOUR MISSION QUEUE · {cohortName.toUpperCase()}</div>
+          <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>Track</h1>
         </div>
         <div className="t-mono" style={{ color: 'var(--off-white-40)', fontSize: 11 }}>
-          WEEK {COHORT.week} OF {COHORT.weekTotal} · DEMO DAY {COHORT.demoDay}
+          WEEK {COHORT.week} OF {cohortWeekTotal} · DEMO DAY {window.getCohortDemoDay?.(activeCohort) || COHORT.demoDay}
         </div>
       </div>
 
@@ -231,7 +234,7 @@ function LegacyMissionsList({ onOpenMission }) {
           <i className="fa-solid fa-bullseye" style={{ marginRight: 6 }} /> Active Queue
         </div>
         <div className={'lb-tab' + (view === 'briefs' ? ' active' : '')} onClick={() => setView('briefs')}>
-          <i className="fa-solid fa-book-open" style={{ marginRight: 6 }} /> Mission Briefs · All 12 Weeks
+          <i className="fa-solid fa-book-open" style={{ marginRight: 6 }} /> Track Briefs · All 12 Weeks
         </div>
         <div className={'lb-tab' + (view === 'rubric' ? ' active' : '')} onClick={() => setView('rubric')}>
           <i className="fa-solid fa-scale-balanced" style={{ marginRight: 6 }} /> Points Rubric
@@ -258,9 +261,9 @@ function LegacyMissionsList({ onOpenMission }) {
             {filtered.length === 0 && (
               <div className="card-panel" style={{ padding: 40, textAlign: 'center' }}>
                 <i className="fa-solid fa-inbox" style={{ fontSize: 32, color: 'var(--off-white-40)', marginBottom: 12 }} />
-                <div className="t-heading" style={{ fontSize: 14, margin: '0 0 6px 0' }}>No missions yet</div>
+                <div className="t-heading" style={{ fontSize: 14, margin: '0 0 6px 0' }}>No track tasks yet</div>
                 <div className="t-body" style={{ fontSize: 12, color: 'var(--off-white-68)' }}>
-                  Missions will appear here once they are created for your cohort or track.
+                  Track tasks will appear here once they are created for your cohort or track.
                 </div>
               </div>
             )}
@@ -315,6 +318,9 @@ function WeeklyMissionsList({ onOpenMission }) {
   const missions = useMissions();
   const subs = useSubs();
   const { profile } = useCurrentUserProfile();
+  const activeCohort = window.getActiveCohort?.(profile) || COHORT;
+  const cohortName = activeCohort?.name || COHORT.name;
+  const cohortWeekTotal = window.getCohortWeekTotal?.(activeCohort) || COHORT.weekTotal;
   const myTrack = profile.trackCode || ME.track || 'AIS';
   const myCohort = profile.cohortId || ME.cohort || 'c2627';
   const [view, setView] = React.useState('queue');
@@ -404,11 +410,11 @@ function WeeklyMissionsList({ onOpenMission }) {
     <div className="enter">
       <div className="section-head">
         <div>
-          <div className="t-label" style={{ marginBottom: 8 }}>YOUR MISSION QUEUE · BATCH 2026-2027</div>
-          <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>Missions</h1>
+          <div className="t-label" style={{ marginBottom: 8 }}>YOUR MISSION QUEUE · {cohortName.toUpperCase()}</div>
+          <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>Track</h1>
         </div>
         <div className="t-mono" style={{ color: 'var(--off-white-40)', fontSize: 11 }}>
-          WEEK {COHORT.week} OF {COHORT.weekTotal} · DEMO DAY {COHORT.demoDay}
+          WEEK {COHORT.week} OF {cohortWeekTotal} · DEMO DAY {window.getCohortDemoDay?.(activeCohort) || COHORT.demoDay}
         </div>
       </div>
 
@@ -417,7 +423,7 @@ function WeeklyMissionsList({ onOpenMission }) {
           <i className="fa-solid fa-calendar-week" style={{ marginRight: 6 }} /> Weekly Queue
         </div>
         <div className={'lb-tab' + (view === 'briefs' ? ' active' : '')} onClick={() => setView('briefs')}>
-          <i className="fa-solid fa-book-open" style={{ marginRight: 6 }} /> Mission Briefs · All 12 Weeks
+          <i className="fa-solid fa-book-open" style={{ marginRight: 6 }} /> Track Briefs · All 12 Weeks
         </div>
         <div className={'lb-tab' + (view === 'rubric' ? ' active' : '')} onClick={() => setView('rubric')}>
           <i className="fa-solid fa-scale-balanced" style={{ marginRight: 6 }} /> Points Rubric
@@ -444,9 +450,9 @@ function WeeklyMissionsList({ onOpenMission }) {
             {weekGroups.length === 0 && (
               <div className="card-panel" style={{ padding: 40, textAlign: 'center' }}>
                 <i className="fa-solid fa-inbox" style={{ fontSize: 32, color: 'var(--off-white-40)', marginBottom: 12 }} />
-                <div className="t-heading" style={{ fontSize: 14, margin: '0 0 6px 0' }}>No mission weeks yet</div>
+                <div className="t-heading" style={{ fontSize: 14, margin: '0 0 6px 0' }}>No track weeks yet</div>
                 <div className="t-body" style={{ fontSize: 12, color: 'var(--off-white-68)' }}>
-                  Weekly missions will appear here once they exist for your cohort or track.
+                  Weekly track tasks will appear here once they exist for your cohort or track.
                 </div>
               </div>
             )}
@@ -553,8 +559,19 @@ function KudosFeed({ onGive }) {
   const [filter, setFilter] = React.useState('all');
   const kudos = useKudos();
   const { profile } = useCurrentUserProfile();
+  const { profiles } = useUserProfiles();
   const meId = profile.id || ME_ID;
-  const feed = filter === 'all' ? kudos.all : kudos.all.filter(k => k.to === meId || k.from === meId);
+  const myCohort = profile.cohortId || ME.cohort || 'c2627';
+  const feed = filter === 'all'
+    ? kudos.all.filter(k => (k.cohortId || 'c2627') === myCohort)
+    : kudos.all.filter(k => k.to === meId || k.from === meId);
+
+  function resolveKudosPerson(userId, storedName) {
+    const p = (profiles || []).find(x => x.id === userId);
+    if (p) return { name: storedName || p.fullName || p.email || 'Exonaut', tier: p.role === 'exonaut' ? 'gold' : 'corps', avatarUrl: p.avatarUrl || '' };
+    if (storedName) return { name: storedName, tier: 'gold', avatarUrl: '' };
+    return resolveAuthor(userId, null);
+  }
 
   return (
     <div className="enter">
@@ -587,13 +604,13 @@ function KudosFeed({ onGive }) {
           </div>
         )}
         {feed.map((k, i) => {
-          const fromInfo = resolveAuthor(k.from, k.fromName);
-          const toInfo   = resolveAuthor(k.to, null);
+          const fromInfo = resolveKudosPerson(k.from, k.fromName);
+          const toInfo   = resolveKudosPerson(k.to, k.toName);
           const fromRoleStyle = roleBadgeStyle(k.fromRole);
           return (
             <div key={k.id || i} className="card-panel" style={{ padding: 18 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                <AvatarWithRing name={fromInfo.name} size={36} tier={fromInfo.tier} />
+                <AvatarWithRing name={fromInfo.name} avatarUrl={fromInfo.avatarUrl} size={36} tier={fromInfo.tier} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontFamily: 'var(--font-display)', fontSize: 12, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                     <span style={{ fontWeight: 700, color: 'var(--off-white)' }}>{fromInfo.name}</span>
@@ -606,10 +623,10 @@ function KudosFeed({ onGive }) {
                     <span style={{ fontWeight: 700, color: 'var(--ink)' }}>{toInfo.name}</span>
                   </div>
                   <div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)', letterSpacing: '0.05em', marginTop: 2 }}>
-                    {kudos.timeAgo(k.createdAt)} · TAGGED {(k.pillar || 'project').toUpperCase()}
+                    {kudos.timeAgo(k.createdAt)} · TAGGED {(k.pillar || 'culture').toUpperCase()} · +{Number(k.receiverPoints || 0.25)} RECEIVED{k.giverPoints ? ` · +${Number(k.giverPoints)} GIVEN` : ''}
                   </div>
                 </div>
-                <AvatarWithRing name={toInfo.name} size={36} tier={toInfo.tier} />
+                <AvatarWithRing name={toInfo.name} avatarUrl={toInfo.avatarUrl} size={36} tier={toInfo.tier} />
               </div>
               <div style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 16, color: 'var(--off-white)', lineHeight: 1.5, paddingLeft: 48 }}>
                 "{k.msg}"
@@ -624,7 +641,28 @@ function KudosFeed({ onGive }) {
 
 // ========== RITUALS HISTORY ==========
 function RitualsPage() {
-  const weeks = [COHORT.week];
+  const { profile } = useCurrentUserProfile();
+  const rowsFromProfiles = useSupabaseExonautRows();
+  const { records, history, completeRitual } = useRitualState(profile.id);
+  const [proofRitual, setProofRitual] = React.useState(null);
+  const activeCohort = window.getActiveCohort?.(profile) || COHORT;
+  const cohortWeekTotal = window.getCohortWeekTotal?.(activeCohort) || COHORT.weekTotal;
+  const weekLabel = window.getCohortWeekWindowLabel?.(activeCohort, COHORT.week) || '';
+  const weeks = Object.keys(history).length
+    ? Object.keys(history).map(k => Number(k.replace('w', ''))).filter(Boolean)
+    : [];
+
+  React.useEffect(() => {
+    const manilaDay = new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'Asia/Manila' }).format(new Date());
+    if (manilaDay !== 'Fri') return;
+    const sorted = [...rowsFromProfiles].sort((a, b) => b.points - a.points);
+    if (sorted[0]?.id === profile.id) completeRitual('iotw', { description: 'Auto logged from Friday leaderboard rank' }, { userId: profile.id, cohortId: profile.cohortId || 'c2627', source: 'intern-of-week' });
+  }, [rowsFromProfiles, profile.id]);
+
+  function submitProof(ritual) {
+    if (ritual.id === 'iotw') return;
+    setProofRitual(ritual);
+  }
 
   return (
     <div className="enter">
@@ -633,26 +671,27 @@ function RitualsPage() {
           <div className="t-label" style={{ marginBottom: 8 }}>WEEKLY CADENCE</div>
           <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>Rituals</h1>
         </div>
-        <div className="t-mono" style={{ fontSize: 11, color: 'var(--off-white-40)' }}>WEEK {COHORT.week}/{COHORT.weekTotal}</div>
+        <div className="t-mono" style={{ fontSize: 11, color: 'var(--off-white-40)' }}>WEEK {COHORT.week}/{cohortWeekTotal}</div>
       </div>
 
       <div style={{ marginBottom: 28 }}>
         <div className="section-head" style={{ marginBottom: 14 }}>
           <h2 style={{ fontSize: 16 }}>This Week</h2>
-          <span className="section-meta">OCT 19 — OCT 25</span>
+          <span className="section-meta">{weekLabel}</span>
         </div>
         <div className="ritual-row">
           {RITUALS.map(r => {
-            const iconCls = r.state === 'done' ? 'fa-circle-check' : r.state === 'missed' ? 'fa-circle-xmark' : 'fa-circle-dot';
-            const cCls = r.state === 'done' ? 'done-c' : r.state === 'missed' ? 'miss-c' : 'pend-c';
+            const state = records[r.id]?.state || 'not-started';
+            const iconCls = state === 'done' ? 'fa-circle-check' : state === 'missed' ? 'fa-circle-xmark' : 'fa-circle-dot';
+            const cCls = state === 'done' ? 'done-c' : state === 'missed' ? 'miss-c' : 'pend-c';
             return (
-              <div key={r.id} className={'ritual-cell ' + r.state}>
+              <div key={r.id} className={'ritual-cell ' + state} onClick={() => submitProof(r)} style={{ cursor: r.id === 'iotw' ? 'default' : 'pointer' }}>
                 <div className="ritual-head">
                   <div className="ritual-name">{r.name}</div>
                   <i className={'fa-solid ' + iconCls + ' ritual-icon ' + cCls} />
                 </div>
                 <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--off-white-40)' }}>
-                  {r.state === 'done' ? 'LOGGED' : r.state === 'missed' ? 'MISSED' : 'PENDING'}
+                  {state === 'done' ? 'LOGGED' : state === 'missed' ? 'MISSED' : 'PENDING'}
                 </div>
                 <div className="ritual-points">+{r.points} PTS</div>
               </div>
@@ -673,8 +712,8 @@ function RitualsPage() {
           <div>PTS</div>
         </div>
         {weeks.slice().reverse().map(w => {
-          const isCurrent = w === COHORT.week;
-          const weekStates = RITUALS.map(r => r.state);
+          const weekRecords = history[window.__ritualStore.weekKey(w)] || {};
+          const weekStates = RITUALS.map(r => weekRecords[r.id]?.state || 'not-started');
           const pts = weekStates.reduce((s, st, i) => s + (st === 'done' ? RITUALS[i].points : 0), 0);
           return (
             <div key={w} className="lb-row" style={{ gridTemplateColumns: '80px repeat(5, 1fr) 80px' }}>
@@ -690,6 +729,77 @@ function RitualsPage() {
             </div>
           );
         })}
+      </div>
+      {proofRitual && (
+        <RitualProofModal
+          ritual={proofRitual}
+          onClose={() => setProofRitual(null)}
+          onSubmit={async (proof) => {
+            await completeRitual(proofRitual.id, proof, { userId: profile.id, cohortId: profile.cohortId || 'c2627' });
+            setProofRitual(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function RitualProofModal({ ritual, onClose, onSubmit }) {
+  const [description, setDescription] = React.useState('');
+  const [file, setFile] = React.useState(null);
+  const [fileDataUrl, setFileDataUrl] = React.useState('');
+  const [saving, setSaving] = React.useState(false);
+
+  function attachFile(nextFile) {
+    setFile(nextFile || null);
+    setFileDataUrl('');
+    if (!nextFile) return;
+    const reader = new FileReader();
+    reader.onload = () => setFileDataUrl(reader.result || '');
+    reader.readAsDataURL(nextFile);
+  }
+
+  async function submit() {
+    if (!file || saving) return;
+    setSaving(true);
+    try {
+      await onSubmit({
+        description: description.trim(),
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: file.type,
+        fileDataUrl,
+      });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="ritual-proof-modal card-panel" onClick={e => e.stopPropagation()}>
+        <div className="task-modal-head">
+          <div>
+            <div className="t-label" style={{ color: 'var(--lime)', marginBottom: 6 }}>RITUAL PROOF</div>
+            <h2 className="t-title">{ritual.name}</h2>
+          </div>
+          <button className="btn btn-ghost btn-sm" onClick={onClose}><i className="fa-solid fa-xmark" /></button>
+        </div>
+        <div className="task-section">
+          <label className="t-label-muted">UPLOAD PROOF</label>
+          <input className="input" type="file" onChange={e => attachFile(e.target.files && e.target.files[0])} />
+          {file && <div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)', marginTop: 8 }}>{file.name}</div>}
+        </div>
+        <div className="task-section">
+          <label className="t-label-muted">DESCRIPTION OPTIONAL</label>
+          <textarea className="textarea" rows={4} value={description} onChange={e => setDescription(e.target.value)} placeholder="Add context, links, notes, or what you completed." />
+        </div>
+        <div className="task-composer-actions">
+          <button className="btn btn-ghost btn-sm" onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary btn-sm" disabled={!file || saving} onClick={submit}>
+            <i className="fa-solid fa-upload" /> {saving ? 'Submitting...' : 'Submit Proof'}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -765,6 +875,20 @@ const NOTIFICATIONS = [
 ];
 
 function NotificationsPage() {
+  const { profile } = useCurrentUserProfile();
+  const { tasks, assignees } = useProjects();
+  const projectNotifications = tasks
+    .filter(t => assignees.some(a => a.taskId === t.id && a.userId === profile.id) || t.consultedId === profile.id)
+    .slice(0, 6)
+    .map(t => ({
+      type: 'project',
+      title: t.taskClass === 'critical' ? 'Critical project task' : 'Project task update',
+      sub: `${t.title} · ${window.__projectStore.deadlineState(t)} · +${t.points} pts`,
+      time: t.dueDate || 'Project Feed',
+      icon: t.taskClass === 'critical' ? 'fa-bolt' : 'fa-list-check',
+      unread: t.taskClass === 'critical' && t.status === 'assigned',
+    }));
+  const notifications = [...projectNotifications, ...NOTIFICATIONS];
   return (
     <div className="enter">
       <div className="section-head">
@@ -776,10 +900,10 @@ function NotificationsPage() {
       </div>
 
       <div className="card-panel" style={{ padding: 0 }}>
-        {NOTIFICATIONS.map((n, i) => (
+        {notifications.map((n, i) => (
           <div key={i} style={{
             display: 'grid', gridTemplateColumns: '40px 1fr auto auto', gap: 16,
-            padding: '18px 24px', borderBottom: i < NOTIFICATIONS.length - 1 ? '1px solid var(--off-white-07)' : 'none',
+            padding: '18px 24px', borderBottom: i < notifications.length - 1 ? '1px solid var(--off-white-07)' : 'none',
             background: n.unread ? 'rgba(201,229,0,0.03)' : 'transparent',
             alignItems: 'center', cursor: 'pointer', transition: 'background 150ms',
           }}>
@@ -813,6 +937,9 @@ function NotificationsPage() {
 // ========== ADMIN PANEL ==========
 function AdminPanel() {
   const missions = useMissions();
+  const { profile } = useCurrentUserProfile();
+  const activeCohort = window.getActiveCohort?.(profile) || COHORT;
+  const cohortUsers = window.getUsersForCohort?.(activeCohort?.id || profile.cohortId || ME.cohort) || [];
   const [tab, setTab] = React.useState('users');
 
   return (
@@ -823,7 +950,7 @@ function AdminPanel() {
           <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>Admin Console</h1>
         </div>
         <div className="t-mono" style={{ fontSize: 11, color: 'var(--off-white-40)' }}>
-          {COHORT.size} EXONAUTS · 7 MISSION LEADS · {COHORT.code}
+          {cohortUsers.length || COHORT.size} EXONAUTS · 7 MISSION LEADS · {activeCohort?.code || COHORT.code}
         </div>
       </div>
 
@@ -948,6 +1075,11 @@ function AdminPanel() {
 
 // ========== ALUMNI PORTAL ==========
 function AlumniPage() {
+  const { profile } = useCurrentUserProfile();
+  const activeCohort = window.getActiveCohort?.(profile) || COHORT;
+  const demoDay = window.getCohortDemoDay?.(activeCohort) || COHORT.demoDay;
+  const demoDate = new Date(demoDay || '');
+  const daysToDemo = isNaN(demoDate.getTime()) ? 0 : Math.max(0, Math.ceil((demoDate.getTime() - Date.now()) / 86400000));
   return (
     <div className="enter">
       <div className="section-head">
@@ -960,10 +1092,10 @@ function AlumniPage() {
         <i className="fa-solid fa-clock-rotate-left" style={{ fontSize: 48, color: 'var(--lavender)', marginBottom: 20 }} />
         <h2 className="t-title" style={{ fontSize: 28, margin: '0 0 12px 0' }}>Your Corps Membership Activates on Launch Day</h2>
         <div className="t-body" style={{ maxWidth: 540, margin: '0 auto 24px', fontSize: 17 }}>
-          On <span style={{ color: 'var(--ink)' }}>JAN 29 2027</span>, your profile, badges, and mission history become permanent. You'll gain access to the alumni directory, Hall of Exonauts, and Corps-only opportunities.
+          On <span style={{ color: 'var(--ink)' }}>{demoDay}</span>, your profile, badges, and mission history become permanent. You'll gain access to the alumni directory, Hall of Exonauts, and Corps-only opportunities.
         </div>
         <div className="t-mono" style={{ fontSize: 11, color: 'var(--off-white-40)', letterSpacing: '0.15em' }}>
-          T-MINUS 73 DAYS TO CORPS INDUCTION
+          T-MINUS {daysToDemo} DAYS TO CORPS INDUCTION
         </div>
       </div>
 
@@ -1144,7 +1276,7 @@ function makeSocials(name, id) {
   };
 }
 
-function getCommunityMembers(profiles) {
+function getCommunityMembers(profiles, ledger = [], subs = [], projectState = {}) {
   // Active = Supabase user_profiles across roles. Alumni can be added later.
   const activeTierFor = (u) => u.points >= 900 ? 'platinum' : u.points >= 600 ? 'gold' : u.points >= 300 ? 'silver' : 'bronze';
   const roleLabel = (role) => {
@@ -1153,31 +1285,93 @@ function getCommunityMembers(profiles) {
     if (role === 'admin') return 'Platform Admin';
     return 'Exonaut';
   };
+  const projects = projectState.projects || [];
+  const tasks = projectState.tasks || [];
+  const assignees = projectState.assignees || [];
+  const projectRosterFor = window.__projectStore?.projectRoster || (() => []);
+
+  function liveBadgesFor(points) {
+    return BADGES.map(b => {
+      const milestone = (window.MILESTONES || []).find(m => m.code === b.code);
+      return { ...b, earned: milestone ? points >= milestone.at : !!b.earned };
+    }).filter(b => b.earned);
+  }
+
+  function projectsForUser(userId) {
+    return projects.filter(project => {
+      if (project.status === 'archived') return false;
+      if (project.firstOfficerId === userId) return true;
+      if ((project.trackCodes || []).some(code => window.__crownStore?.getActiveCrownForTrack(code)?.userId === userId)) return true;
+      if (projectRosterFor(project.id).includes(userId)) return true;
+      return tasks.some(task => task.projectId === project.id && (
+        task.trackLeadId === userId ||
+        task.secondOfficerId === userId ||
+        assignees.some(a => a.taskId === task.id && a.userId === userId)
+      ));
+    });
+  }
+
   const active = (profiles || []).map(p => {
     const trackCode = p.trackCode || 'AIS';
-    const creds = COMMUNITY_CREDENTIALS[trackCode] || [];
-    const projects = COMMUNITY_PROJECTS_BY_TRACK[trackCode] || [];
-    const hash = String(p.id || p.email || '').split('').reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
-    const points = p.role === 'exonaut' ? 180 + (hash % 260) : 0;
+    const points = ledger
+      .filter(e => e.userId === p.id)
+      .reduce((sum, e) => sum + Number(e.points || 0), 0);
+    const earnedBadges = liveBadgesFor(points);
+    const userSubs = subs.filter(s => s.exonautId === p.id);
+    const approvedSubs = userSubs.filter(s => s.state === 'approved');
+    const pendingSubs = userSubs.filter(s => s.state === 'pending');
+    const userProjects = projectsForUser(p.id);
+    const approvedProjectTasks = tasks.filter(t =>
+      t.status === 'approved' &&
+      (t.trackLeadId === p.id || t.secondOfficerId === p.id || assignees.some(a => a.taskId === t.id && a.userId === p.id))
+    );
     const cohort = COHORTS.find(c => c.id === (p.cohortId || 'c2627'));
+    const credentials = [
+      p.expertise,
+      p.school,
+      TRACKS.find(t => t.code === trackCode)?.short,
+      roleLabel(p.role),
+    ].filter(Boolean);
+    const primaryProject = userProjects[0];
     return {
       id: p.id,
       name: p.fullName || p.email || roleLabel(p.role),
       email: p.email,
+      avatarUrl: p.avatarUrl || '',
       roleKey: p.role || 'exonaut',
       role: roleLabel(p.role),
       track: trackCode,
       points,
       tier: p.role === 'exonaut' ? (points >= 300 ? 'prime' : 'builder') : 'corps',
-      badges: p.role === 'exonaut' ? 2 + (hash % 5) : 0,
+      badges: earnedBadges.length,
+      earnedBadges,
       status: 'active',
       cohort: (cohort?.name || 'Batch 2026-27').replace('Batch ', ''),
       tierBadge: p.role === 'exonaut' ? activeTierFor({ points }) : 'corps',
-      credentials: p.role === 'exonaut' ? creds.slice(hash % 3, hash % 3 + 4) : [roleLabel(p.role), cohort?.name || 'Current Cohort'],
-      project: p.role === 'exonaut'
-        ? (projects[hash % Math.max(1, projects.length)] || { title: 'Program Project', output: 'Cohort work in progress', outcome: 'Building toward demo day.' })
-        : { title: roleLabel(p.role), output: 'Program staff profile', outcome: 'Supports cohort operations and member success.' },
-      socials: makeSocials(p.fullName || p.email || roleLabel(p.role), p.id || p.email || p.role),
+      credentials,
+      project: primaryProject ? {
+        title: primaryProject.title,
+        output: primaryProject.description || 'Assigned project',
+        outcome: `${tasks.filter(t => t.projectId === primaryProject.id && t.status === 'approved').length}/${tasks.filter(t => t.projectId === primaryProject.id).length} tasks approved`,
+      } : null,
+      projectsAll: userProjects.map(project => ({
+        title: project.title,
+        output: project.description || 'Assigned project',
+        outcome: `${tasks.filter(t => t.projectId === project.id && t.status === 'approved').length}/${tasks.filter(t => t.projectId === project.id).length} tasks approved`,
+      })),
+      progress: {
+        trackTasksApproved: approvedSubs.length,
+        pendingReviews: pendingSubs.length,
+        projectTasksApproved: approvedProjectTasks.length,
+        projectsAssigned: userProjects.length,
+      },
+      recentApprovals: approvedSubs
+        .slice()
+        .sort((a, b) => new Date(b.gradedAt || b.submittedAtIso || 0) - new Date(a.gradedAt || a.submittedAtIso || 0))
+        .slice(0, 5),
+      socials: p.linkedinUrl ? {
+        linkedin: { handle: p.linkedinUrl.replace(/^https?:\/\/(www\.)?linkedin\.com\/in\//, '').replace(/\/$/, ''), url: p.linkedinUrl },
+      } : null,
     };
   });
 
@@ -1202,6 +1396,9 @@ function getCommunityMembers(profiles) {
 
 function CommunityPage() {
   const { profiles, loading } = useUserProfiles();
+  const { ledger } = usePoints();
+  const subs = useSubs();
+  const projectState = useProjects();
   const [tab, setTab] = React.useState(() => localStorage.getItem('exo:community:tab') || 'directory');
   React.useEffect(() => { localStorage.setItem('exo:community:tab', tab); }, [tab]);
   const [filter, setFilter] = React.useState('all');     // all | active | alumni
@@ -1210,7 +1407,7 @@ function CommunityPage() {
   const [query, setQuery] = React.useState('');
   const [selected, setSelected] = React.useState(null);
 
-  const members = React.useMemo(() => getCommunityMembers(profiles), [profiles]);
+  const members = React.useMemo(() => getCommunityMembers(profiles, ledger, subs, projectState), [profiles, ledger, subs, projectState]);
 
   // Unique batches (cohort years) across all members, sorted newest → oldest
   const allBatches = React.useMemo(() => {
@@ -1359,7 +1556,7 @@ function CommunityCard({ m, onOpen }) {
     onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--off-white-15)'; e.currentTarget.style.background = 'transparent'; }}>
 
       <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', marginBottom: 12 }}>
-        <AvatarWithRing name={m.name} size={44} tier={m.tierBadge} />
+        <AvatarWithRing name={m.name} avatarUrl={m.avatarUrl} size={44} tier={m.tierBadge} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <div className="t-heading" style={{ fontSize: 13, textTransform: 'none', letterSpacing: 0, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
@@ -1417,14 +1614,11 @@ function CommunityCard({ m, onOpen }) {
       </div>
 
       {/* Socials mini row */}
-      {m.socials && (
+      {m.socials?.linkedin && (
         <div style={{ display: 'flex', gap: 6, paddingTop: 10, borderTop: '1px solid var(--off-white-07)' }}>
           {[
             { k: 'linkedin',  icon: 'fa-brands fa-linkedin-in', color: '#0A66C2' },
-            { k: 'instagram', icon: 'fa-brands fa-instagram',   color: '#E4405F' },
-            { k: 'facebook',  icon: 'fa-brands fa-facebook-f',  color: '#1877F2' },
-            { k: 'github',    icon: 'fa-brands fa-github',      color: 'var(--off-white)' },
-          ].map(s => (
+          ].filter(s => m.socials?.[s.k]).map(s => (
             <a key={s.k} href={m.socials[s.k].url} target="_blank" rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
               title={'@' + m.socials[s.k].handle}
@@ -1447,11 +1641,7 @@ function CommunityCard({ m, onOpen }) {
 function CommunityProfileSheet({ m, onClose }) {
   const track = TRACKS.find(t => t.code === m.track);
   const isAlumni = m.status === 'alumni';
-  // Pick a deterministic set of badges for display
-  const displayBadges = React.useMemo(() => {
-    const hash = m.id.charCodeAt(1) + m.id.charCodeAt(2);
-    return BADGES.slice(hash % Math.max(1, BADGES.length - 6), hash % Math.max(1, BADGES.length - 6) + Math.min(6, m.badges));
-  }, [m.id, m.badges]);
+  const displayBadges = m.earnedBadges || [];
 
   return (
     <div onClick={onClose} style={{
@@ -1471,7 +1661,7 @@ function CommunityProfileSheet({ m, onClose }) {
           }}><i className="fa-solid fa-xmark" /></div>
 
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 18 }}>
-            <AvatarWithRing name={m.name} size={72} tier={m.tierBadge} />
+            <AvatarWithRing name={m.name} avatarUrl={m.avatarUrl} size={72} tier={m.tierBadge} />
             <div style={{ flex: 1 }}>
               <div className="t-mono" style={{ fontSize: 10, color: 'var(--ink)', letterSpacing: '0.08em', fontWeight: 700, marginBottom: 4 }}>
                 BATCH {m.cohort}
@@ -1505,8 +1695,8 @@ function CommunityProfileSheet({ m, onClose }) {
             {[
               { k: 'POINTS', v: m.points },
               { k: 'BADGES', v: m.badges },
-              { k: 'TIER',   v: (m.tierBadge || 'bronze').toUpperCase() },
-              { k: 'STATUS', v: isAlumni ? 'ALUMNI' : 'ACTIVE' },
+              { k: 'TRACK APPROVED', v: m.progress?.trackTasksApproved || 0 },
+              { k: 'PROJECTS', v: m.progress?.projectsAssigned || 0 },
             ].map((s, i) => (
               <div key={i} style={{ textAlign: i === 0 ? 'left' : 'center', borderLeft: i === 0 ? 'none' : '1px solid var(--off-white-07)' }}>
                 <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.08em' }}>{s.k}</div>
@@ -1519,6 +1709,9 @@ function CommunityProfileSheet({ m, onClose }) {
         {/* Badges */}
         <div style={{ padding: '20px 32px', borderBottom: '1px solid var(--off-white-07)' }}>
           <div className="t-label" style={{ marginBottom: 14 }}>BADGES · {m.badges} EARNED</div>
+          {displayBadges.length === 0 ? (
+            <div className="empty-line">No badges earned yet.</div>
+          ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 10 }}>
             {displayBadges.map((b, i) => (
               <div key={i} title={b.name} style={{
@@ -1534,11 +1727,15 @@ function CommunityProfileSheet({ m, onClose }) {
               </div>
             ))}
           </div>
+          )}
         </div>
 
         {/* Credentials */}
         <div style={{ padding: '20px 32px', borderBottom: '1px solid var(--off-white-07)' }}>
           <div className="t-label" style={{ marginBottom: 14 }}>CREDENTIALS & SKILLS</div>
+          {m.credentials.length === 0 ? (
+            <div className="empty-line">No profile skills added yet.</div>
+          ) : (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {m.credentials.map(c => (
               <span key={c} className="t-mono" style={{
@@ -1547,19 +1744,48 @@ function CommunityProfileSheet({ m, onClose }) {
               }}>{c.toUpperCase()}</span>
             ))}
           </div>
+          )}
+        </div>
+
+        {/* Progress */}
+        <div style={{ padding: '20px 32px', borderBottom: '1px solid var(--off-white-07)' }}>
+          <div className="t-label" style={{ marginBottom: 14 }}>LIVE PROGRESS</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+            {[
+              { k: 'TRACK APPROVED', v: m.progress?.trackTasksApproved || 0 },
+              { k: 'PENDING REVIEW', v: m.progress?.pendingReviews || 0 },
+              { k: 'PROJECT TASKS', v: m.progress?.projectTasksApproved || 0 },
+              { k: 'PROJECTS', v: m.progress?.projectsAssigned || 0 },
+            ].map(item => (
+              <div key={item.k} className="card-flat" style={{ padding: 12 }}>
+                <div className="t-mono" style={{ fontSize: 8, color: 'var(--off-white-40)', letterSpacing: '0.08em' }}>{item.k}</div>
+                <div className="t-heading" style={{ fontSize: 18, marginTop: 5, color: 'var(--ink)' }}>{item.v}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ marginTop: 12, display: 'grid', gap: 8 }}>
+            {(m.recentApprovals || []).length === 0 ? (
+              <div className="empty-line">No approved track tasks yet.</div>
+            ) : (m.recentApprovals || []).map(a => (
+              <div key={a.id} className="card-flat" style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
+                <div>
+                  <div className="t-heading" style={{ fontSize: 12, textTransform: 'none', letterSpacing: 0 }}>{a.missionTitle}</div>
+                  <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', marginTop: 3 }}>{a.grade ? String(a.grade).toUpperCase() : 'APPROVED'}</div>
+                </div>
+                <div className="mission-points"><span className="plus">+</span>{a.pointsAwarded || 0}</div>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Socials */}
-        {m.socials && (
+        {m.socials?.linkedin && (
           <div style={{ padding: '20px 32px', borderBottom: '1px solid var(--off-white-07)' }}>
             <div className="t-label" style={{ marginBottom: 14 }}>CONNECT</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
               {[
                 { k: 'linkedin',  icon: 'fa-brands fa-linkedin-in', color: '#0A66C2', label: 'LinkedIn' },
-                { k: 'github',    icon: 'fa-brands fa-github',      color: 'var(--off-white)', label: 'GitHub' },
-                { k: 'instagram', icon: 'fa-brands fa-instagram',   color: '#E4405F', label: 'Instagram' },
-                { k: 'facebook',  icon: 'fa-brands fa-facebook-f',  color: '#1877F2', label: 'Facebook' },
-              ].map(s => (
+              ].filter(s => m.socials?.[s.k]).map(s => (
                 <a key={s.k} href={m.socials[s.k].url} target="_blank" rel="noopener noreferrer"
                   style={{
                     display: 'flex', alignItems: 'center', gap: 10,
@@ -1590,9 +1816,10 @@ function CommunityProfileSheet({ m, onClose }) {
 
         {/* Projects */}
         <div style={{ padding: '20px 32px' }}>
-          <div className="t-label" style={{ marginBottom: 14 }}>PROJECT TITLES</div>
+          <div className="t-label" style={{ marginBottom: 14 }}>PROJECTS</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {/* Current / capstone project — full detail */}
+            {!m.project && <div className="empty-line">No assigned projects yet.</div>}
             {m.project && (
               <div style={{
                 padding: '14px 16px',
@@ -1620,10 +1847,10 @@ function CommunityProfileSheet({ m, onClose }) {
             )}
 
             {/* Earlier projects for alumni — compact */}
-            {isAlumni && (m.projectsAll || []).filter(p => p.title !== m.project?.title).slice(0, 2).map((p, i) => (
+            {(m.projectsAll || []).filter(p => p.title !== m.project?.title).slice(0, 4).map((p, i) => (
               <div key={i} style={{ padding: '12px 14px', border: '1px solid var(--off-white-15)', borderRadius: 2 }}>
                 <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.08em', fontWeight: 700, marginBottom: 4 }}>
-                  EARLIER PROJECT
+                  ASSIGNED PROJECT
                 </div>
                 <div className="t-body" style={{ fontSize: 12, color: 'var(--off-white)', marginBottom: 6, fontWeight: 500 }}>{p.title}</div>
                 <div className="t-body" style={{ fontSize: 11, color: 'var(--off-white-68)', lineHeight: 1.5 }}>

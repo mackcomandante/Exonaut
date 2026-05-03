@@ -15,6 +15,7 @@ function profileAsExonautRow(profile, ledger = []) {
     name: profile.fullName || profile.email || 'Exonaut',
     track: profile.trackCode || 'AIS',
     cohort: profile.cohortId || 'c2627',
+    avatarUrl: profile.avatarUrl || '',
     points,
     tier: points >= 300 ? 'prime' : points >= 100 ? 'builder' : 'entry',
     change: (seed % 7) - 2,
@@ -34,6 +35,42 @@ function useSupabaseExonautRows() {
   );
 }
 
+function missionForLeadQueue(sub) {
+  return (window.__missionStore?.all?.() || []).find(m => m.id === sub.missionId);
+}
+
+function submissionMatchesLeadScope(sub, leadTrack, leadCohort, exonautRows) {
+  const ex = exonautRows.find(u => u.id === sub.exonautId);
+  const mission = missionForLeadQueue(sub);
+  const missionTrack = mission?.track || mission?.trackCode || '';
+  const sameCohort = !leadCohort || !ex || (ex.cohort || 'c2627') === leadCohort;
+  const sameTrack = ex ? ex.track === leadTrack : (!missionTrack || missionTrack === leadTrack);
+  return sameCohort && sameTrack;
+}
+
+function realTrackLeadFor(trackCode, crowns = [], profiles = []) {
+  const crown = (crowns || []).find(c => c.trackCode === trackCode && c.status === 'active')
+    || window.__crownStore?.getActiveCrownForTrack?.(trackCode);
+  const profile = crown?.userId ? (profiles || []).find(p => p.id === crown.userId) : null;
+  return {
+    crown,
+    profile,
+    name: profile?.fullName || profile?.email || 'Unassigned',
+    avatarUrl: profile?.avatarUrl || '',
+  };
+}
+
+function latestSubmissionMsFor(userId, submissions = []) {
+  return Math.max(0, ...submissions
+    .filter(s => s.exonautId === userId)
+    .map(s => new Date(s.gradedAt || s.submittedAtIso || s.submittedAt).getTime())
+    .filter(Number.isFinite));
+}
+
+function missionForCommanderSub(sub, missions = []) {
+  return missions.find(m => m.id === sub.missionId) || missionForLeadQueue(sub);
+}
+
 // ========== MISSION LEAD CONSOLE ==========
 function LeadHome({ onNavigate }) {
   const { profile } = useCurrentUserProfile();
@@ -47,8 +84,15 @@ function LeadHome({ onNavigate }) {
   const sortedByPoints = [...myExonauts].sort((a,b) => b.points - a.points);
   const trackAvg = myExonauts.length ? Math.round(myExonauts.reduce((s,u) => s + u.points, 0) / myExonauts.length) : 0;
   const allSubs = useSubs();
-  const myIds = new Set(myExonauts.map(u => u.id));
-  const myPending = allSubs.filter(s => s.state === 'pending' && myIds.has(s.exonautId));
+  React.useEffect(() => { window.refreshSubs?.(); }, []);
+  const myPending = allSubs.filter(s =>
+    s.state === 'pending' && submissionMatchesLeadScope(s, leadTrack, profile.cohortId || 'c2627', exonautRows)
+  );
+  const myTrackSubs = allSubs.filter(s => submissionMatchesLeadScope(s, leadTrack, profile.cohortId || 'c2627', exonautRows));
+  const mySubmitRate = myExonauts.length
+    ? Math.round((new Set(myTrackSubs.map(s => s.exonautId)).size / myExonauts.length) * 100)
+    : 0;
+  const myApproved = myTrackSubs.filter(s => s.state === 'approved').length;
 
   return (
     <div className="enter">
@@ -73,9 +117,9 @@ function LeadHome({ onNavigate }) {
       {/* Track KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 28 }}>
         <KPI label="GRADING QUEUE" value={myPending.length} accent="amber" sub={myPending.some(s => s.isLate) ? '1 BREACHED 48h SLA' : 'WITHIN SLA'} />
-        <KPI label="TRACK AVG PTS" value={trackAvg} accent="lime" sub="▲ +38 vs last wk" />
-        <KPI label="SUBMIT RATE" value="0%" accent="platinum" sub="ON-TIME · WEEK 2" />
-        <KPI label="CLIENT SAT" value="0.0" accent="lime" sub="AVG ACROSS TRACK · 5 MAX" />
+        <KPI label="TRACK AVG PTS" value={trackAvg} accent="lime" sub="POINTS PER EXONAUT" />
+        <KPI label="SUBMIT RATE" value={`${mySubmitRate}%`} accent="platinum" sub="TRACK SUBMITTERS" />
+        <KPI label="APPROVED" value={myApproved} accent="lime" sub="TRACK TASKS GRADED" />
       </div>
 
       {/* Hero: review queue preview + track leaderboard */}
@@ -92,7 +136,7 @@ function LeadHome({ onNavigate }) {
                 display: 'grid', gridTemplateColumns: '40px 1fr auto auto', gap: 14, alignItems: 'center',
                 padding: '14px 0', borderTop: '1px solid var(--off-white-07)',
               }}>
-                <AvatarWithRing name={ex.name} size={36} tier={ex.tier} />
+                <AvatarWithRing name={ex.name} avatarUrl={ex.avatarUrl} size={36} tier={ex.tier} />
                 <div>
                   <div className="t-heading" style={{ fontSize: 13, textTransform: 'none', letterSpacing: 0 }}>{ex.name}</div>
                   <div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)', marginTop: 2 }}>
@@ -114,7 +158,7 @@ function LeadHome({ onNavigate }) {
           {sortedByPoints.map((u, i) => (
             <div key={u.id} style={{ display: 'grid', gridTemplateColumns: '24px 30px 1fr auto', gap: 10, alignItems: 'center', padding: '10px 0', borderTop: i > 0 ? '1px solid var(--off-white-07)' : 'none' }}>
               <div className="t-mono" style={{ fontSize: 11, color: 'var(--off-white-40)' }}>#{i+1}</div>
-              <AvatarWithRing name={u.name} size={26} tier={u.tier} />
+              <AvatarWithRing name={u.name} avatarUrl={u.avatarUrl} size={26} tier={u.tier} />
               <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12, color: 'var(--off-white)' }}>{u.name}</div>
               <div className="t-mono" style={{ fontSize: 13, color: 'var(--lime)', fontWeight: 700 }}>{u.points}</div>
             </div>
@@ -171,7 +215,7 @@ function LeadRoster() {
           return (
             <div key={u.id} className={'lb-row' + (isAtRisk ? '' : '')} style={{ gridTemplateColumns: '48px 48px 1fr 100px 100px 100px 120px' }}>
               <div className="lb-rank">#{i+1}</div>
-              <AvatarWithRing name={u.name} size={34} tier={u.tier} />
+              <AvatarWithRing name={u.name} avatarUrl={u.avatarUrl} size={34} tier={u.tier} />
               <div className="lb-name">
                 {u.name}<TierCrest tier={u.tier} />
                 {isAtRisk && <span style={{ marginLeft: 10, fontSize: 9, fontFamily: 'var(--font-mono)', color: 'var(--red)', letterSpacing: '0.1em' }}>⚠ AT RISK</span>}
@@ -196,12 +240,13 @@ function LeadQueue({ onNavigate }) {
   const { profile } = useCurrentUserProfile();
   const exonautRows = useSupabaseExonautRows();
   const leadTrack = profile.trackCode || 'AIS';
-  const myIds = new Set(exonautRows.filter(u =>
-    u.track === leadTrack && (!profile.cohortId || u.cohort === profile.cohortId)
-  ).map(u => u.id));
   const allSubs = useSubs();
-  const myPending = allSubs.filter(s => s.state === 'pending' && myIds.has(s.exonautId));
-  const myGraded = allSubs.filter(s => s.state !== 'pending' && myIds.has(s.exonautId));
+  React.useEffect(() => { window.refreshSubs?.(); }, []);
+  const scopedSubs = allSubs.filter(s =>
+    submissionMatchesLeadScope(s, leadTrack, profile.cohortId || 'c2627', exonautRows)
+  );
+  const myPending = scopedSubs.filter(s => s.state === 'pending');
+  const myGraded = scopedSubs.filter(s => s.state !== 'pending');
   const [tab, setTab] = React.useState('pending');
 
   const list = tab === 'pending' ? myPending : myGraded;
@@ -245,7 +290,7 @@ function LeadQueue({ onNavigate }) {
         const gradeColor = { 'good': 'var(--lime)', 'excellent': 'var(--gold)', 'needs-revision': 'var(--amber)' }[s.grade];
         return (
           <div key={s.id} className="card-panel" style={{ padding: 16, marginBottom: 10, display: 'grid', gridTemplateColumns: '42px 1fr auto auto auto', gap: 14, alignItems: 'center' }}>
-            <AvatarWithRing name={ex.name} size={38} tier={ex.tier} />
+            <AvatarWithRing name={ex.name} avatarUrl={ex.avatarUrl} size={38} tier={ex.tier} />
             <div>
               <div className="t-heading" style={{ fontSize: 13, textTransform: 'none', letterSpacing: 0 }}>{ex.name}</div>
               <div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)', marginTop: 2 }}>
@@ -320,7 +365,7 @@ function LeadGrade({ onBack, subId }) {
       <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 18 }}>
         <div className="card-panel">
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16, paddingBottom: 16, borderBottom: '1px solid var(--off-white-07)' }}>
-            <AvatarWithRing name={ex.name} size={44} tier={ex.tier} />
+            <AvatarWithRing name={ex.name} avatarUrl={ex.avatarUrl} size={44} tier={ex.tier} />
             <div>
               <div className="t-heading" style={{ fontSize: 15, textTransform: 'none', letterSpacing: 0 }}>{ex.name}</div>
               <div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)', marginTop: 2 }}>
@@ -368,9 +413,9 @@ function LeadGrade({ onBack, subId }) {
           <div style={{ display: 'grid', gap: 8, marginBottom: 20 }}>
             {[
               { v: 'rejected',       label: 'Rejected',       sub: '0 pts - comment required', color: 'var(--red)' },
-              { v: 'needs-revision', label: 'Needs Revision', sub: '+5 pts · one resubmit allowed', color: 'var(--amber)' },
-              { v: 'good',           label: 'Good',           sub: 'base + 10 pts', color: 'var(--lime)' },
-              { v: 'excellent',      label: 'Excellent',      sub: 'base + 20 pts · badge recheck', color: 'var(--gold)' },
+              { v: 'needs-revision', label: 'Needs Revision', sub: '0 pts · one resubmit allowed', color: 'var(--amber)' },
+              { v: 'good',           label: 'Good',           sub: 'task points awarded', color: 'var(--lime)' },
+              { v: 'excellent',      label: 'Excellent',      sub: 'task points awarded · badge recheck', color: 'var(--gold)' },
             ].map(g => (
               <div key={g.v} onClick={() => setGrade(g.v)}
                    style={{
@@ -440,16 +485,43 @@ function CommanderHome({ onNavigate }) {
   const activeCohort = window.__cohortStore.getSelected();
   const exonautRows = useSupabaseExonautRows();
   const allSubs = useSubs();
+  const missions = useMissions();
+  const { crowns } = useCrownState();
+  const { profiles } = useUserProfiles();
   const escalations = useEscalations();
   const cohortUsers = exonautRows.filter(u => !activeCohort?.id || u.cohort === activeCohort.id);
   const cohortIds = new Set(cohortUsers.map(u => u.id));
+  const cohortSubs = allSubs.filter(s => cohortIds.has(s.exonautId));
   const totalExonauts = cohortUsers.length;
-  const atRisk = cohortUsers.filter(u => u.points < 200).length;
+  const staleAfterMs = 7 * 24 * 60 * 60 * 1000;
+  const atRisk = cohortUsers.filter(u => {
+    const latestMs = latestSubmissionMsFor(u.id, cohortSubs);
+    return u.points <= 0 || !latestMs || Date.now() - latestMs > staleAfterMs;
+  }).length;
   const avgPoints = cohortUsers.length
     ? Math.round(cohortUsers.reduce((s,u) => s + u.points, 0) / cohortUsers.length)
     : 0;
-  const totalQueue = allSubs.filter(s => s.state === 'pending' && cohortIds.has(s.exonautId)).length;
-  const avgLeadSat = (LEADS.reduce((sum, lead) => sum + (lead.satisfaction || 0), 0) / Math.max(1, LEADS.length)).toFixed(1);
+  const totalQueue = cohortSubs.filter(s => s.state === 'pending').length;
+  const totalReviewed = cohortSubs.filter(s => ['approved', 'needs-revision', 'rejected'].includes(s.state)).length;
+  const totalApproved = cohortSubs.filter(s => s.state === 'approved').length;
+  const approvalRate = totalReviewed ? Math.round((totalApproved / totalReviewed) * 100) : 0;
+  const realLeadCount = TRACKS.filter(t => realTrackLeadFor(t.code, crowns, profiles).crown).length;
+  const trackCount = TRACKS.length;
+  const trackMetrics = TRACKS.map(track => {
+    const roster = cohortUsers.filter(u => u.track === track.code);
+    const rosterIds = new Set(roster.map(u => u.id));
+    const trackSubs = cohortSubs.filter(s => {
+      if (rosterIds.has(s.exonautId)) return true;
+      const mission = missionForCommanderSub(s, missions);
+      return (mission?.track || mission?.trackCode) === track.code;
+    });
+    const pending = trackSubs.filter(s => s.state === 'pending').length;
+    const approved = trackSubs.filter(s => s.state === 'approved').length;
+    const submittedUsers = new Set(trackSubs.map(s => s.exonautId));
+    const submitRate = roster.length ? Math.round((submittedUsers.size / roster.length) * 100) : 0;
+    const avg = roster.length ? Math.round(roster.reduce((s,u) => s + u.points, 0) / roster.length) : 0;
+    return { track, roster, pending, approved, submitRate, avg, lead: realTrackLeadFor(track.code, crowns, profiles) };
+  });
 
   // Empty-cohort state (newly created batch with no members yet)
   if (cohortUsers.length === 0) {
@@ -487,7 +559,7 @@ function CommanderHome({ onNavigate }) {
           </div>
           <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>Command Bridge</h1>
           <div className="t-body" style={{ marginTop: 6 }}>
-            {activeCohort?.code || COHORT.code} · Week {COHORT.week}/{COHORT.weekTotal} · {totalExonauts} Exonauts across {LEADS.length} tracks
+            {activeCohort?.code || COHORT.code} · Week {COHORT.week}/{window.getCohortWeekTotal?.(activeCohort) || COHORT.weekTotal} · {totalExonauts} Exonauts across {trackCount} tracks
           </div>
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
@@ -502,51 +574,49 @@ function CommanderHome({ onNavigate }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 28 }}>
         <KPI label="ACTIVE EXONAUTS" value={totalExonauts} accent="lime" sub={`${Math.max(0, totalExonauts - atRisk)} ON TRACK`} />
         <KPI label="AT-RISK" value={atRisk} accent="red" sub="NO SUB 7+ DAYS" />
-        <KPI label="COHORT AVG" value={avgPoints} accent="platinum" sub="▲ +32 VS WK 1" />
-        <KPI label="GRADING LOAD" value={totalQueue} accent="amber" sub="ACROSS 7 LEADS" />
-        <KPI label="LEAD SAT AVG" value={avgLeadSat} accent="lime" sub="OUT OF 5.0" />
+        <KPI label="COHORT AVG" value={avgPoints} accent="platinum" sub="POINTS PER EXONAUT" />
+        <KPI label="GRADING LOAD" value={totalQueue} accent="amber" sub={`ACROSS ${realLeadCount || trackCount} LEADS`} />
+        <KPI label="APPROVAL RATE" value={`${approvalRate}%`} accent="lime" sub={`${totalApproved} APPROVED SUBMISSIONS`} />
       </div>
 
       {/* Track Matrix */}
       <div className="section-head">
         <h2 style={{ fontSize: 16 }}>Track Performance Matrix</h2>
-        <span className="section-meta">ALL 7 TRACKS · LIVE</span>
+        <span className="section-meta">{`ALL ${trackCount} TRACKS - LIVE`}</span>
       </div>
       <div className="lb-table">
         <div className="lb-header" style={{ gridTemplateColumns: '1fr 1fr 70px 80px 80px 90px 100px' }}>
-          <div>TRACK</div><div>TRACK LEAD</div><div>EXONAUTS</div><div>AVG PTS</div><div>SUBMIT%</div><div>CLIENT SAT</div><div>QUEUE</div>
+          <div>TRACK</div><div>TRACK LEAD</div><div>EXONAUTS</div><div>AVG PTS</div><div>SUBMIT%</div><div>APPROVED</div><div>QUEUE</div>
         </div>
-        {LEADS.map(lead => {
-          const track = TRACKS.find(t => t.code === lead.track);
-          const trackExos = cohortUsers.filter(u => u.track === lead.track);
-          const avg = trackExos.length ? Math.round(trackExos.reduce((s,u) => s + u.points, 0) / trackExos.length) : 0;
-          const overload = lead.reviewQueue >= 5;
-          const underperf = lead.avgSubmitRate < 80;
+        {trackMetrics.map(row => {
+          const { track, lead } = row;
+          const overload = row.pending >= 5;
+          const underperf = row.submitRate < 80 && row.roster.length > 0;
           return (
-            <div key={lead.id} className="lb-row" style={{ gridTemplateColumns: '1fr 1fr 70px 80px 80px 90px 100px', cursor: 'pointer' }}
+            <div key={track.code} className="lb-row" style={{ gridTemplateColumns: '1fr 1fr 70px 80px 80px 90px 100px', cursor: 'pointer' }}
                  onClick={() => onNavigate('cmdr-leads')}>
               <div>
                 <div className="t-heading" style={{ fontSize: 12, letterSpacing: 0, textTransform: 'none' }}>{track.name}</div>
                 <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', marginTop: 2 }}>{track.short}</div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <AvatarWithRing name={lead.name} size={26} tier="corps" />
+                <AvatarWithRing name={lead.name} avatarUrl={lead.avatarUrl} size={26} tier="corps" />
                 <div className="t-body" style={{ fontSize: 12, color: 'var(--off-white)' }}>{lead.name}</div>
               </div>
-              <div className="t-mono" style={{ fontSize: 13 }}>{trackExos.length}</div>
-              <div className="lb-points" style={{ fontSize: 14 }}>{avg}</div>
+              <div className="t-mono" style={{ fontSize: 13 }}>{row.roster.length}</div>
+              <div className="lb-points" style={{ fontSize: 14 }}>{row.avg}</div>
               <div className="t-mono" style={{ fontSize: 12, color: underperf ? 'var(--red)' : 'var(--off-white-68)' }}>
-                {lead.avgSubmitRate}%
+                {row.submitRate}%
               </div>
-              <div className="t-mono" style={{ fontSize: 12, color: lead.satisfaction >= 4.5 ? 'var(--lime)' : 'var(--off-white-68)' }}>
-                ★ {lead.satisfaction.toFixed(1)}
+              <div className="t-mono" style={{ fontSize: 12, color: row.approved ? 'var(--lime)' : 'var(--off-white-40)' }}>
+                {row.approved}
               </div>
               <div>
                 <span className="status-pill" style={{
                   background: overload ? 'rgba(239,68,68,0.15)' : 'rgba(201,229,0,0.08)',
                   color: overload ? 'var(--red)' : 'var(--lime)',
                   borderColor: overload ? 'rgba(239,68,68,0.3)' : 'var(--lime-border)',
-                }}>{lead.reviewQueue} {overload ? 'HOT' : 'OK'}</span>
+                }}>{row.pending} {overload ? 'HOT' : 'OK'}</span>
               </div>
             </div>
           );
@@ -631,7 +701,7 @@ function LegacyCommanderLeads() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, padding: '12px 0', borderTop: '1px solid var(--off-white-07)', borderBottom: '1px solid var(--off-white-07)' }}>
                 <div><div className="t-label-muted">INTERNS</div><div className="t-mono" style={{ fontSize: 18, color: 'var(--off-white)', fontWeight: 700 }}>{trackExos.length}</div></div>
                 <div><div className="t-label-muted">QUEUE</div><div className="t-mono" style={{ fontSize: 18, color: lead.reviewQueue >= 5 ? 'var(--red)' : 'var(--lime)', fontWeight: 700 }}>{lead.reviewQueue}</div></div>
-                <div><div className="t-label-muted">SAT</div><div className="t-mono" style={{ fontSize: 18, color: 'var(--lime)', fontWeight: 700 }}>{lead.satisfaction.toFixed(1)}</div></div>
+                <div><div className="t-label-muted">APPROVED</div><div className="t-mono" style={{ fontSize: 18, color: 'var(--lime)', fontWeight: 700 }}>0</div></div>
               </div>
               <div style={{ display: 'flex', gap: 6, marginTop: 12 }}>
                 <button className="btn btn-ghost btn-sm" style={{ flex: 1, justifyContent: 'center' }}><i className="fa-solid fa-message" /> DM</button>
@@ -717,7 +787,7 @@ function CommanderLeads() {
             const status = bad ? 'At Risk' : pending ? 'Needs Attention' : done ? 'On Track' : 'Needs Attention';
             return (
               <div key={u.id} className="lb-row" style={{ gridTemplateColumns: '1.3fr 80px 80px 80px 80px 80px 80px 105px 120px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><AvatarWithRing name={u.name} size={28} tier={u.tier} /><span>{u.name}</span></div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><AvatarWithRing name={u.name} avatarUrl={u.avatarUrl} size={28} tier={u.tier} /><span>{u.name}</span></div>
                 <div>{weekDone}/{selected.weekMissions.length}</div><div>{done}</div><div>{pending}</div><div>{bad}</div><div className="lb-points">{points}</div><div>{u.badges || 0}</div><div>{lastSubMs ? new Date(lastSubMs).toLocaleDateString() : '-'}</div>
                 <span className={'status-pill ' + statusClass(status)}>{status}</span>
               </div>
@@ -734,7 +804,7 @@ function CommanderLeads() {
         <div>
           <div className="t-label" style={{ marginBottom: 8, color: 'var(--amber)' }}>COMMANDER - EXECUTION OVERSIGHT</div>
           <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>Track Progress</h1>
-          <div className="t-body" style={{ marginTop: 6 }}>Week {currentWeek}/{COHORT.weekTotal} - {cohortUsers.length} Exonauts - {activeCohort?.name || COHORT.code}</div>
+          <div className="t-body" style={{ marginTop: 6 }}>Week {currentWeek}/{window.getCohortWeekTotal?.(activeCohort) || COHORT.weekTotal} - {cohortUsers.length} Exonauts - {activeCohort?.name || COHORT.code}</div>
         </div>
       </div>
       <div className="lb-table">
@@ -1002,7 +1072,7 @@ function CommanderExonauts() {
             <div>#</div><div></div><div>EXONAUT</div><div>TRACK</div><div>MANAGER</div><div>POINTS</div><div>BADGES</div><div>TIER</div><div>COHORT</div>
           </div>
           {rows.slice(0, 80).map((u, i) => {
-            const track = TRACKS.find(t => t.code === u.track);
+            const track = TRACKS.find(t => t.code === u.track) || { short: 'N/A' };
             const lead = leadForUser(u.id);
             const uCohort = getUserCohort(u.id);
             const cohortObj = window.__cohortStore.getAll().find(c => c.id === uCohort);
@@ -1010,7 +1080,7 @@ function CommanderExonauts() {
             return (
               <div key={u.id} className="lb-row" style={{ gridTemplateColumns: '40px 48px 1fr 110px 140px 90px 80px 80px 80px' }}>
                 <div className="t-mono" style={{ fontSize: 11, color: 'var(--off-white-40)' }}>{String(i + 1).padStart(2, '0')}</div>
-                <AvatarWithRing name={u.name} size={34} tier={u.tier} />
+                <AvatarWithRing name={u.name} avatarUrl={u.avatarUrl} size={34} tier={u.tier} />
                 <div className="lb-name">
                   {u.name}
                   {risk && <span style={{ marginLeft: 6, fontSize: 8, color: 'var(--red)', fontFamily: 'var(--font-mono)', letterSpacing: '0.08em' }}>● AT-RISK</span>}
@@ -1088,7 +1158,23 @@ function CommanderHealth() {
   useCohort();
   const activeCohort = window.__cohortStore.getSelected();
   const exonautRows = useSupabaseExonautRows();
+  const allSubs = useSubs();
+  const { ledger } = usePoints();
   const cohortUsers = exonautRows.filter(u => !activeCohort?.id || u.cohort === activeCohort.id);
+  const cohortIds = new Set(cohortUsers.map(u => u.id));
+  const cohortLedger = ledger.filter(e => cohortIds.has(e.userId));
+  const cohortSubs = allSubs.filter(s => cohortIds.has(s.exonautId));
+  const totalPoints = cohortLedger.reduce((sum, e) => sum + Number(e.points || 0), 0);
+  const pillarPoints = [
+    { name: 'MISSIONS', value: cohortLedger.filter(e => ['missions', 'project', 'mission'].includes(e.pillar) || e.sourceType === 'mission').reduce((sum, e) => sum + Number(e.points || 0), 0), color: 'var(--lime)' },
+    { name: 'CLIENT', value: cohortLedger.filter(e => e.pillar === 'client').reduce((sum, e) => sum + Number(e.points || 0), 0), color: 'var(--platinum)' },
+    { name: 'RECRUIT', value: cohortLedger.filter(e => ['recruitment', 'recruit'].includes(e.pillar)).reduce((sum, e) => sum + Number(e.points || 0), 0), color: 'var(--lavender)' },
+    { name: 'CULTURE', value: cohortLedger.filter(e => ['culture', 'ritual'].includes(e.pillar) || ['kudos', 'ritual'].includes(e.sourceType)).reduce((sum, e) => sum + Number(e.points || 0), 0), color: 'var(--amber)' },
+  ].map(p => ({ ...p, pct: totalPoints ? Math.round((p.value / totalPoints) * 100) : 0 }));
+  const atRiskUsers = cohortUsers.filter(u => {
+    const latestMs = latestSubmissionMsFor(u.id, cohortSubs);
+    return u.points <= 0 || !latestMs || Date.now() - latestMs > 7 * 24 * 60 * 60 * 1000;
+  });
   const total = cohortUsers.length || 1;
   return (
     <div className="enter">
@@ -1121,11 +1207,7 @@ function CommanderHealth() {
 
         <div className="card-flat">
           <div className="t-label-muted" style={{ marginBottom: 8 }}>PILLAR BALANCE · COHORT</div>
-          {[
-            { name: 'PROJECT', pct: 78, color: 'var(--lime)' },
-            { name: 'CLIENT',  pct: 64, color: 'var(--platinum)' },
-            { name: 'RECRUIT', pct: 42, color: 'var(--lavender)' },
-          ].map(p => (
+          {pillarPoints.map(p => (
             <div key={p.name} style={{ marginBottom: 12 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                 <span className="t-heading" style={{ fontSize: 10 }}>{p.name}</span>
@@ -1136,18 +1218,16 @@ function CommanderHealth() {
               </div>
             </div>
           ))}
-          <div className="t-body" style={{ fontSize: 12, marginTop: 14, color: 'var(--amber)' }}>
-            ⚠ Recruit pillar lagging — push for referrals by Wk 6.
-          </div>
+          <div className="t-body" style={{ fontSize: 12, marginTop: 14, color: 'var(--amber)' }}>{totalPoints ? 'Balance is based on approved point ledger entries.' : 'No approved point ledger entries yet.'}</div>
         </div>
 
         <div className="card-flat">
           <div className="t-label-muted" style={{ marginBottom: 8 }}>AT-RISK WATCHLIST</div>
-          {cohortUsers.filter(u => u.points < 200).map(u => {
-            const track = TRACKS.find(t => t.code === u.track);
+          {atRiskUsers.map(u => {
+            const track = TRACKS.find(t => t.code === u.track) || { short: 'N/A' };
             return (
               <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderTop: '1px solid var(--off-white-07)' }}>
-                <AvatarWithRing name={u.name} size={28} tier={u.tier} />
+                <AvatarWithRing name={u.name} avatarUrl={u.avatarUrl} size={28} tier={u.tier} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div className="t-heading" style={{ fontSize: 11, textTransform: 'none', letterSpacing: 0 }}>{u.name}</div>
                   <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)' }}>{track.short} · {u.points} pts</div>
@@ -1160,8 +1240,8 @@ function CommanderHealth() {
       </div>
 
       <div className="card-panel">
-        <div className="t-label" style={{ marginBottom: 14 }}>PROGRAM TRAJECTORY · 12 WEEKS</div>
-        <TrajectoryChart />
+        <div className="t-label" style={{ marginBottom: 14 }}>{`PROGRAM TRAJECTORY - ${window.getCohortWeekTotal?.(activeCohort) || COHORT.weekTotal} WEEKS`}</div>
+        <TrajectoryChart ledger={cohortLedger} />
       </div>
     </div>
   );
@@ -1194,16 +1274,35 @@ function ChainNode({ role, name, sub, accent, active }) {
   );
 }
 
-function TrajectoryChart() {
-  // Simple sparkline for cohort avg points across weeks
-  const data = Array.from({ length: COHORT.weekTotal }, () => 0);
+function TrajectoryChart({ ledger = [] }) {
+  // Cohort point trajectory from approved point ledger entries.
+  const activeCohort = window.getActiveCohort?.() || COHORT;
+  const totalWeeks = window.getCohortWeekTotal?.(activeCohort) || COHORT.weekTotal;
+  const data = Array.from({ length: totalWeeks }, () => 0);
+  ledger.forEach(entry => {
+    const awarded = new Date(entry.awardedAt || Date.now());
+    let weekIndex = -1;
+    for (let i = 0; i < totalWeeks; i++) {
+      const win = window.EOW?.weekWindow?.(activeCohort, i + 1);
+      if (win && awarded >= win.startFri && awarded <= win.endThu) {
+        weekIndex = i;
+        break;
+      }
+    }
+    if (weekIndex < 0) {
+      const fallbackWeek = Math.min(totalWeeks, Math.max(1, COHORT.week || 1));
+      weekIndex = fallbackWeek - 1;
+    }
+    data[weekIndex] += Number(entry.points || 0);
+  });
+  for (let i = 1; i < data.length; i++) data[i] += data[i - 1];
   const currentWeek = COHORT.week;
   const max = Math.max(1, ...data);
   return (
     <div style={{ position: 'relative', height: 140 }}>
       <svg viewBox="0 0 600 140" style={{ width: '100%', height: '100%' }}>
         {data.map((v, i) => {
-          const x = (i / (data.length - 1)) * 580 + 10;
+          const x = data.length === 1 ? 300 : (i / (data.length - 1)) * 580 + 10;
           const y = 130 - (v / max) * 110;
           const isCurrent = i === currentWeek - 1;
           const isPast = i < currentWeek;
@@ -1211,7 +1310,7 @@ function TrajectoryChart() {
             <g key={i}>
               {i > 0 && (
                 <line
-                  x1={((i-1) / (data.length - 1)) * 580 + 10}
+                  x1={data.length === 1 ? 300 : ((i-1) / (data.length - 1)) * 580 + 10}
                   y1={130 - (data[i-1] / max) * 110}
                   x2={x} y2={y}
                   stroke={isPast ? '#C9E500' : 'rgba(245,240,248,0.15)'}

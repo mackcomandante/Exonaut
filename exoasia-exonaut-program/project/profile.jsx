@@ -11,12 +11,14 @@ function Profile({ onOpenMission, onTriggerBadge }) {
     school: '',
     expertise: '',
     avatarUrl: '',
+    avatarFile: null,
+    avatarPreview: '',
   });
   const [saveError, setSaveError] = React.useState('');
   const [saving, setSaving] = React.useState(false);
   const displayName = profile.fullName || ME.name;
   const track = TRACKS.find(t => t.code === (profile.trackCode || ME.track)) || TRACKS[0];
-  const cohort = COHORTS.find(c => c.id === (profile.cohortId || ME.cohort)) || COHORT;
+  const cohort = window.getActiveCohort?.(profile) || COHORTS.find(c => c.id === (profile.cohortId || ME.cohort)) || COHORT;
   const tier = ME.tier || 'entry';
   const missions = useMissions();
 
@@ -39,6 +41,8 @@ function Profile({ onOpenMission, onTriggerBadge }) {
       school: profile.school || '',
       expertise: profile.expertise || '',
       avatarUrl: profile.avatarUrl || '',
+      avatarFile: null,
+      avatarPreview: '',
     });
     setSaveError('');
     setEditing(true);
@@ -53,13 +57,16 @@ function Profile({ onOpenMission, onTriggerBadge }) {
     setSaving(true);
     setSaveError('');
     try {
+      const avatarUrl = draft.avatarFile
+        ? await uploadProfileAvatar(draft.avatarFile)
+        : draft.avatarUrl.trim();
       await save({
         fullName,
         bio: draft.bio.trim(),
         linkedinUrl: draft.linkedinUrl.trim(),
         school: draft.school.trim(),
         expertise: draft.expertise.trim(),
-        avatarUrl: draft.avatarUrl.trim(),
+        avatarUrl,
       });
       setEditing(false);
     } catch (err) {
@@ -127,8 +134,28 @@ function Profile({ onOpenMission, onTriggerBadge }) {
             </label>
           </div>
           <label>
-            <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.12em', marginBottom: 6, fontWeight: 700 }}>AVATAR URL</div>
-            <input className="input" value={draft.avatarUrl} onChange={(e) => setDraft(d => ({ ...d, avatarUrl: e.target.value }))} />
+            <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.12em', marginBottom: 6, fontWeight: 700 }}>PROFILE PHOTO</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <AvatarWithRing name={draft.fullName || displayName} avatarUrl={draft.avatarPreview || draft.avatarUrl} size={58} tier={tier} />
+              <input
+                className="input"
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0] || null;
+                  setDraft(d => ({
+                    ...d,
+                    avatarFile: file,
+                    avatarPreview: file ? URL.createObjectURL(file) : '',
+                  }));
+                }}
+              />
+            </div>
+            {draft.avatarUrl && !draft.avatarFile && (
+              <button type="button" className="btn btn-ghost btn-sm" style={{ marginTop: 8 }} onClick={() => setDraft(d => ({ ...d, avatarUrl: '', avatarFile: null, avatarPreview: '' }))}>
+                Remove current photo
+              </button>
+            )}
           </label>
           {saveError && <div className="t-body" style={{ color: 'var(--red)', fontSize: 12 }}>{saveError}</div>}
           <div style={{ display: 'flex', gap: 8 }}>
@@ -172,7 +199,7 @@ function Profile({ onOpenMission, onTriggerBadge }) {
           <div className="v">{earnedBadges.length}<span style={{ color: 'var(--off-white-40)', fontSize: 14, marginLeft: 4 }}>/ 22</span></div>
         </div>
         <div className="profile-stat">
-          <div className="k">Missions Approved</div>
+          <div className="k">Track Tasks Approved</div>
           <div className="v">{approvedMissions.length}<span style={{ color: 'var(--off-white-40)', fontSize: 14, marginLeft: 4 }}>/ 7</span></div>
         </div>
         <div className="profile-stat">
@@ -187,7 +214,7 @@ function Profile({ onOpenMission, onTriggerBadge }) {
         <div className={'lb-tab' + (tab === 'badges' ? ' active' : '')} onClick={() => setTab('badges')}>
           Badges <span style={{ opacity: 0.5, marginLeft: 6 }}>{earnedBadges.length}/22</span>
         </div>
-        <div className={'lb-tab' + (tab === 'missions' ? ' active' : '')} onClick={() => setTab('missions')}>Mission History</div>
+        <div className={'lb-tab' + (tab === 'missions' ? ' active' : '')} onClick={() => setTab('missions')}>Track History</div>
       </div>
 
       {tab === 'overview' && (
@@ -199,7 +226,7 @@ function Profile({ onOpenMission, onTriggerBadge }) {
               <span className="section-meta">WEIGHTED · PROGRAM TO DATE</span>
             </div>
             {[
-              { k: 'Project', v: breakdown.project || 0, max: 400, color: 'var(--ink)', label: 'P1 · 40%' },
+              { k: 'Missions', v: (breakdown.missions || 0) + (breakdown.project || 0), max: 400, color: 'var(--ink)', label: 'P1 · 40%' },
               { k: 'Client',  v: breakdown.client || 0, max: 350, color: 'var(--platinum)', label: 'P2 · 35%' },
               { k: 'Recruitment', v: breakdown.recruitment || 0, max: 250, color: 'var(--lavender)', label: 'P3 · 25%' },
             ].map(p => (
@@ -276,7 +303,7 @@ function Profile({ onOpenMission, onTriggerBadge }) {
       {tab === 'missions' && (
         <div>
           <div className="section-head">
-            <h2 style={{ fontSize: 16 }}>Mission History · Chronological</h2>
+            <h2 style={{ fontSize: 16 }}>Track History · Chronological</h2>
             <span className="section-meta">{approvedMissions.length} COMPLETED</span>
           </div>
           <div>

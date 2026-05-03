@@ -6,9 +6,8 @@ function Sidebar({ current, onNavigate, onSignOut }) {
   const projectState = useProjects();
   const crown = window.__crownStore.getUserCrown(profile.id);
   const isFirstOfficer = window.__projectStore.userIsFirstOfficer(profile.id);
-  const isSecondOfficer = window.__projectStore.userIsSecondOfficer(profile.id);
   const hasAssignedProject = window.__projectStore.visibleProjects(profile).length > 0;
-  const hasProjectTasks = window.__projectStore.secondOfficerTasks(profile.id).length || projectState.assignees.some(a => a.userId === profile.id);
+  const hasProjectTasks = window.__projectStore.firstOfficerTasks(profile.id).length || projectState.assignees.some(a => a.userId === profile.id);
   const displayName = profile.fullName || ME.name;
   const tier = ME.tier || 'entry';
   const me = [
@@ -17,7 +16,7 @@ function Sidebar({ current, onNavigate, onSignOut }) {
   ];
   const links = [
     { id: 'dashboard',   label: 'Dashboard',   icon: 'fa-gauge-high' },
-    { id: 'missions',    label: 'Missions',    icon: 'fa-bullseye', count: 3 },
+    { id: 'missions',    label: 'Track',       icon: 'fa-bullseye', count: 3 },
     { id: 'leaderboard', label: 'Leaderboard', icon: 'fa-ranking-star' },
     { id: 'credentials', label: 'Certificates', icon: 'fa-certificate' },
   ];
@@ -43,7 +42,7 @@ function Sidebar({ current, onNavigate, onSignOut }) {
         <div className="sidebar-tag">EXONAUT PORTAL · v2.0</div>
       </div>
       <div className="sidebar-user" onClick={() => onNavigate('profile')} style={{ cursor: 'pointer' }}>
-        <AvatarWithRing name={displayName} size={36} tier={tier} />
+        <AvatarWithRing name={displayName} avatarUrl={profile.avatarUrl} size={36} tier={tier} />
         <div className="sidebar-user-info">
           <div className="sidebar-user-name">{displayName}</div>
           <div className="sidebar-user-tier" style={{ color: TIERS[tier].color }}>
@@ -96,7 +95,7 @@ function Sidebar({ current, onNavigate, onSignOut }) {
             ))}
           </>
         )}
-        {(hasAssignedProject || isFirstOfficer || isSecondOfficer || hasProjectTasks) && (
+        {(hasAssignedProject || isFirstOfficer || hasProjectTasks) && (
           <>
             <div className="sidebar-nav-section" style={{ color: 'var(--lime)' }}>Projects</div>
             <div className={'sidebar-link' + (current === 'projects' ? ' active' : '')} onClick={() => onNavigate('projects')}>
@@ -106,16 +105,10 @@ function Sidebar({ current, onNavigate, onSignOut }) {
             {isFirstOfficer && (
               <div className={'sidebar-link' + (current === 'first-projects' ? ' active' : '')} onClick={() => onNavigate('first-projects')}>
                 <i className="fa-solid fa-user-tie" />
-                <span>Delegations</span>
+                <span>Project Lead Board</span>
               </div>
             )}
-            {isSecondOfficer && (
-              <div className={'sidebar-link' + (current === 'delegation-inbox' ? ' active' : '')} onClick={() => onNavigate('delegation-inbox')}>
-                <i className="fa-solid fa-inbox" />
-                <span>Delegation Inbox</span>
-              </div>
-            )}
-            {(isFirstOfficer || isSecondOfficer || hasProjectTasks) && (
+            {(isFirstOfficer || hasProjectTasks) && (
               <div className={'sidebar-link' + (current === 'project-tasks' ? ' active' : '')} onClick={() => onNavigate('project-tasks')}>
                 <i className="fa-solid fa-list-check" />
                 <span>Project Tasks</span>
@@ -138,6 +131,9 @@ function Sidebar({ current, onNavigate, onSignOut }) {
 }
 
 function Topbar({ crumbs, onNavigate }) {
+  const { profile } = useCurrentUserProfile();
+  const cohort = window.getActiveCohort?.(profile) || COHORT;
+  const weekTotal = window.getCohortWeekTotal?.(cohort) || COHORT.weekTotal;
   const [time, setTime] = React.useState('');
   React.useEffect(() => {
     const tick = () => {
@@ -162,9 +158,9 @@ function Topbar({ crumbs, onNavigate }) {
         ))}
       </div>
       <div className="topbar-right">
-        <span>{COHORT.code}</span>
+        <span>{cohort?.code || COHORT.code}</span>
         <span style={{ color: 'var(--off-white-20)' }}>·</span>
-        <span>WK {COHORT.week}/{COHORT.weekTotal}</span>
+        <span>WK {COHORT.week}/{weekTotal}</span>
         <span style={{ color: 'var(--off-white-20)' }}>·</span>
         <span>{time} SGT</span>
         <button onClick={() => onNavigate && onNavigate('notifications')}

@@ -26,6 +26,142 @@
   };
 })();
 
+// -------- Admin-created tracks --------
+(function () {
+  const KEY = 'exo:admin-tracks:v1';
+  const listeners = new Set();
+  function load() {
+    try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch { return []; }
+  }
+  const loadedTracks = load();
+  let createdTracks = Array.isArray(loadedTracks) ? loadedTracks : (loadedTracks.createdTracks || []);
+  let hiddenTrackCodes = Array.isArray(loadedTracks.hiddenTrackCodes) ? loadedTracks.hiddenTrackCodes : [];
+  function persist() {
+    try { localStorage.setItem(KEY, JSON.stringify({ createdTracks, hiddenTrackCodes })); } catch (e) {}
+  }
+  function syncGlobalTracks() {
+    if (typeof TRACKS === 'undefined') return;
+    createdTracks.forEach(track => {
+      if (!TRACKS.some(t => t.code === track.code)) TRACKS.push(track);
+    });
+  }
+  function notify() {
+    syncGlobalTracks();
+    listeners.forEach(fn => fn());
+  }
+  async function currentUserId() {
+    if (!window.__db || !window.__db.auth) return null;
+    const session = await window.__db.auth.getSession();
+    return session?.data?.session?.user?.id || null;
+  }
+  function fromRow(row) {
+    return {
+      code: row.code,
+      name: row.name,
+      short: row.short,
+      emoji: row.emoji || '',
+      objective: row.objective || '',
+      clientType: row.client_type || '',
+      leadTitle: row.lead_title || 'Track Lead',
+      trackBadge: row.track_badge || row.name,
+      custom: row.custom !== false,
+    };
+  }
+  async function refreshRemote() {
+    if (!window.__db) return;
+    const { data, error } = await window.__db
+      .from('tracks')
+      .select('*')
+      .eq('status', 'active')
+      .order('created_at', { ascending: true });
+    if (error) {
+      console.warn('Could not load admin tracks:', error.message || error);
+      return;
+    }
+    createdTracks = (data || []).map(fromRow);
+    hiddenTrackCodes = [];
+    persist();
+    notify();
+  }
+  syncGlobalTracks();
+  window.__adminTrackStore = {
+    all() {
+      syncGlobalTracks();
+      const hidden = new Set(hiddenTrackCodes);
+      return (typeof TRACKS !== 'undefined' ? TRACKS : createdTracks).filter(t => !hidden.has(t.code));
+    },
+    custom() { return createdTracks; },
+    create(data) {
+      const code = (data.code || data.short || data.name || 'TRK')
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, '')
+        .slice(0, 6) || ('TRK' + Date.now().toString(36).slice(-3).toUpperCase());
+      if (this.all().some(t => t.code === code)) throw new Error('Track code already exists.');
+      const track = {
+        code,
+        name: data.name || 'New Track',
+        short: data.short || code,
+        emoji: data.emoji || '',
+        objective: data.objective || '',
+        clientType: data.clientType || '',
+        leadTitle: data.leadTitle || 'Track Lead',
+        trackBadge: data.trackBadge || data.name || code,
+        custom: true,
+      };
+      createdTracks = [...createdTracks, track];
+      persist();
+      notify();
+      if (window.__db) {
+        currentUserId().then(createdBy => window.__db.from('tracks').upsert({
+          code: track.code,
+          name: track.name,
+          short: track.short,
+          emoji: track.emoji || null,
+          objective: track.objective || null,
+          client_type: track.clientType || null,
+          lead_title: track.leadTitle || null,
+          track_badge: track.trackBadge || null,
+          status: 'active',
+          custom: true,
+          created_by: createdBy,
+        }, { onConflict: 'code' }).then(({ error }) => {
+          if (error) console.warn('Could not save track:', error.message || error);
+          else refreshRemote();
+        }));
+      }
+      return track;
+    },
+    delete(code) {
+      createdTracks = createdTracks.filter(t => t.code !== code);
+      if (typeof TRACKS !== 'undefined') {
+        const idx = TRACKS.findIndex(t => t.code === code && t.custom);
+        if (idx !== -1) TRACKS.splice(idx, 1);
+      }
+      if (!hiddenTrackCodes.includes(code)) hiddenTrackCodes.push(code);
+      persist();
+      notify();
+      if (window.__db) {
+        window.__db.from('tracks').update({ status: 'archived' }).eq('code', code).then(({ error }) => {
+          if (error) console.warn('Could not archive track:', error.message || error);
+          else refreshRemote();
+        });
+      }
+    },
+    refresh: refreshRemote,
+    subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
+  };
+  window.useAdminTracks = function useAdminTracks() {
+    const [, setTick] = React.useState(0);
+    React.useEffect(() => {
+      const unsub = window.__adminTrackStore.subscribe(() => setTick(t => t + 1));
+      window.__adminTrackStore.refresh();
+      return unsub;
+    }, []);
+    return window.__adminTrackStore.all();
+  };
+  refreshRemote();
+})();
+
 // -------- Admin Cohort Filter (sidebar widget) --------
 function AdminCohortFilter() {
   const { all, createCohort, deleteCohort } = useCohort();
@@ -138,7 +274,14 @@ function AdminCohortFilter() {
         </div>
       )}
 
-      {creating && <AdminCreateCohortModal onClose={() => setCreating(false)} onCreate={(data) => { createCohort(data); setCreating(false); }} />}
+      {creating && <AdminCreateCohortModal onClose={() => setCreating(false)} onCreate={(data) => {
+        try {
+          createCohort(data);
+          setCreating(false);
+        } catch (err) {
+          alert(err.message || 'Could not create cohort.');
+        }
+      }} />}
     </div>
   );
 }
@@ -153,10 +296,10 @@ function PlatformAdminSidebar({ current, onNavigate, onSignOut }) {
   ];
   const links = [
     { id: 'pa-cohorts',  label: 'Cohort Management',  icon: 'fa-layer-group' },
-    { id: 'pa-missions', label: 'Mission Builder',     icon: 'fa-bullseye' },
-    { id: 'pa-projects', label: 'Project Builder',     icon: 'fa-diagram-project' },
-    { id: 'pa-managers', label: 'Track Management',   icon: 'fa-route' },
+    { id: 'pa-missions', label: 'Track Creation',      icon: 'fa-bullseye' },
     { id: 'pa-assign',   label: 'Exonaut Assignment', icon: 'fa-user-gear' },
+    { id: 'pa-managers', label: 'Track Management',   icon: 'fa-route' },
+    { id: 'pa-projects', label: 'Project Builder',     icon: 'fa-diagram-project' },
     { id: 'pa-users',    label: 'User Directory',     icon: 'fa-address-book' },
     { id: 'pa-console',  label: 'System Console',     icon: 'fa-shield-halved' },
     { id: 'pa-removals', label: 'Removals',           icon: 'fa-user-slash' },
@@ -170,7 +313,7 @@ function PlatformAdminSidebar({ current, onNavigate, onSignOut }) {
         <div className="sidebar-tag" style={{ color: 'var(--sky)' }}>PLATFORM · ADMIN</div>
       </div>
       <div className="sidebar-user" style={{ cursor: 'pointer' }} onClick={() => onNavigate('pa-profile')} title="Open my profile">
-        <AvatarWithRing name={displayName} size={36} tier="corps" />
+        <AvatarWithRing name={displayName} avatarUrl={profile.avatarUrl} size={36} tier="corps" />
         <div className="sidebar-user-info">
           <div className="sidebar-user-name">{displayName}</div>
           <div className="sidebar-user-tier" style={{ color: 'var(--sky)' }}>PLATFORM ADMIN</div>
@@ -210,8 +353,51 @@ function PlatformAdminSidebar({ current, onNavigate, onSignOut }) {
 
 // -------- Cohort Management --------
 function AdminCohorts() {
-  const { all, cohortId, setSelected, createCohort, deleteCohort } = useCohort();
+  const { all, cohortId, setSelected, createCohort, updateCohort, deleteCohort, assignUserToCohort, unassignUserFromCohort, isUserUnassigned, getAssignments } = useCohort();
+  const { profiles, updateProfile } = useUserProfiles();
   const [creating, setCreating] = React.useState(false);
+  const [editingCohort, setEditingCohort] = React.useState(null);
+  const [selectedUsers, setSelectedUsers] = React.useState([]);
+  const [targetCohort, setTargetCohort] = React.useState(cohortId || 'c2627');
+  const [, setTick] = React.useState(0);
+  const selectedCohort = all.find(c => c.id === cohortId) || all[0];
+  const assignments = getAssignments();
+  const rows = profiles.length
+    ? profiles.map(p => ({
+        id: p.id,
+        name: p.fullName || p.email || 'User',
+        role: p.role || 'exonaut',
+        cohort: p.cohortId || 'c2627',
+        track: p.trackCode || '',
+        supabaseProfile: true,
+      }))
+    : USERS.map(u => ({ ...u, role: 'exonaut', cohort: getUserCohort(u.id), track: getUserTrack(u.id) }));
+
+  function rowCohort(row) {
+    if (isUserUnassigned(row.id)) return '';
+    return assignments[row.id] || row.cohort || 'c2627';
+  }
+
+  const assignedRows = rows.filter(row => rowCohort(row) === selectedCohort?.id);
+  const unassignedRows = rows.filter(row => !rowCohort(row));
+
+  function toggleSelected(userId) {
+    setSelectedUsers(prev => prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]);
+  }
+
+  async function assignSelected() {
+    if (!selectedUsers.length || !targetCohort) return;
+    for (const userId of selectedUsers) {
+      const row = rows.find(u => u.id === userId);
+      assignUserToCohort(userId, targetCohort);
+      if (row?.supabaseProfile) {
+        try { await updateProfile(userId, { cohortId: targetCohort }); } catch (err) { console.warn('Could not update cohort profile:', err); }
+      }
+    }
+    setSelectedUsers([]);
+    setSelected(targetCohort);
+    setTick(t => t + 1);
+  }
 
   return (
     <div className="enter">
@@ -230,9 +416,11 @@ function AdminCohorts() {
         </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.35fr) minmax(320px, 0.65fr)', gap: 18, alignItems: 'start' }}>
+        <div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 14, marginBottom: 18 }}>
         {all.map(c => {
-          const users = getCohortUsers(c.id);
+          const users = rows.filter(row => rowCohort(row) === c.id);
           const accent = c.status === 'active' ? 'var(--lime)' : c.status === 'upcoming' ? 'var(--sky)' : 'var(--lavender)';
           const isSelected = c.id === cohortId;
           return (
@@ -243,18 +431,24 @@ function AdminCohorts() {
                 <div className="t-mono" style={{ fontSize: 9, color: accent, letterSpacing: '0.12em', fontWeight: 700 }}>
                   {(c.status || '').toUpperCase()}
                 </div>
-                {c.custom && (
-                  <button onClick={(e) => { e.stopPropagation(); if (confirm(`Delete cohort "${c.name}"?`)) deleteCohort(c.id); }}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <button title="Edit cohort" onClick={(e) => { e.stopPropagation(); setSelected(c.id); setEditingCohort(c); }}
                     style={{ background: 'transparent', border: 'none', color: 'var(--off-white-40)', cursor: 'pointer', fontSize: 11 }}>
-                    <i className="fa-solid fa-trash" />
+                    <i className="fa-solid fa-calendar-days" />
                   </button>
-                )}
+                  {c.custom && (
+                    <button onClick={(e) => { e.stopPropagation(); if (confirm(`Delete cohort "${c.name}"?`)) deleteCohort(c.id); }}
+                      style={{ background: 'transparent', border: 'none', color: 'var(--off-white-40)', cursor: 'pointer', fontSize: 11 }}>
+                      <i className="fa-solid fa-trash" />
+                    </button>
+                  )}
+                </div>
               </div>
               <h2 className="t-heading" style={{ fontSize: 18, margin: '0 0 4px 0', textTransform: 'none', letterSpacing: 0, color: 'var(--off-white)' }}>
                 {c.name}
               </h2>
               <div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)', letterSpacing: '0.08em', marginBottom: 14 }}>
-                {c.code || '—'}
+                ID {c.id} · {c.code || '—'}
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
                 <div>
@@ -275,9 +469,103 @@ function AdminCohorts() {
             </div>
           );
         })}
+          </div>
+
+          <div className="card-panel" style={{ padding: 20 }}>
+            <div className="section-head" style={{ marginBottom: 14 }}>
+              <div>
+                <div className="t-label" style={{ color: 'var(--sky)', marginBottom: 6 }}>{selectedCohort?.code || selectedCohort?.id}</div>
+                <h2 style={{ fontSize: 16 }}>{selectedCohort?.name || 'Selected Cohort'} Roster</h2>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <button className="btn btn-ghost btn-sm" onClick={() => setEditingCohort(selectedCohort)}>
+                  <i className="fa-solid fa-pen-to-square" /> Edit Cohort
+                </button>
+                <span className="section-meta">{assignedRows.length} USERS</span>
+              </div>
+            </div>
+            {assignedRows.length === 0 && <div className="empty-line">No users assigned to this cohort.</div>}
+            <div style={{ display: 'grid', gap: 8 }}>
+              {assignedRows.map(row => {
+                const track = row.track ? (TRACKS.find(t => t.code === row.track)?.short || row.track) : 'N/A';
+                const role = row.role ? row.role.toUpperCase() : 'N/A';
+                return (
+                  <div key={row.id} className="card-flat" style={{ display: 'grid', gridTemplateColumns: '1fr 90px 90px auto', alignItems: 'center', gap: 10 }}>
+                    <div>
+                      <div className="t-heading" style={{ fontSize: 13, textTransform: 'none', letterSpacing: 0 }}>{row.name}</div>
+                      <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)' }}>{row.id}</div>
+                    </div>
+                    <span className="status-pill status-submitted">{track}</span>
+                    <span className="status-pill status-not-started">{role}</span>
+                    <button className="btn btn-ghost btn-sm" onClick={() => { unassignUserFromCohort(row.id); setTick(t => t + 1); }}>
+                      Unassign
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        <div className="card-panel" style={{ padding: 20, position: 'sticky', top: 70 }}>
+          <div className="section-head" style={{ marginBottom: 14 }}>
+            <h2 style={{ fontSize: 16 }}>Unassigned Users</h2>
+            <span className="section-meta">{unassignedRows.length} WAITING</span>
+          </div>
+          <select className="select" value={targetCohort} onChange={e => setTargetCohort(e.target.value)} style={{ marginBottom: 12 }}>
+            {all.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+          <div style={{ display: 'grid', gap: 8, maxHeight: 420, overflow: 'auto', marginBottom: 12 }}>
+            {unassignedRows.length === 0 && <div className="empty-line">No unassigned users.</div>}
+            {unassignedRows.map(row => (
+              <label key={row.id} className="card-flat" style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+                <input type="checkbox" checked={selectedUsers.includes(row.id)} onChange={() => toggleSelected(row.id)} />
+                <span className="t-heading" style={{ fontSize: 13, textTransform: 'none', letterSpacing: 0 }}>{row.name}</span>
+              </label>
+            ))}
+          </div>
+          <button className="btn btn-primary" disabled={!selectedUsers.length} onClick={assignSelected} style={{ width: '100%', justifyContent: 'center', opacity: selectedUsers.length ? 1 : 0.45 }}>
+            Assign Selected
+          </button>
+        </div>
       </div>
 
-      {creating && <AdminCreateCohortModal onClose={() => setCreating(false)} onCreate={(data) => { createCohort(data); setCreating(false); }} />}
+      {creating && <AdminCreateCohortModal onClose={() => setCreating(false)} onCreate={(data) => {
+        try {
+          createCohort(data);
+          setCreating(false);
+        } catch (err) {
+          alert(err.message || 'Could not create cohort.');
+        }
+      }} />}
+      {editingCohort && (
+        <AdminEditCohortDatesModal
+          cohort={editingCohort}
+          onClose={() => setEditingCohort(null)}
+          onSave={async (data) => {
+            const oldId = editingCohort.id;
+            const renamedUsers = rows.filter(row => rowCohort(row) === oldId);
+            let updated;
+            try {
+              updated = updateCohort(oldId, data);
+            } catch (err) {
+              alert(err.message || 'Could not update cohort.');
+              return;
+            }
+            if (data.id && data.id !== oldId) {
+              if (window.__adminScope?.get() === oldId) window.__adminScope.set(data.id);
+              setTargetCohort(t => t === oldId ? data.id : t);
+              for (const row of renamedUsers) {
+                if (row.supabaseProfile) {
+                  try { await updateProfile(row.id, { cohortId: data.id }); } catch (err) { console.warn('Could not update renamed cohort profile:', err); }
+                }
+              }
+            }
+            if (updated?.id) setSelected(updated.id);
+            setEditingCohort(null);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -286,11 +574,13 @@ function AdminCohorts() {
 // Admin sets Cohort + Track + Manager (Lead) for any Exonaut.
 // Respects the sidebar Cohort Filter ("All Cohorts" or specific cohort).
 function AdminAssign() {
-  const { all, assignUserToCohort, assignUserToTrack, assignUserToLead } = useCohort();
+  const { all, assignUserToCohort, unassignUserFromCohort, isUserUnassigned, getAssignments, assignUserToTrack, assignUserToLead } = useCohort();
   const { profiles, updateProfile } = useUserProfiles();
   const { scope } = useAdminScope();
+  const tracks = useAdminTracks();
   const [, setTick] = React.useState(0);
   const [search, setSearch] = React.useState('');
+  const [cohortFilter, setCohortFilter] = React.useState(scope || 'all');
 
   // Leads bucketed by track — lets admin pick a plausible manager.
   const leadsByTrack = React.useMemo(() => {
@@ -300,25 +590,27 @@ function AdminAssign() {
   }, []);
 
   const rows = profiles.length
-    ? profiles.filter(p => p.role === 'exonaut').map(p => ({
+    ? profiles.map(p => ({
         id: p.id,
         name: p.fullName || p.email || 'Exonaut',
         points: 0,
         tier: 'entry',
         cohort: p.cohortId || 'c2627',
         track: p.trackCode || 'AIS',
+        role: p.role || 'exonaut',
         supabaseProfile: true,
       }))
-    : USERS;
+    : USERS.map(u => ({ ...u, role: 'exonaut', cohort: getUserCohort(u.id), track: getUserTrack(u.id) || 'AIS' }));
 
   const filtered = rows.filter(u => {
-    const curCohort = u.supabaseProfile ? u.cohort : getUserCohort(u.id);
-    if (scope !== 'all' && curCohort !== scope) return false;
+    const assignments = getAssignments();
+    const curCohort = isUserUnassigned(u.id) ? '' : (assignments[u.id] || u.cohort || getUserCohort(u.id));
+    if (cohortFilter !== 'all' && curCohort !== cohortFilter) return false;
     if (search && !u.name.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
 
-  const scopeLabel = scope === 'all' ? 'All Cohorts' : (all.find(c => c.id === scope)?.name || '—');
+  const scopeLabel = cohortFilter === 'all' ? 'All Cohorts' : (all.find(c => c.id === cohortFilter)?.name || 'Selected Cohort');
 
   return (
     <div className="enter">
@@ -329,12 +621,12 @@ function AdminAssign() {
           </div>
           <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>Assign Exonauts</h1>
           <div className="t-body" style={{ marginTop: 6 }}>
-            Set Cohort, Track, and Manager for each Exonaut. Changes take effect immediately across all role views.
+            Set Cohort, Track, and role. New accounts stay Exonaut by default until Admin changes them.
           </div>
         </div>
       </div>
 
-      <div className="card-panel" style={{ padding: 16, marginBottom: 16 }}>
+      <div className="card-panel" style={{ padding: 16, marginBottom: 16, display: 'grid', gridTemplateColumns: '1fr 240px', gap: 12 }}>
         <div style={{ position: 'relative' }}>
           <i className="fa-solid fa-magnifying-glass" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--off-white-40)', fontSize: 11 }} />
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name…"
@@ -349,19 +641,25 @@ function AdminAssign() {
           <i className="fa-solid fa-filter" style={{ marginRight: 5 }} />
           SCOPE: {scopeLabel.toUpperCase()} · CHANGE VIA SIDEBAR COHORT FILTER
         </div>
+        <select className="select" value={cohortFilter} onChange={e => setCohortFilter(e.target.value)}>
+          <option value="all">All cohorts</option>
+          {all.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
       </div>
 
       <div className="lb-table">
-        <div className="lb-header" style={{ gridTemplateColumns: '48px 1.4fr 90px 180px 180px 200px' }}>
+        <div className="lb-header" style={{ gridTemplateColumns: '48px 1.4fr 80px 130px 150px 150px 180px' }}>
           <div></div>
-          <div>EXONAUT</div>
+          <div>USER</div>
           <div>POINTS</div>
+          <div>ROLE</div>
           <div>COHORT</div>
           <div>TRACK</div>
           <div>MANAGER</div>
         </div>
         {filtered.slice(0, 50).map(u => {
-          const curCohort = u.supabaseProfile ? u.cohort : getUserCohort(u.id);
+          const assignments = getAssignments();
+          const curCohort = isUserUnassigned(u.id) ? '' : (assignments[u.id] || u.cohort || getUserCohort(u.id));
           const curTrack = u.supabaseProfile ? u.track : getUserTrack(u.id);
           const curLead = getUserLead(u.id);
           const leadOptions = leadsByTrack[curTrack] || LEADS;
@@ -372,15 +670,29 @@ function AdminAssign() {
             cursor: 'pointer', outline: 'none', width: '100%',
           };
           return (
-            <div key={u.id} className="lb-row" style={{ gridTemplateColumns: '48px 1.4fr 90px 180px 180px 200px' }}>
+            <div key={u.id} className="lb-row" style={{ gridTemplateColumns: '48px 1.4fr 80px 130px 150px 150px 180px' }}>
               <AvatarWithRing name={u.name} size={34} tier={u.tier} />
               <div className="lb-name">{u.name}</div>
               <div className="lb-points">{u.points}</div>
-              <select value={curCohort} onChange={async (e) => { u.supabaseProfile ? await updateProfile(u.id, { cohortId: e.target.value }) : assignUserToCohort(u.id, e.target.value); setTick(t => t + 1); }} style={selectStyle}>
+              <select value={u.role || 'exonaut'} onChange={async (e) => { if (u.supabaseProfile) await updateProfile(u.id, { role: e.target.value }); u.role = e.target.value; setTick(t => t + 1); }} style={selectStyle}>
+                <option value="exonaut">Exonaut</option>
+                <option value="commander">Commander</option>
+                <option value="admin">Admin</option>
+              </select>
+              <select value={curCohort} onChange={async (e) => {
+                if (!e.target.value) {
+                  unassignUserFromCohort(u.id);
+                } else {
+                  assignUserToCohort(u.id, e.target.value);
+                  if (u.supabaseProfile) await updateProfile(u.id, { cohortId: e.target.value });
+                }
+                setTick(t => t + 1);
+              }} style={selectStyle}>
+                <option value="">Unassigned</option>
                 {all.map(c => (<option key={c.id} value={c.id}>{c.name}</option>))}
               </select>
               <select value={curTrack} onChange={async (e) => { u.supabaseProfile ? await updateProfile(u.id, { trackCode: e.target.value }) : assignUserToTrack(u.id, e.target.value); setTick(t => t + 1); }} style={selectStyle}>
-                {TRACKS.map(t => (<option key={t.code} value={t.code}>{t.short} — {t.name}</option>))}
+                {tracks.map(t => (<option key={t.code} value={t.code}>{t.short} - {t.name}</option>))}
               </select>
               <select value={curLead?.id || ''} onChange={(e) => { assignUserToLead(u.id, e.target.value); setTick(t => t + 1); }} style={selectStyle}>
                 <option value="">— Unassigned —</option>
@@ -498,16 +810,18 @@ function AdminUsers() {
 
 // -------- Create Cohort Modal (platform admin variant) --------
 function AdminCreateCohortModal({ onClose, onCreate }) {
+  const [id, setId] = React.useState('');
   const [name, setName] = React.useState('');
   const [code, setCode] = React.useState('');
   const [start, setStart] = React.useState('');
   const [end, setEnd] = React.useState('');
 
-  const canSave = name.trim().length >= 3;
+  const cleanId = id.trim();
+  const canSave = name.trim().length >= 3 && (!cleanId || /^[a-zA-Z0-9_-]+$/.test(cleanId));
 
   function save() {
     if (!canSave) return;
-    onCreate({ name: name.trim(), code: code.trim(), start: start.trim(), end: end.trim() });
+    onCreate({ id: cleanId, name: name.trim(), code: code.trim(), start: start.trim(), end: end.trim() });
   }
 
   return (
@@ -534,6 +848,7 @@ function AdminCreateCohortModal({ onClose, onCreate }) {
         </div>
 
         <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <AdminLabeledInput label="COHORT ID" value={id} onChange={setId} placeholder="e.g. c2728" />
           <AdminLabeledInput label="NAME" value={name} onChange={setName} placeholder="e.g. Batch 2027–2028" autoFocus />
           <AdminLabeledInput label="CODE (OPTIONAL)" value={code} onChange={setCode} placeholder="e.g. EXO-B-2728" />
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
@@ -555,6 +870,72 @@ function AdminCreateCohortModal({ onClose, onCreate }) {
             fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.08em', fontWeight: 700, textTransform: 'uppercase',
           }}>
             <i className="fa-solid fa-plus" style={{ marginRight: 6 }} />Create
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AdminEditCohortDatesModal({ cohort, onClose, onSave }) {
+  const [id, setId] = React.useState(cohort?.id || '');
+  const [name, setName] = React.useState(cohort?.name || '');
+  const [code, setCode] = React.useState(cohort?.code || '');
+  const [start, setStart] = React.useState(cohort?.start || '');
+  const [end, setEnd] = React.useState(cohort?.end || '');
+  const cleanId = id.trim();
+  const canSave = name.trim().length >= 3 && /^[a-zA-Z0-9_-]+$/.test(cleanId);
+
+  function save() {
+    if (!canSave) return;
+    onSave({ id: cleanId, name: name.trim(), code: code.trim(), start: start.trim(), end: end.trim() });
+  }
+
+  return (
+    <div onClick={onClose} style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)',
+      zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+    }}>
+      <div onClick={(e) => e.stopPropagation()} className="card-panel" style={{
+        width: 'min(440px, 100%)', padding: 0, borderColor: 'var(--sky)',
+      }}>
+        <div style={{ padding: '20px 24px 14px', borderBottom: '1px solid var(--off-white-07)', position: 'relative' }}>
+          <div className="t-mono" style={{ fontSize: 9, color: 'var(--sky)', letterSpacing: '0.12em', fontWeight: 700, marginBottom: 6 }}>
+            PLATFORM ADMIN · EDIT COHORT
+          </div>
+          <h2 className="t-title" style={{ fontSize: 22, margin: 0 }}>{cohort?.name || 'Cohort'}</h2>
+          <div className="t-body" style={{ fontSize: 12, color: 'var(--off-white-68)', marginTop: 4 }}>
+            Update the cohort ID, name, code, and dates shown across admin and cohort views.
+          </div>
+          <div onClick={onClose} style={{
+            position: 'absolute', top: 14, right: 14, width: 26, height: 26,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', color: 'var(--off-white-40)',
+          }}><i className="fa-solid fa-xmark" /></div>
+        </div>
+
+        <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <AdminLabeledInput label="COHORT ID" value={id} onChange={setId} placeholder="e.g. c2728" />
+          <AdminLabeledInput label="NAME" value={name} onChange={setName} placeholder="e.g. Batch 2027-2028" autoFocus />
+          <AdminLabeledInput label="CODE" value={code} onChange={setCode} placeholder="e.g. EXO-B-2728" />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <AdminLabeledInput label="START" value={start} onChange={setStart} placeholder="OCT 05 2027" />
+            <AdminLabeledInput label="END" value={end} onChange={setEnd} placeholder="JAN 28 2028" />
+          </div>
+        </div>
+
+        <div style={{ padding: '14px 24px 20px', display: 'flex', gap: 8, justifyContent: 'flex-end', borderTop: '1px solid var(--off-white-07)' }}>
+          <button onClick={onClose} style={{
+            padding: '9px 16px', background: 'transparent', border: '1px solid var(--off-white-15)',
+            borderRadius: 2, color: 'var(--off-white-68)', cursor: 'pointer',
+            fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.08em', fontWeight: 700, textTransform: 'uppercase',
+          }}>Cancel</button>
+          <button onClick={save} disabled={!canSave} style={{
+            padding: '9px 16px', background: canSave ? 'var(--sky)' : 'var(--off-white-15)',
+            border: 'none', borderRadius: 2, color: canSave ? 'var(--deep-black)' : 'var(--off-white-40)', cursor: canSave ? 'pointer' : 'not-allowed',
+            fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.08em', fontWeight: 700, textTransform: 'uppercase',
+          }}>
+            <i className="fa-solid fa-floppy-disk" style={{ marginRight: 6 }} />Save Cohort
           </button>
         </div>
       </div>
@@ -588,6 +969,7 @@ function AdminLabeledInput({ label, value, onChange, placeholder, autoFocus }) {
 // ============================================================================
 function AdminTrackControl() {
   const { all } = useCohort();
+  const tracks = useAdminTracks();
   const { profiles, loading: profilesLoading, error: profilesError, updateProfile } = useUserProfiles();
   const { crowns, requests, loaded: crownsLoaded } = useCrownState();
   const { scope } = useAdminScope();
@@ -686,6 +1068,18 @@ function AdminTrackControl() {
     }
   }
 
+  function deleteTrack(trackCode) {
+    const track = tracks.find(t => t.code === trackCode);
+    const ok = confirm(`Delete ${track?.short || trackCode} from Track Management and admin track lists? Existing tasks and profiles keep their saved track code.`);
+    if (!ok) return;
+    window.__adminTrackStore.delete(trackCode);
+    setExpanded(prev => {
+      const next = { ...prev };
+      delete next[trackCode];
+      return next;
+    });
+  }
+
   async function updateMember(userId, patch) {
     setError('');
     try {
@@ -724,7 +1118,7 @@ function AdminTrackControl() {
       )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(440px, 1fr))', gap: 14 }}>
-        {TRACKS.map(track => {
+        {tracks.map(track => {
           const roster = rosterFor(track.code);
           const active = crowns.find(c => c.trackCode === track.code && c.status === 'active');
           const pending = requests.find(r => r.trackCode === track.code && r.status === 'pending');
@@ -749,6 +1143,13 @@ function AdminTrackControl() {
                   style={{ background: 'transparent', border: '1px solid var(--off-white-15)', borderRadius: 2, color: 'var(--off-white-68)', cursor: 'pointer', padding: '6px 8px', fontSize: 10 }}
                 >
                   <i className={`fa-solid fa-chevron-${isOpen ? 'up' : 'down'}`} />
+                </button>
+                <button
+                  title="Delete track"
+                  onClick={() => deleteTrack(track.code)}
+                  style={{ background: 'transparent', border: '1px solid var(--off-white-15)', borderRadius: 2, color: 'var(--red)', cursor: 'pointer', padding: '6px 8px', fontSize: 10 }}
+                >
+                  <i className="fa-solid fa-trash" />
                 </button>
               </div>
 
@@ -1440,6 +1841,12 @@ function RosterAddRow({ user, onAdd }) {
 function AdminMissionBuilder() {
   const missions = useMissions();
   const { scope } = useAdminScope();
+  const { all: cohorts } = useCohort();
+  const tracks = useAdminTracks();
+  const [trackDraft, setTrackDraft] = React.useState({ name: '', code: '', short: '', objective: '' });
+  const [trackError, setTrackError] = React.useState('');
+  const [taskTrackFilter, setTaskTrackFilter] = React.useState('all');
+  const [selectedTaskId, setSelectedTaskId] = React.useState('');
   const [draft, setDraft] = React.useState({
     title: '',
     track: 'AIS',
@@ -1459,11 +1866,25 @@ function AdminMissionBuilder() {
     setDraft(d => ({ ...d, cohortId: scope === 'all' ? d.cohortId || 'c2627' : scope }));
   }, [scope]);
 
-  const scopedMissions = missions.filter(m => scope === 'all' || (m.cohortId || 'c2627') === scope);
+  const scopedMissions = missions
+    .filter(m => scope === 'all' || (m.cohortId || 'c2627') === scope)
+    .filter(m => taskTrackFilter === 'all' ? true : taskTrackFilter === 'all-cohort' ? !m.track : m.track === taskTrackFilter);
+  const selectedTask = scopedMissions.find(m => m.id === selectedTaskId) || scopedMissions[0];
   const canCreate = draft.title.trim().length >= 4 && draft.description.trim().length >= 10;
 
   function setField(key, value) {
     setDraft(d => ({ ...d, [key]: value }));
+  }
+
+  function createTrack() {
+    setTrackError('');
+    try {
+      const track = window.__adminTrackStore.create(trackDraft);
+      setDraft(d => ({ ...d, track: track.code }));
+      setTrackDraft({ name: '', code: '', short: '', objective: '' });
+    } catch (err) {
+      setTrackError(err.message || 'Could not create track.');
+    }
   }
 
   function createMission() {
@@ -1502,9 +1923,9 @@ function AdminMissionBuilder() {
           <div className="t-label" style={{ marginBottom: 8, color: 'var(--sky)' }}>
             PLATFORM ADMIN · NORMAL MISSION BUILDER
           </div>
-          <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>Mission Builder</h1>
+          <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>Track Creation</h1>
           <div className="t-body" style={{ marginTop: 6 }}>
-            Create the standard cohort or track mission list. Leads grade submissions; directives remain Lead-created custom tasks.
+            Create the standard cohort or track task list. Track Leads grade submissions; directives remain Lead-created custom tasks.
           </div>
         </div>
       </div>
@@ -1512,7 +1933,22 @@ function AdminMissionBuilder() {
       <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr', gap: 18, alignItems: 'start' }}>
         <div className="card-panel">
           <div className="section-head" style={{ marginBottom: 14 }}>
-            <h2 style={{ fontSize: 16 }}>Create Mission</h2>
+            <h2 style={{ fontSize: 16 }}>Create Track</h2>
+            <span className="section-meta">{tracks.length} TRACKS</span>
+          </div>
+          {trackError && <div className="t-body" style={{ color: 'var(--red)', fontSize: 12, marginBottom: 10 }}>{trackError}</div>}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 110px 120px', gap: 10, marginBottom: 10 }}>
+            <input className="input" placeholder="Track name" value={trackDraft.name} onChange={e => setTrackDraft(d => ({ ...d, name: e.target.value }))} />
+            <input className="input" placeholder="CODE" value={trackDraft.code} onChange={e => setTrackDraft(d => ({ ...d, code: e.target.value }))} />
+            <input className="input" placeholder="Short label" value={trackDraft.short} onChange={e => setTrackDraft(d => ({ ...d, short: e.target.value }))} />
+          </div>
+          <textarea className="textarea" rows={2} placeholder="Track objective" value={trackDraft.objective} onChange={e => setTrackDraft(d => ({ ...d, objective: e.target.value }))} style={{ marginBottom: 10 }} />
+          <button className="btn btn-ghost btn-sm" disabled={!trackDraft.name.trim()} onClick={createTrack} style={{ marginBottom: 22 }}>
+            <i className="fa-solid fa-route" /> Create Track
+          </button>
+
+          <div className="section-head" style={{ marginBottom: 14 }}>
+            <h2 style={{ fontSize: 16 }}>Create Track Task</h2>
             <span className="section-meta">{scope === 'all' ? 'PLATFORM SCOPE' : scope.toUpperCase()}</span>
           </div>
 
@@ -1525,13 +1961,13 @@ function AdminMissionBuilder() {
               <label className="t-label-muted" style={{ display: 'block', marginBottom: 6 }}>TRACK</label>
               <select className="input" value={draft.track} onChange={e => setField('track', e.target.value)}>
                 <option value="all">ALL-COHORT</option>
-                {TRACKS.map(t => <option key={t.code} value={t.code}>{t.short} - {t.name}</option>)}
+                {tracks.map(t => <option key={t.code} value={t.code}>{t.short} - {t.name}</option>)}
               </select>
             </div>
             <div>
               <label className="t-label-muted" style={{ display: 'block', marginBottom: 6 }}>COHORT</label>
               <select className="input" value={draft.cohortId} onChange={e => setField('cohortId', e.target.value)}>
-                {COHORTS.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                {cohorts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
           </div>
@@ -1596,20 +2032,34 @@ function AdminMissionBuilder() {
 
         <div className="card-panel">
           <div className="section-head" style={{ marginBottom: 14 }}>
-            <h2 style={{ fontSize: 16 }}>Published Missions</h2>
+            <h2 style={{ fontSize: 16 }}>Published Track Tasks</h2>
             <span className="section-meta">{scopedMissions.length} LIVE</span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '180px 1fr', gap: 10, marginBottom: 14 }}>
+            <select className="input" value={taskTrackFilter} onChange={e => { setTaskTrackFilter(e.target.value); setSelectedTaskId(''); }}>
+              <option value="all">All tracks</option>
+              <option value="all-cohort">All-cohort tasks</option>
+              {tracks.map(t => <option key={t.code} value={t.code}>{t.short}</option>)}
+            </select>
+            <select className="input" value={selectedTask?.id || ''} onChange={e => setSelectedTaskId(e.target.value)}>
+              {scopedMissions.map(m => {
+                const track = m.track ? tracks.find(t => t.code === m.track) : null;
+                return <option key={m.id} value={m.id}>WK {m.week || '-'} · {track?.short || 'ALL'} · {m.title}</option>;
+              })}
+            </select>
           </div>
           {scopedMissions.length === 0 && (
             <div style={{ padding: 32, textAlign: 'center' }}>
               <i className="fa-solid fa-bullseye" style={{ fontSize: 30, color: 'var(--off-white-40)', marginBottom: 12 }} />
-              <div className="t-heading" style={{ fontSize: 14, marginBottom: 6 }}>No normal missions yet</div>
+              <div className="t-heading" style={{ fontSize: 14, marginBottom: 6 }}>No track tasks yet</div>
               <div className="t-body" style={{ fontSize: 12, color: 'var(--off-white-68)' }}>
                 Create one here and it will appear for Exonauts and staff immediately.
               </div>
             </div>
           )}
-          {scopedMissions.map(m => {
-            const track = m.track ? TRACKS.find(t => t.code === m.track) : null;
+          {selectedTask && (() => {
+            const m = selectedTask;
+            const track = m.track ? tracks.find(t => t.code === m.track) : null;
             return (
               <div key={m.id} style={{ padding: '14px 0', borderTop: '1px solid var(--off-white-07)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 6 }}>
@@ -1634,13 +2084,14 @@ function AdminMissionBuilder() {
                   </select>
                   <button className="btn btn-ghost btn-sm" onClick={() => {
                     if (confirm('Delete this normal mission?')) window.__missionStore.remove(m.id);
+                    setSelectedTaskId('');
                   }}>
                     <i className="fa-solid fa-trash" /> DELETE
                   </button>
                 </div>
               </div>
             );
-          })}
+          })()}
         </div>
       </div>
     </div>

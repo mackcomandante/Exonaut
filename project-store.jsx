@@ -1,4 +1,4 @@
-// Project management flow: First Officer ownership, Second Officer track boards,
+// Project management flow: Project Lead ownership, Track Lead / First Officer boards,
 // roster submissions, review comments, and project point awards.
 (function () {
   if (window.__projectStore) return;
@@ -16,13 +16,54 @@
   };
 
   const KANBAN_COLUMNS = [
+    { id: 'backlog', label: 'Backlog', icon: 'fa-box-archive' },
     { id: 'assigned', label: 'To Do', icon: 'fa-list-check' },
     { id: 'in_progress', label: 'In Progress', icon: 'fa-spinner' },
     { id: 'submitted', label: 'Done', icon: 'fa-circle-check' },
     { id: 'approved', label: 'Approved', icon: 'fa-award' },
   ];
 
-  const PRIORITIES = ['low', 'medium', 'high', 'urgent'];
+  const TASK_CLASSES = {
+    critical: { label: 'CRITICAL', color: 'red', points: 2 },
+    urgent: { label: 'URGENT', color: 'blue', points: 1 },
+    important: { label: 'IMPORTANT', color: 'yellow', points: 3 },
+  };
+
+  const PROJECT_ROSTER_KEY = 'exo:project-rosters:v1';
+
+  function loadProjectRosters() {
+    try { return JSON.parse(localStorage.getItem(PROJECT_ROSTER_KEY) || '{}'); } catch { return {}; }
+  }
+
+  function saveProjectRosters(rosters) {
+    try { localStorage.setItem(PROJECT_ROSTER_KEY, JSON.stringify(rosters)); } catch {}
+  }
+
+  function projectRoster(projectId) {
+    return loadProjectRosters()[projectId] || [];
+  }
+
+  function setProjectRoster(projectId, userIds) {
+    const rosters = loadProjectRosters();
+    rosters[projectId] = [...new Set(userIds || [])];
+    saveProjectRosters(rosters);
+    notify();
+  }
+
+  function classifyTask({ urgent, important }) {
+    if (urgent && important) return { key: 'critical', status: 'assigned', sortOrder: -1000, ...TASK_CLASSES.critical };
+    if (urgent && !important) return { key: 'urgent', status: 'assigned', sortOrder: 0, ...TASK_CLASSES.urgent };
+    return { key: 'important', status: 'backlog', sortOrder: 1000, ...TASK_CLASSES.important };
+  }
+
+  function deadlineState(task) {
+    if (!task?.dueDate || task.status === 'approved') return 'On Track';
+    const today = new Date().toISOString().slice(0, 10);
+    if (['assigned', 'in_progress'].includes(task.status) && task.dueDate <= today) return 'Critical';
+    if (task.status === 'backlog' && task.taskClass === 'important' && task.dueDate <= today) return 'Critical';
+    if (task.status === 'backlog' && task.taskClass === 'important' && task.dueDate > today) return 'At Risk';
+    return 'On Track';
+  }
 
   function notify() {
     listeners.forEach(fn => fn());
@@ -58,9 +99,16 @@
       brief: row.brief || '',
       trackCode: row.track_code,
       secondOfficerId: row.second_officer_id,
+      trackLeadId: row.track_lead_id || row.second_officer_id,
       createdBy: row.created_by,
       status: row.status || 'assigned',
-      priority: row.priority || 'medium',
+      priority: row.priority || row.task_class || 'important',
+      urgent: !!row.urgent,
+      important: row.important !== false,
+      taskClass: row.task_class || row.priority || 'important',
+      accountableId: row.accountable_id || null,
+      consultedId: row.consulted_id || null,
+      informedIds: row.informed_ids || [],
       deliverableType: row.deliverable_type || 'file',
       points: Number(row.points) || 2,
       dueDate: row.due_date || '',
@@ -126,7 +174,7 @@
     return session?.data?.session?.user?.id || localStorage.getItem('exo:userId') || null;
   }
 
-  function secondOfficerForTrack(trackCode) {
+  function trackLeadForTrack(trackCode) {
     return window.__crownStore?.getActiveCrownForTrack(trackCode)?.userId || null;
   }
 
@@ -200,30 +248,68 @@
 
   async function saveTask(data) {
     const createdBy = await actorId();
+    const classified = classifyTask({
+      urgent: data.urgent !== undefined ? data.urgent : data.priority === 'critical' || data.priority === 'urgent',
+      important: data.important !== undefined ? data.important : data.priority !== 'urgent',
+    });
+    const status = data.status || classified.status;
     const row = {
       id: data.id || 'ptask-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
       project_id: data.projectId,
       title: data.title || 'Untitled task',
       brief: data.brief || '',
       track_code: data.trackCode,
-      second_officer_id: data.secondOfficerId || secondOfficerForTrack(data.trackCode),
+      second_officer_id: data.trackLeadId || data.secondOfficerId || trackLeadForTrack(data.trackCode),
+      track_lead_id: data.trackLeadId || data.secondOfficerId || trackLeadForTrack(data.trackCode),
       created_by: data.createdBy || createdBy,
-      status: data.status || 'assigned',
-      priority: data.priority || 'medium',
+      status,
+      priority: classified.key,
+      urgent: !!data.urgent,
+      important: data.important !== false,
+      task_class: classified.key,
+      accountable_id: data.accountableId || null,
+      consulted_id: data.consultedId || null,
+      informed_ids: data.informedIds || [],
       deliverable_type: data.deliverableType || 'file',
-      points: Number(data.points || 2),
+      points: Number(data.points || classified.points),
       due_date: data.dueDate || null,
-      sort_order: Number(data.sortOrder || 0),
+      sort_order: Number(data.sortOrder ?? classified.sortOrder),
     };
     const { error } = await window.__db.from('project_tasks').upsert(row, { onConflict: 'id' });
     if (error) throw error;
-    await logActivity(row.id, data.id ? 'task_updated' : 'task_created', { title: row.title, status: row.status });
+    await logActivity(row.id, data.id ? 'task_updated' : 'task_created', {
+      title: row.title,
+      status: row.status,
+      class: row.task_class,
+      deadlineState: deadlineState(toTask(row)),
+    });
+    if (!data.id && row.task_class === 'critical' && data.responsibleId && window.__notifStore) {
+      window.__notifStore.add({
+        toUserId: data.responsibleId,
+        type: 'project-task',
+        title: 'CRITICAL TASK ASSIGNED',
+        sub: `${row.title} needs acceptance ASAP.`,
+        icon: 'fa-bolt',
+      });
+    }
+    if (!data.id && data.consultedId && window.__notifStore) {
+      window.__notifStore.add({
+        toUserId: data.consultedId,
+        type: 'project-feed',
+        title: 'CONSULTED ON PROJECT TASK',
+        sub: row.title,
+        icon: 'fa-comments',
+      });
+    }
     await refresh();
+    return row.id;
   }
 
   window.__projectStore = {
     KANBAN_COLUMNS,
-    PRIORITIES,
+    TASK_CLASSES,
+    classifyTask,
+    deadlineState,
     subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
     all() { return state; },
     refresh,
@@ -233,14 +319,14 @@
     firstOfficerProjects(userId) {
       return state.projects.filter(p => p.firstOfficerId === userId && p.status !== 'archived');
     },
-    secondOfficerTasks(userId) {
-      return state.tasks.filter(t => t.secondOfficerId === userId);
+    firstOfficerTasks(userId) {
+      return state.tasks.filter(t => t.trackLeadId === userId || t.secondOfficerId === userId);
     },
     projectAccess(userId, projectId) {
       const project = state.projects.find(p => p.id === projectId);
       if (!project) return 'none';
       if (project.firstOfficerId === userId) return 'first';
-      if (state.tasks.some(t => t.projectId === projectId && t.secondOfficerId === userId)) return 'second';
+      if (state.tasks.some(t => t.projectId === projectId && (t.trackLeadId === userId || t.secondOfficerId === userId))) return 'track-lead';
       if (state.assignees.some(a => a.userId === userId && state.tasks.some(t => t.id === a.taskId && t.projectId === projectId))) return 'member';
       return 'none';
     },
@@ -248,18 +334,24 @@
       if (!profile) return [];
       if (profile.role === 'admin' || profile.role === 'commander') return state.projects;
       return state.projects.filter(project => this.projectAccess(profile.id, project.id) !== 'none'
+        || projectRoster(project.id).includes(profile.id)
         || project.trackCodes.includes(profile.trackCode));
     },
     async createProject(data) {
       await upsertProject(data);
+      if (data.id || data.memberIds?.length) {
+        setProjectRoster(data.id || state.projects[0]?.id, data.memberIds || []);
+      }
     },
+    projectRoster,
+    setProjectRoster,
     async archiveProject(projectId) {
       const { error } = await window.__db.from('projects').update({ status: 'archived' }).eq('id', projectId);
       if (error) throw error;
       await refresh();
     },
     async saveTask(data) {
-      await saveTask(data);
+      return await saveTask(data);
     },
     async deleteTask(taskId) {
       const { error } = await window.__db.from('project_tasks').delete().eq('id', taskId);
@@ -342,7 +434,7 @@
       if (!task) return;
       const reviewer = await actorId();
       const assignees = state.assignees.filter(a => a.taskId === taskId);
-      const recipients = assignees.length ? assignees.map(a => a.userId) : [task.secondOfficerId].filter(Boolean);
+      const recipients = assignees.length ? assignees.map(a => a.userId) : [task.trackLeadId || task.secondOfficerId].filter(Boolean);
       const [taskResult] = await Promise.all([
         window.__db.from('project_tasks').update({
           status: 'approved',
@@ -360,7 +452,7 @@
         source_id: taskId,
         cohort_id: 'c2627',
         track_code: task.trackCode,
-        pillar: 'project',
+        pillar: 'missions',
         points: task.points,
         note: task.title,
         awarded_by: reviewer,
@@ -368,6 +460,12 @@
       if (rows.length) {
         const { error } = await window.__db.from('point_ledger').upsert(rows, { onConflict: 'id' });
         if (error) throw error;
+      }
+      if (window.__pointsStore) {
+        recipients.forEach(userId => {
+          const exists = window.__pointsStore.getAll(userId).some(e => e.source === 'project.task' && e.ref === taskId);
+          if (!exists) window.__pointsStore.add(userId, { source: 'project.task', pts: task.points, note: task.title, ref: taskId });
+        });
       }
       await logActivity(taskId, 'approved', { recipients: recipients.length, points: task.points });
       await refresh();
@@ -403,9 +501,10 @@ function ProjectBuilderPage() {
   const { profiles } = useUserProfiles();
   const { projects, tasks, loaded, error } = useProjects();
   useCrownState();
-  const [draft, setDraft] = React.useState({ title: '', description: '', trackCodes: [], firstOfficerId: '', startDate: '', dueDate: '' });
+  const [draft, setDraft] = React.useState({ title: '', description: '', trackCodes: [], firstOfficerId: '', memberIds: [], startDate: '', dueDate: '' });
   const [saving, setSaving] = React.useState(false);
   const officers = profiles.filter(p => ['exonaut', 'lead', 'commander'].includes(p.role || 'exonaut'));
+  const exonauts = profiles.filter(p => (p.role || 'exonaut') === 'exonaut');
   const nameOf = id => profiles.find(p => p.id === id)?.fullName || profiles.find(p => p.id === id)?.email || 'Unassigned';
 
   function toggleTrack(code) {
@@ -416,8 +515,9 @@ function ProjectBuilderPage() {
     if (!draft.title.trim() || !draft.firstOfficerId || draft.trackCodes.length === 0) return;
     setSaving(true);
     try {
-      await window.__projectStore.createProject({ ...draft, title: draft.title.trim(), description: draft.description.trim(), status: 'active' });
-      setDraft({ title: '', description: '', trackCodes: [], firstOfficerId: '', startDate: '', dueDate: '' });
+      const id = 'proj-' + Date.now();
+      await window.__projectStore.createProject({ ...draft, id, title: draft.title.trim(), description: draft.description.trim(), status: 'active' });
+      setDraft({ title: '', description: '', trackCodes: [], firstOfficerId: '', memberIds: [], startDate: '', dueDate: '' });
     } finally {
       setSaving(false);
     }
@@ -429,7 +529,7 @@ function ProjectBuilderPage() {
         <div>
           <div className="t-label" style={{ marginBottom: 8, color: 'var(--sky)' }}>PLATFORM ADMIN · PROJECTS</div>
           <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>Project Builder</h1>
-          <div className="t-body" style={{ marginTop: 6 }}>Create projects, assign a First Officer, and open track boards for Second Officers.</div>
+          <div className="t-body" style={{ marginTop: 6 }}>Create projects, assign a Project Lead, and open track boards for Track Leads / First Officers.</div>
         </div>
       </div>
 
@@ -445,10 +545,14 @@ function ProjectBuilderPage() {
           <div className="track-chip-row">
             {TRACKS.map(t => <button key={t.code} className={'lb-filter' + (draft.trackCodes.includes(t.code) ? ' active' : '')} onClick={() => toggleTrack(t.code)}>{t.short}</button>)}
           </div>
-          <label className="t-label-muted">FIRST OFFICER</label>
+          <label className="t-label-muted">PROJECT LEAD</label>
           <select className="select" value={draft.firstOfficerId} onChange={e => setDraft(d => ({ ...d, firstOfficerId: e.target.value }))}>
             <option value="">Select officer</option>
             {officers.map(p => <option key={p.id} value={p.id}>{p.fullName || p.email}</option>)}
+          </select>
+          <label className="t-label-muted">PROJECT EXONAUTS</label>
+          <select multiple className="select assignee-select" value={draft.memberIds} onChange={e => setDraft(d => ({ ...d, memberIds: Array.from(e.target.selectedOptions).map(o => o.value) }))}>
+            {exonauts.map(p => <option key={p.id} value={p.id}>{p.fullName || p.email}</option>)}
           </select>
           <div className="project-date-grid">
             <input className="input" type="date" value={draft.startDate} onChange={e => setDraft(d => ({ ...d, startDate: e.target.value }))} />
@@ -463,6 +567,7 @@ function ProjectBuilderPage() {
           {!loaded && <div className="card-panel">Loading projects...</div>}
           {projects.map(project => {
             const projectTasks = tasks.filter(t => t.projectId === project.id);
+            const roster = window.__projectStore.projectRoster(project.id);
             return (
               <div key={project.id} className="card-panel project-summary-card">
                 <div className="project-summary-main">
@@ -474,7 +579,8 @@ function ProjectBuilderPage() {
                   <button className="btn btn-ghost btn-sm" onClick={() => window.__projectStore.archiveProject(project.id)}>Archive</button>
                 </div>
                 <div className="project-stat-grid">
-                  <ProjectStat label="First Officer" value={nameOf(project.firstOfficerId)} />
+                  <ProjectStat label="Project Lead" value={nameOf(project.firstOfficerId)} />
+                  <ProjectStat label="Exonauts" value={roster.length} />
                   <ProjectStat label="Tasks" value={projectTasks.length} />
                   <ProjectStat label="Done" value={projectTasks.filter(t => t.status === 'submitted').length} />
                   <ProjectStat label="Approved" value={projectTasks.filter(t => t.status === 'approved').length} />
@@ -510,7 +616,7 @@ function ProjectWorkspacePage({ mode = 'member' }) {
   const officerTracks = project ? project.trackCodes.filter(code =>
     projectAccess === 'first'
     || profile.role === 'admin'
-    || tasks.some(t => t.projectId === project.id && t.trackCode === code && t.secondOfficerId === profile.id)
+    || tasks.some(t => t.projectId === project.id && t.trackCode === code && (t.trackLeadId === profile.id || t.secondOfficerId === profile.id))
     || window.__crownStore?.getActiveCrownForTrack(code)?.userId === profile.id
   ) : [];
   const allowedTracks = project
@@ -523,10 +629,11 @@ function ProjectWorkspacePage({ mode = 'member' }) {
   const access = projectAccess;
   const canOfficer = profile.role === 'admin'
     || access === 'first'
-    || projectTasks.some(t => t.secondOfficerId === profile.id)
+    || projectTasks.some(t => t.trackLeadId === profile.id || t.secondOfficerId === profile.id)
     || window.__crownStore?.getActiveCrownForTrack(activeTrack)?.userId === profile.id;
   const [selectedTaskId, setSelectedTaskId] = React.useState(null);
   const selectedTask = tasks.find(t => t.id === selectedTaskId);
+  const modeLabel = mode === 'project-lead' ? 'PROJECT LEAD' : mode === 'first-officer' ? 'FIRST OFFICER' : 'ROSTER';
 
   React.useEffect(() => {
     if (project && !allowedTracks.includes(activeTrack)) setTrackCode(allowedTracks[0] || '');
@@ -544,7 +651,7 @@ function ProjectWorkspacePage({ mode = 'member' }) {
     <div className="enter">
       <div className="section-head project-workspace-head">
         <div>
-          <div className="t-label" style={{ marginBottom: 8, color: 'var(--platinum)' }}>PROJECTS · {mode === 'first' ? 'FIRST OFFICER' : mode === 'second' ? 'SECOND OFFICER' : 'ROSTER'}</div>
+          <div className="t-label" style={{ marginBottom: 8, color: 'var(--platinum)' }}>PROJECTS · {modeLabel}</div>
           <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>{project.title}</h1>
           <div className="t-body" style={{ marginTop: 6 }}>{project.description || 'Track task board and submissions.'}</div>
         </div>
@@ -592,22 +699,31 @@ function ProjectWorkspacePage({ mode = 'member' }) {
 
 function TaskComposer({ project, trackCode, profiles }) {
   const [open, setOpen] = React.useState(false);
-  const [draft, setDraft] = React.useState({ title: '', brief: '', priority: 'medium', deliverableType: 'file', dueDate: '' });
+  const [draft, setDraft] = React.useState({ title: '', brief: '', urgent: false, important: true, deliverableType: 'file', dueDate: '', responsibleId: '', consultedId: '' });
   const crown = window.__crownStore?.getActiveCrownForTrack(trackCode);
+  const roster = profiles.filter(p => (p.role || 'exonaut') === 'exonaut' && (p.trackCode || 'AIS') === trackCode && (p.cohortId || 'c2627') === (project.cohortId || 'c2627'));
+  const projectLead = profiles.find(p => p.id === project.firstOfficerId);
+  const commander = profiles.find(p => p.role === 'commander') || { id: 'cmdr-01', fullName: 'Mission Commander' };
 
   async function save() {
     if (!draft.title.trim()) return;
-    await window.__projectStore.saveTask({
+    const taskId = await window.__projectStore.saveTask({
       projectId: project.id,
       trackCode,
-      secondOfficerId: crown?.userId,
+      trackLeadId: crown?.userId,
       title: draft.title.trim(),
       brief: draft.brief.trim(),
-      priority: draft.priority,
+      urgent: draft.urgent,
+      important: draft.important,
+      responsibleId: draft.responsibleId,
+      accountableId: project.firstOfficerId,
+      consultedId: draft.consultedId || null,
+      informedIds: [commander.id, crown?.userId].filter(Boolean),
       deliverableType: draft.deliverableType,
       dueDate: draft.dueDate,
     });
-    setDraft({ title: '', brief: '', priority: 'medium', deliverableType: 'file', dueDate: '' });
+    if (draft.responsibleId) await window.__projectStore.assignTaskTeam(taskId, [draft.responsibleId]);
+    setDraft({ title: '', brief: '', urgent: false, important: true, deliverableType: 'file', dueDate: '', responsibleId: '', consultedId: '' });
     setOpen(false);
   }
 
@@ -619,9 +735,21 @@ function TaskComposer({ project, trackCode, profiles }) {
       <input className="input" placeholder="Task title" value={draft.title} onChange={e => setDraft(d => ({ ...d, title: e.target.value }))} />
       <textarea className="textarea" placeholder="Brief, evidence needed, and expectations" value={draft.brief} onChange={e => setDraft(d => ({ ...d, brief: e.target.value }))} />
       <div className="task-composer-grid">
-        <select className="select" value={draft.priority} onChange={e => setDraft(d => ({ ...d, priority: e.target.value }))}>
-          {window.__projectStore.PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
+        <select className="select" value={draft.responsibleId} onChange={e => setDraft(d => ({ ...d, responsibleId: e.target.value }))}>
+          <option value="">Responsible Exonaut</option>
+          {roster.map(p => <option key={p.id} value={p.id}>{p.fullName || p.email}</option>)}
         </select>
+        <select className="select" value={project.firstOfficerId} disabled>
+          <option>{projectLead?.fullName || projectLead?.email || 'Project Lead'} accountable</option>
+        </select>
+        <select className="select" value={draft.consultedId} onChange={e => setDraft(d => ({ ...d, consultedId: e.target.value }))}>
+          <option value="">Consulted person</option>
+          {profiles.map(p => <option key={p.id} value={p.id}>{p.fullName || p.email}</option>)}
+        </select>
+      </div>
+      <div className="task-composer-grid">
+        <label className="task-check"><input type="checkbox" checked={draft.urgent} onChange={e => setDraft(d => ({ ...d, urgent: e.target.checked }))} /> Urgent</label>
+        <label className="task-check"><input type="checkbox" checked={draft.important} onChange={e => setDraft(d => ({ ...d, important: e.target.checked }))} /> Important</label>
         <select className="select" value={draft.deliverableType} onChange={e => setDraft(d => ({ ...d, deliverableType: e.target.value }))}>
           <option value="file">File</option>
           <option value="link">Link</option>
@@ -647,7 +775,7 @@ function KanbanBoard({ tasks, profile, profiles, assignees, canOfficer, onOpen }
   return (
     <div className="kanban-board">
       {window.__projectStore.KANBAN_COLUMNS.map(col => {
-        const colTasks = tasks.filter(t => t.status === col.id);
+        const colTasks = tasks.filter(t => t.status === col.id).sort((a, b) => (a.sortOrder - b.sortOrder) || String(a.dueDate || '').localeCompare(String(b.dueDate || '')));
         return (
           <div key={col.id} className="kanban-column" onDragOver={e => e.preventDefault()} onDrop={e => {
             const taskId = e.dataTransfer.getData('text/plain');
@@ -662,11 +790,12 @@ function KanbanBoard({ tasks, profile, profiles, assignees, canOfficer, onOpen }
               {colTasks.map(task => {
                 const team = assignees.filter(a => a.taskId === task.id);
                 return (
-                  <div key={task.id} className={'kanban-card priority-' + task.priority} draggable={canOfficer || team.some(a => a.userId === profile.id)} onDragStart={e => e.dataTransfer.setData('text/plain', task.id)} onClick={() => onOpen(task.id)}>
+                  <div key={task.id} className={'kanban-card task-' + task.taskClass} draggable={canOfficer || team.some(a => a.userId === profile.id)} onDragStart={e => e.dataTransfer.setData('text/plain', task.id)} onClick={() => onOpen(task.id)}>
                     <div className="kanban-card-title">{task.title}</div>
                     <div className="kanban-card-brief">{task.brief || 'No brief.'}</div>
                     <div className="kanban-card-meta">
-                      <span>{task.priority}</span>
+                      <span>{window.__projectStore.TASK_CLASSES[task.taskClass]?.label || task.taskClass}</span>
+                      <span>{window.__projectStore.deadlineState(task)}</span>
                       <span>{team.length} assigned</span>
                       {task.dueDate && <span>{task.dueDate}</span>}
                     </div>
@@ -686,12 +815,12 @@ function TaskDetailModal({ task, project, profile, profiles, assignees, submissi
   const [team, setTeam] = React.useState(assignees.map(a => a.userId));
   const [submission, setSubmission] = React.useState({ note: '', linkUrl: '', fileUrl: '' });
   const [review, setReview] = React.useState('');
-  const [edit, setEdit] = React.useState({ title: task.title, brief: task.brief, priority: task.priority, dueDate: task.dueDate || '', deliverableType: task.deliverableType });
+  const [edit, setEdit] = React.useState({ title: task.title, brief: task.brief, urgent: !!task.urgent, important: task.important !== false, dueDate: task.dueDate || '', deliverableType: task.deliverableType });
   const nameOf = id => profiles.find(p => p.id === id)?.fullName || profiles.find(p => p.id === id)?.email || 'Unknown';
   const isAssigned = assignees.some(a => a.userId === profile.id);
 
   async function saveTask() {
-    await window.__projectStore.saveTask({ ...task, ...edit, id: task.id, projectId: task.projectId, trackCode: task.trackCode });
+    await window.__projectStore.saveTask({ ...task, ...edit, id: task.id, projectId: task.projectId, trackCode: task.trackCode, trackLeadId: task.trackLeadId || task.secondOfficerId });
   }
 
   async function submitWork() {
@@ -725,7 +854,8 @@ function TaskDetailModal({ task, project, profile, profiles, assignees, submissi
                 <input className="input" value={edit.title} onChange={e => setEdit(d => ({ ...d, title: e.target.value }))} />
                 <textarea className="textarea" value={edit.brief} onChange={e => setEdit(d => ({ ...d, brief: e.target.value }))} />
                 <div className="task-composer-grid">
-                  <select className="select" value={edit.priority} onChange={e => setEdit(d => ({ ...d, priority: e.target.value }))}>{window.__projectStore.PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}</select>
+                  <label className="task-check"><input type="checkbox" checked={edit.urgent} onChange={e => setEdit(d => ({ ...d, urgent: e.target.checked }))} /> Urgent</label>
+                  <label className="task-check"><input type="checkbox" checked={edit.important} onChange={e => setEdit(d => ({ ...d, important: e.target.checked }))} /> Important</label>
                   <select className="select" value={edit.deliverableType} onChange={e => setEdit(d => ({ ...d, deliverableType: e.target.value }))}><option value="file">File</option><option value="link">Link</option><option value="note">Note</option></select>
                   <input className="input" type="date" value={edit.dueDate} onChange={e => setEdit(d => ({ ...d, dueDate: e.target.value }))} />
                 </div>
@@ -762,6 +892,16 @@ function TaskDetailModal({ task, project, profile, profiles, assignees, submissi
 
           <div className="task-side-pane">
             <div className="task-section">
+              <div className="t-label-muted">RACI</div>
+              <div className="name-stack">
+                <span>Responsible: {assignees.map(a => nameOf(a.userId)).join(', ') || 'Unassigned'}</span>
+                <span>Accountable: {nameOf(task.accountableId || project.firstOfficerId)}</span>
+                <span>Consulted: {task.consultedId ? nameOf(task.consultedId) : 'As needed'}</span>
+                <span>Informed: Mission Commander{task.trackLeadId || task.secondOfficerId ? ' · Track Lead' : ''}</span>
+              </div>
+            </div>
+
+            <div className="task-section">
               <div className="t-label-muted">ASSIGNEES</div>
               {canOfficer ? (
                 <>
@@ -780,7 +920,7 @@ function TaskDetailModal({ task, project, profile, profiles, assignees, submissi
                 <div className="t-label-muted">REVIEW</div>
                 <textarea className="textarea" placeholder="Approval or revision comment" value={review} onChange={e => setReview(e.target.value)} />
                 <div className="review-actions">
-                  <button className="btn btn-primary btn-sm" onClick={() => window.__projectStore.approveTask(task.id, review || 'Approved')}>Approve +2</button>
+                  <button className="btn btn-primary btn-sm" onClick={() => window.__projectStore.approveTask(task.id, review || 'Approved')}>Approve +{task.points}</button>
                   <button className="btn btn-ghost btn-sm" onClick={() => window.__projectStore.requestRevision(task.id, review || 'Needs revision')}>Request Revision</button>
                 </div>
               </div>

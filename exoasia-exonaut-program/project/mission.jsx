@@ -11,9 +11,9 @@ function MissionDetail({ missionId, onBack, onSubmitted }) {
     return (
       <div className="enter" style={{ textAlign: 'center', padding: 60 }}>
         <i className="fa-solid fa-bullseye" style={{ fontSize: 42, color: 'var(--off-white-40)', marginBottom: 18 }} />
-        <h2 className="t-title" style={{ fontSize: 28 }}>No mission selected.</h2>
+        <h2 className="t-title" style={{ fontSize: 28 }}>No track task selected.</h2>
         <div className="t-body" style={{ maxWidth: 440, margin: '12px auto 24px' }}>
-          Missions will appear here after they are created in the live program data.
+          Track tasks will appear here after they are created in the live program data.
         </div>
         <button className="btn btn-primary" onClick={onBack}>BACK TO MISSIONS</button>
       </div>
@@ -127,8 +127,8 @@ function MissionDetail({ missionId, onBack, onSubmitted }) {
 
         {/* Brief */}
         <div className="brief-body" style={{ marginBottom: 20 }}>
-          <strong>Mission Brief</strong>
-          {(mission.description || 'Full brief will be attached by your Mission Lead.').split('\n').map((p, i) =>
+          <strong>Track Brief</strong>
+          {(mission.description || 'Full brief will be attached by your Track Lead.').split('\n').map((p, i) =>
             p.startsWith('•')
               ? <div key={i} style={{ paddingLeft: 16, marginBottom: 6 }} dangerouslySetInnerHTML={{ __html: p }} />
               : <p key={i} dangerouslySetInnerHTML={{ __html: p }} />
@@ -256,10 +256,7 @@ function MissionDetail({ missionId, onBack, onSubmitted }) {
           </div>
           <div style={{ fontFamily: 'var(--font-mono)', display: 'flex', flexDirection: 'column', gap: 10 }}>
             {[
-              { k: 'On-time submission', v: mission.points, active: true },
-              { k: 'Approved · Good', v: 10, active: false },
-              { k: 'Approved · Excellent', v: 20, active: false },
-              { k: 'Revision bonus', v: 5, active: false },
+              { k: 'Activity points', v: mission.points, active: true },
             ].map((row, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--off-white-07)' }}>
                 <span style={{ fontSize: 11, color: row.active ? 'var(--off-white)' : 'var(--off-white-40)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>{row.k}</span>
@@ -268,7 +265,7 @@ function MissionDetail({ missionId, onBack, onSubmitted }) {
             ))}
             <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 8 }}>
               <span className="t-label">MAX POSSIBLE</span>
-              <span style={{ fontSize: 18, color: 'var(--ink)', fontWeight: 700 }}>+{mission.points + 20}</span>
+              <span style={{ fontSize: 18, color: 'var(--ink)', fontWeight: 700 }}>+{mission.points}</span>
             </div>
           </div>
         </div>

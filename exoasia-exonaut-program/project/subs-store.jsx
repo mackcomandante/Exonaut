@@ -197,9 +197,8 @@ const gradeSubmission = ({ subId, grade, feedback }) => {
   const sub = subStore.subs.find(s => s.id === subId);
   const mission = sub ? missionForSubmission(sub) : null;
   const basePoints = Number(mission?.points || 0);
-  const bonusByGrade = { rejected: 0, 'needs-revision': 0, good: 0, excellent: 20 };
   const state = grade === 'rejected' ? 'rejected' : grade === 'needs-revision' ? 'needs-revision' : 'approved';
-  const pointsAwarded = state === 'approved' ? basePoints + Number(bonusByGrade[grade] || 0) : 0;
+  const pointsAwarded = state === 'approved' ? basePoints : 0;
   subStore.subs = subStore.subs.map(s =>
     s.id === subId ? { ...s, state, grade, feedback, pointsAwarded } : s
   );
@@ -233,7 +232,7 @@ const gradeSubmission = ({ subId, grade, feedback }) => {
         sourceId: subId,
         cohortId: mission?.cohortId || 'c2627',
         trackCode: mission?.track || '',
-        pillar: mission?.pillar || 'project',
+        pillar: mission?.pillar === 'project' ? 'missions' : (mission?.pillar || 'missions'),
         points: pointsAwarded,
         note: mission?.title || sub.missionTitle,
         awardedBy: user?.id || null,

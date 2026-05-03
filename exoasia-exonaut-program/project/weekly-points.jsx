@@ -81,7 +81,11 @@
     const diffDays = Math.floor((Date.now() - w1.getTime()) / DAY_MS);
     let wk = Math.floor(diffDays / 7) + 1;
     if (wk < 1) wk = 1;
-    const total = (typeof COHORT !== 'undefined' ? COHORT.weekTotal : null) || 12;
+    const start = cohort ? parseCohortDate(cohort.start || cohort.startDate) : null;
+    const end = cohort ? parseCohortDate(cohort.end || cohort.demoDay) : null;
+    const total = start && end && end > start
+      ? Math.max(1, Math.ceil((end.getTime() - start.getTime() + 1) / DAY_MS / 7))
+      : ((typeof COHORT !== 'undefined' ? COHORT.weekTotal : null) || 12);
     if (wk > total) wk = total;
     return wk;
   }
