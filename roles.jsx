@@ -15,10 +15,41 @@ const RITUAL_SOURCE = {
   'fri-win': { source: 'ritual.fri_win', pts: 5 },
 };
 
+// React hook — merges Supabase-registered exonauts with seed USERS.
+// Optionally scoped to a specific cohortId. Always call at component top-level.
+function useMergedUsers(cohortId) {
+  const registeredUsers = window.useRegisteredUsers ? window.useRegisteredUsers() : [];
+  const seedUsers = typeof USERS !== 'undefined' ? USERS : [];
+  const seedIds = new Set(seedUsers.map(u => u.id));
+  const regNormalized = registeredUsers
+    .filter(u => u.role === 'exonaut' && !seedIds.has(u.userId))
+    .filter(u => {
+      if (!cohortId) return true;
+      const assignedCohort = window.getUserCohort ? window.getUserCohort(u.userId) : (u.cohortId || 'c2627');
+      return assignedCohort === cohortId;
+    })
+    .map(u => ({
+      id: u.userId,
+      name: u.name,
+      track: window.getUserTrack ? window.getUserTrack(u.userId) : (u.track || ''),
+      points: window.__pointsStore ? window.__pointsStore.getTotal(u.userId) : 0,
+      badges: 0,
+      tier: u.tier || 'entry',
+      cohort: window.getUserCohort ? window.getUserCohort(u.userId) : (u.cohortId || 'c2627'),
+    }));
+  const filtered = cohortId
+    ? seedUsers.filter(u => (window.getUserCohort ? window.getUserCohort(u.id) : (u.cohort || 'c2627')) === cohortId)
+    : seedUsers;
+  return [...filtered, ...regNormalized];
+}
+
 function LeadHome({ onNavigate }) {
   const lead = getMyLead();
   const track = TRACKS.find(t => t.code === lead.track);
-  const myExonauts = USERS.filter(u => lead.reports.includes(u.id));
+  const allUsers = useMergedUsers(null);
+  const myExonauts = allUsers.filter(u =>
+    lead.reports.includes(u.id) || window.getUserLead?.(u.id)?.id === lead.id
+  );
   const sortedByPoints = [...myExonauts].sort((a,b) => b.points - a.points);
   const [ritualTick, setRitualTick] = React.useState(0);
   const trackAvg = Math.round(myExonauts.reduce((s,u) => s + u.points, 0) / myExonauts.length);
@@ -61,7 +92,7 @@ function LeadHome({ onNavigate }) {
             <span className="section-meta">{myPending.length} PENDING · SLA 48H</span>
           </div>
           {myPending.map(s => {
-            const ex = USERS.find(u => u.id === s.exonautId);
+            const ex = allUsers.find(u => u.id === s.exonautId) || { name: 'Unknown', tier: 'entry' };
             return (
               <div key={s.id} style={{
                 display: 'grid', gridTemplateColumns: '40px 1fr auto auto', gap: 14, alignItems: 'center',
@@ -401,7 +432,7 @@ function LeadGrade({ onBack, subId }) {
 function CommanderHome({ onNavigate }) {
   useCohort();   // re-render when Commander switches cohort
   const activeCohort = window.__cohortStore.getSelected();
-  const cohortUsers = getCohortUsers();
+  const cohortUsers = useMergedUsers(activeCohort?.id);
   const totalExonauts = cohortUsers.length;
   const atRisk = cohortUsers.filter(u => u.points < 200).length;
   const avgPoints = cohortUsers.length
@@ -417,7 +448,7 @@ function CommanderHome({ onNavigate }) {
         <div className="section-head">
           <div>
             <div className="t-label" style={{ marginBottom: 8, color: 'var(--amber)' }}>
-              MISSION COMMANDER · FOUNDER
+              MISSION COMMANDER
             </div>
             <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>{activeCohort?.name || 'Command Bridge'}</h1>
             <div className="t-body" style={{ marginTop: 6 }}>
@@ -442,7 +473,7 @@ function CommanderHome({ onNavigate }) {
       <div className="section-head">
         <div>
           <div className="t-label" style={{ marginBottom: 8, color: 'var(--amber)' }}>
-            MISSION COMMANDER · FOUNDER · {(activeCohort?.name || '').toUpperCase()}
+            MISSION COMMANDER · {(activeCohort?.name || '').toUpperCase()}
           </div>
           <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>Command Bridge</h1>
           <div className="t-body" style={{ marginTop: 6 }}>
@@ -561,7 +592,8 @@ function CommanderHome({ onNavigate }) {
 
 function CommanderLeads() {
   useCohort();
-  const cohortUsers = getCohortUsers();
+  const activeCohort = window.__cohortStore.getSelected();
+  const cohortUsers = useMergedUsers(activeCohort?.id);
   return (
     <div className="enter">
       <div className="section-head">
@@ -573,7 +605,10 @@ function CommanderLeads() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
         {LEADS.map(lead => {
           const track = TRACKS.find(t => t.code === lead.track);
-          const trackExos = cohortUsers.filter(u => lead.reports.includes(u.id));
+          const trackExos = cohortUsers.filter(u =>
+            lead.reports.includes(u.id) || window.getUserLead?.(u.id)?.id === lead.id
+          );
+          const avg = trackExos.length ? Math.round(trackExos.reduce((s,u) => s + u.points, 0) / trackExos.length) : 0;
           return (
             <div key={lead.id} className="card-panel">
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
@@ -613,15 +648,19 @@ function CommanderExonauts() {
   const [search, setSearch] = React.useState('');
   const [sort, setSort] = React.useState('points'); // 'points' | 'name' | 'missions'
 
-  // Build base set by scope
+  // Build base set by scope — uses merged seed+registered pool
+  const allMergedUsers = useMergedUsers(null);
+  const cohortMergedUsers = useMergedUsers(activeCohort?.id);
   let base;
   if (scope === 'all') {
-    base = USERS;
+    base = allMergedUsers;
   } else if (scope === 'cohort') {
-    base = getCohortUsers(activeCohort?.id);
+    base = cohortMergedUsers;
   } else { // manager
     const lead = LEADS.find(l => l.id === leadFilter);
-    base = USERS.filter(u => lead?.reports.includes(u.id));
+    base = allMergedUsers.filter(u =>
+      lead?.reports.includes(u.id) || window.getUserLead?.(u.id)?.id === lead?.id
+    );
   }
 
   // Apply track + search
@@ -641,6 +680,8 @@ function CommanderExonauts() {
 
   // Helper — find the lead managing a given exonaut
   function leadForUser(userId) {
+    const byLead = window.getUserLead ? window.getUserLead(userId) : null;
+    if (byLead) return byLead;
     return LEADS.find(l => l.reports.includes(userId));
   }
 
@@ -659,7 +700,7 @@ function CommanderExonauts() {
       {/* Scope picker — the primary view toggle */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 14 }}>
         {[
-          { id: 'all',     label: 'All Exonauts', sub: `${USERS.length} platform-wide`, icon: 'fa-globe' },
+          { id: 'all',     label: 'All Exonauts', sub: `${allMergedUsers.length} platform-wide`, icon: 'fa-globe' },
           { id: 'cohort',  label: 'By Cohort',    sub: activeCohort?.name || '—',        icon: 'fa-layer-group' },
           { id: 'manager', label: 'By Manager',   sub: `${LEADS.length} mission leads`,  icon: 'fa-user-shield' },
         ].map(opt => {
@@ -996,9 +1037,8 @@ function RoleSwitcher({ current, onChange, userRole }) {
     { id: 'commander', label: 'Commander',sub: 'Director',  icon: 'fa-star',           accent: 'var(--amber)' },
     { id: 'admin',     label: 'Admin',    sub: 'Platform',  icon: 'fa-shield-halved',  accent: 'var(--sky)' },
   ];
-  const roles = userRole === 'admin'
-    ? allRoles
-    : allRoles.filter(r => r.id === (userRole || 'exonaut'));
+  // Only show the role(s) this user is credentialed for.
+  const roles = allRoles.filter(r => r.id === (userRole || 'exonaut'));
   if (roles.length <= 1) return null;
   return (
     <div style={{
@@ -1028,8 +1068,186 @@ function RoleSwitcher({ current, onChange, userRole }) {
   );
 }
 
+// =========================================================================
+// PROGRAM MANAGEMENT — Mission assignment for Commander + Lead
+// =========================================================================
+const __missionAssignStore = (() => {
+  const KEY = 'exo:mission-assign:v1';
+  const listeners = new Set();
+  function load() { try { return JSON.parse(localStorage.getItem(KEY) || '{}'); } catch { return {}; } }
+  function save(d) { try { localStorage.setItem(KEY, JSON.stringify(d)); } catch {} }
+  function notify() { listeners.forEach(fn => fn()); }
+  return {
+    getAssigned(missionId) { return load()[missionId] || []; },
+    assign(missionId, userId) {
+      const d = load();
+      if (!d[missionId]) d[missionId] = [];
+      if (!d[missionId].includes(userId)) d[missionId].push(userId);
+      save(d); notify();
+    },
+    unassign(missionId, userId) {
+      const d = load();
+      if (d[missionId]) d[missionId] = d[missionId].filter(id => id !== userId);
+      save(d); notify();
+    },
+    getAll() { return load(); },
+    subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
+  };
+})();
+window.__missionAssignStore = __missionAssignStore;
+
+function useMissionAssign() {
+  const [data, setData] = React.useState(() => __missionAssignStore.getAll());
+  React.useEffect(() => __missionAssignStore.subscribe(() => setData(__missionAssignStore.getAll())), []);
+  return data;
+}
+
+function ProgramManagement({ roleScope }) {
+  // roleScope: 'commander' (all exonauts) or 'lead' (own exonauts only)
+  const missions = window.__missionStore ? window.__missionStore.getAll() : [];
+  const [missionList, setMissionList] = React.useState(missions);
+  React.useEffect(() => {
+    if (!window.__missionStore) return;
+    return window.__missionStore.subscribe(() => setMissionList(window.__missionStore.getAll()));
+  }, []);
+
+  const assignData = useMissionAssign();
+  const allMerged = useMergedUsers(null);
+
+  // Scope: lead sees only their own exonauts
+  const myLead = roleScope === 'lead' ? getMyLead() : null;
+  const exonautPool = React.useMemo(() => {
+    if (roleScope === 'lead' && myLead) {
+      return allMerged.filter(u =>
+        myLead.reports.includes(u.id) || window.getUserLead?.(u.id)?.id === myLead.id
+      );
+    }
+    return allMerged;
+  }, [allMerged, myLead, roleScope]);
+
+  const [expandedId, setExpandedId] = React.useState(null);
+  const [search, setSearch] = React.useState('');
+
+  const accentColor = roleScope === 'lead' ? 'var(--platinum)' : 'var(--amber)';
+  const roleLabel   = roleScope === 'lead' ? 'MISSION LEAD' : 'MISSION COMMANDER';
+
+  return (
+    <div className="enter">
+      <div className="section-head">
+        <div>
+          <div className="t-label" style={{ marginBottom: 8, color: accentColor }}>{roleLabel} · PROGRAM MANAGEMENT</div>
+          <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>Program Management</h1>
+          <div className="t-body" style={{ marginTop: 6 }}>
+            Assign missions to Exonauts. {missionList.length} mission{missionList.length !== 1 ? 's' : ''} available.
+          </div>
+        </div>
+      </div>
+
+      {/* Search */}
+      <div className="card-panel" style={{ padding: 14, marginBottom: 16 }}>
+        <div style={{ position: 'relative' }}>
+          <i className="fa-solid fa-magnifying-glass" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--off-white-40)', fontSize: 11 }} />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search missions…"
+            style={{ width: '100%', padding: '9px 12px 9px 32px', background: 'var(--deep-black)', color: 'var(--off-white)', border: '1px solid var(--off-white-15)', borderRadius: 2, fontFamily: 'var(--font-display)', fontSize: 12, outline: 'none' }} />
+        </div>
+      </div>
+
+      {missionList.length === 0 ? (
+        <div className="card-panel" style={{ textAlign: 'center', padding: 64 }}>
+          <i className="fa-solid fa-rocket" style={{ fontSize: 32, color: 'var(--off-white-40)', marginBottom: 12 }} />
+          <div className="t-heading" style={{ fontSize: 15, margin: '0 0 6px 0' }}>No missions yet</div>
+          <div className="t-body" style={{ fontSize: 13, color: 'var(--off-white-68)' }}>Platform Admin creates missions. Once created they'll appear here for assignment.</div>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {missionList
+            .filter(m => !search || m.title.toLowerCase().includes(search.toLowerCase()))
+            .map(m => {
+              const assigned = assignData[m.id] || [];
+              const isOpen = expandedId === m.id;
+              return (
+                <div key={m.id} className="card-panel" style={{ padding: 0, overflow: 'hidden' }}>
+                  {/* Mission header row */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '16px 20px', cursor: 'pointer' }}
+                       onClick={() => setExpandedId(isOpen ? null : m.id)}>
+                    <div style={{ width: 36, height: 36, borderRadius: 2, background: accentColor + '18', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                      <i className="fa-solid fa-rocket" style={{ color: accentColor, fontSize: 14 }} />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div className="t-heading" style={{ fontSize: 13, textTransform: 'none', letterSpacing: 0 }}>{m.title}</div>
+                      <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', marginTop: 3, letterSpacing: '0.08em' }}>
+                        {m.id} · {m.points || 0} PTS · WK {m.week || '—'} · {assigned.length} ASSIGNED
+                      </div>
+                    </div>
+                    <span className="status-pill" style={{ background: accentColor + '18', color: accentColor, borderColor: accentColor + '40' }}>
+                      {assigned.length}/{exonautPool.length} ASSIGNED
+                    </span>
+                    <i className={`fa-solid fa-chevron-${isOpen ? 'up' : 'down'}`} style={{ color: 'var(--off-white-40)', fontSize: 11 }} />
+                  </div>
+
+                  {/* Expanded assignment panel */}
+                  {isOpen && (
+                    <div style={{ borderTop: '1px solid var(--off-white-07)', padding: '16px 20px' }}>
+                      {exonautPool.length === 0 ? (
+                        <div className="t-body" style={{ color: 'var(--off-white-40)', fontSize: 13 }}>
+                          No Exonauts in scope yet.
+                        </div>
+                      ) : (
+                        <div style={{ display: 'grid', gap: 8 }}>
+                          {/* Assign all / clear all */}
+                          <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
+                            <button className="btn btn-ghost btn-sm" onClick={() => {
+                              exonautPool.forEach(u => __missionAssignStore.assign(m.id, u.id));
+                            }}>ASSIGN ALL</button>
+                            <button className="btn btn-ghost btn-sm" onClick={() => {
+                              exonautPool.forEach(u => __missionAssignStore.unassign(m.id, u.id));
+                            }}>CLEAR ALL</button>
+                          </div>
+                          {exonautPool.map(u => {
+                            const isAssigned = assigned.includes(u.id);
+                            return (
+                              <div key={u.id} style={{
+                                display: 'flex', alignItems: 'center', gap: 12,
+                                padding: '10px 14px',
+                                background: isAssigned ? accentColor + '08' : 'var(--off-white-07)',
+                                border: '1px solid ' + (isAssigned ? accentColor + '40' : 'transparent'),
+                                borderRadius: 2, transition: 'all 0.12s',
+                              }}>
+                                <AvatarWithRing name={u.name} size={28} tier={u.tier || 'entry'} />
+                                <div style={{ flex: 1 }}>
+                                  <div className="t-heading" style={{ fontSize: 12, textTransform: 'none', letterSpacing: 0 }}>{u.name}</div>
+                                  <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', marginTop: 2 }}>
+                                    {u.track || '—'} · {u.points || 0} PTS
+                                  </div>
+                                </div>
+                                <button
+                                  className={'btn btn-sm ' + (isAssigned ? 'btn-ghost' : 'btn-primary')}
+                                  style={{ minWidth: 90, justifyContent: 'center', borderColor: isAssigned ? accentColor : undefined, color: isAssigned ? accentColor : undefined }}
+                                  onClick={() => isAssigned
+                                    ? __missionAssignStore.unassign(m.id, u.id)
+                                    : __missionAssignStore.assign(m.id, u.id)
+                                  }>
+                                  {isAssigned ? <><i className="fa-solid fa-check" /> ASSIGNED</> : 'ASSIGN'}
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 Object.assign(window, {
   LeadHome, LeadRoster, LeadGrade, LeadQueue,
   CommanderHome, CommanderLeads, CommanderExonauts, CommanderEscalations, CommanderHealth,
+  ProgramManagement,
   RoleSwitcher, KPI,
 });

@@ -354,8 +354,11 @@ function AdminAssign() {
   const { all, assignUserToCohort, assignUserToTrack, assignUserToLead } = useCohort();
   const { scope } = useAdminScope();
   const registeredUsers = useRegisteredUsers();
-  const [, setTick] = React.useState(0);
   const [search, setSearch] = React.useState('');
+
+  // Draft state — tracks unsaved changes per user: { [userId]: { cohort, track, lead } }
+  const [draft, setDraft] = React.useState({});
+  const [saved, setSaved] = React.useState(false);
 
   const leadsByTrack = React.useMemo(() => {
     const map = {};
@@ -363,26 +366,86 @@ function AdminAssign() {
     return map;
   }, []);
 
-  // Registered Exonauts only — seed users are demo data
-  const filtered = registeredUsers.filter(u => {
-    if (u.role !== 'exonaut') return false;
-    const curCohort = u.cohortId || getUserCohort(u.userId);
+  const exonauts = registeredUsers.filter(u => u.role === 'exonaut');
+
+  const filtered = exonauts.filter(u => {
+    const curCohort = draft[u.userId]?.cohort ?? (u.cohortId || getUserCohort(u.userId) || '');
     if (scope !== 'all' && curCohort !== scope) return false;
     if (search && !u.name.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
 
   const scopeLabel = scope === 'all' ? 'All Cohorts' : (all.find(c => c.id === scope)?.name || '—');
+  const pendingCount = Object.keys(draft).length;
+  const hasPending = pendingCount > 0;
 
-  const selectStyle = {
-    padding: '6px 8px', background: 'var(--deep-black)', color: 'var(--off-white)',
-    border: '1px solid var(--off-white-15)', borderRadius: 2,
+  function patch(uid, key, val) {
+    setDraft(d => ({ ...d, [uid]: { ...d[uid], [key]: val } }));
+    setSaved(false);
+  }
+
+  function saveAll() {
+    Object.entries(draft).forEach(([uid, changes]) => {
+      if (changes.cohort !== undefined) assignUserToCohort(uid, changes.cohort);
+      if (changes.track  !== undefined) assignUserToTrack(uid, changes.track);
+      if (changes.lead   !== undefined) assignUserToLead(uid, changes.lead);
+    });
+    setDraft({});
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2500);
+  }
+
+  function discardAll() { setDraft({}); setSaved(false); }
+
+  const selectStyle = (uid, field) => ({
+    padding: '6px 8px', width: '100%', borderRadius: 2,
     fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.06em',
-    cursor: 'pointer', outline: 'none', width: '100%',
-  };
+    cursor: 'pointer', outline: 'none',
+    background: draft[uid]?.[field] !== undefined ? 'rgba(201,229,0,0.08)' : 'var(--deep-black)',
+    color: draft[uid]?.[field] !== undefined ? 'var(--lime)' : 'var(--off-white)',
+    border: '1px solid ' + (draft[uid]?.[field] !== undefined ? 'var(--lime-border)' : 'var(--off-white-15)'),
+    transition: 'all 0.12s',
+  });
 
   return (
     <div className="enter">
+      {/* Sticky save bar */}
+      {hasPending && (
+        <div style={{
+          position: 'sticky', top: 56, zIndex: 50,
+          display: 'flex', alignItems: 'center', gap: 12,
+          padding: '12px 20px', marginBottom: 16,
+          background: 'rgba(201,229,0,0.06)',
+          border: '1px solid var(--lime-border)',
+          borderRadius: 4, backdropFilter: 'blur(8px)',
+        }}>
+          <i className="fa-solid fa-circle-dot" style={{ color: 'var(--lime)', fontSize: 10 }} />
+          <span className="t-mono" style={{ fontSize: 10, color: 'var(--lime)', letterSpacing: '0.1em', flex: 1 }}>
+            {pendingCount} UNSAVED CHANGE{pendingCount !== 1 ? 'S' : ''} — Review and save when ready.
+          </span>
+          <button className="btn btn-ghost btn-sm" onClick={discardAll}>
+            <i className="fa-solid fa-xmark" /> DISCARD
+          </button>
+          <button className="btn btn-primary" onClick={saveAll} style={{ minWidth: 140, justifyContent: 'center' }}>
+            <i className="fa-solid fa-floppy-disk" /> SAVE CHANGES
+          </button>
+        </div>
+      )}
+
+      {/* Success flash */}
+      {saved && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 10, padding: '12px 20px',
+          marginBottom: 16, background: 'rgba(201,229,0,0.08)',
+          border: '1px solid var(--lime-border)', borderRadius: 4,
+        }}>
+          <i className="fa-solid fa-circle-check" style={{ color: 'var(--lime)' }} />
+          <span className="t-mono" style={{ fontSize: 10, color: 'var(--lime)', letterSpacing: '0.1em' }}>
+            ALL ASSIGNMENTS SAVED SUCCESSFULLY
+          </span>
+        </div>
+      )}
+
       <div className="section-head">
         <div>
           <div className="t-label" style={{ marginBottom: 8, color: 'var(--sky)' }}>
@@ -390,9 +453,14 @@ function AdminAssign() {
           </div>
           <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>Assign Exonauts</h1>
           <div className="t-body" style={{ marginTop: 6 }}>
-            Set Cohort, Track, and Manager for each Exonaut. Changes take effect immediately.
+            Set Cohort, Track, and Manager for each Exonaut. Click <strong>Save Changes</strong> to apply.
           </div>
         </div>
+        {hasPending && (
+          <button className="btn btn-primary" onClick={saveAll} style={{ alignSelf: 'flex-end', minWidth: 160, justifyContent: 'center' }}>
+            <i className="fa-solid fa-floppy-disk" /> SAVE CHANGES · {pendingCount}
+          </button>
+        )}
       </div>
 
       <div className="card-panel" style={{ padding: 16, marginBottom: 16 }}>
@@ -404,10 +472,11 @@ function AdminAssign() {
         <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.08em', marginTop: 10 }}>
           <i className="fa-solid fa-filter" style={{ marginRight: 5 }} />
           SCOPE: {scopeLabel.toUpperCase()} · {filtered.length} EXONAUT{filtered.length !== 1 ? 'S' : ''}
+          {hasPending && <span style={{ marginLeft: 10, color: 'var(--lime)' }}>· {pendingCount} PENDING</span>}
         </div>
       </div>
 
-      {registeredUsers.length === 0 ? (
+      {exonauts.length === 0 ? (
         <div className="card-panel" style={{ textAlign: 'center', padding: 48 }}>
           <i className="fa-solid fa-user-plus" style={{ fontSize: 28, color: 'var(--off-white-40)', marginBottom: 12, display: 'block' }} />
           <div className="t-heading" style={{ fontSize: 15, marginBottom: 6 }}>No registered Exonauts yet</div>
@@ -421,47 +490,78 @@ function AdminAssign() {
         </div>
       ) : (
         <div className="lb-table">
-          <div className="lb-header" style={{ gridTemplateColumns: '48px 1.4fr 160px 180px 200px' }}>
-            <div></div><div>EXONAUT</div><div>COHORT</div><div>TRACK</div><div>MANAGER</div>
+          <div className="lb-header" style={{ gridTemplateColumns: '48px 1.4fr 160px 180px 200px 24px' }}>
+            <div></div><div>EXONAUT</div><div>COHORT</div><div>TRACK</div><div>MANAGER</div><div></div>
           </div>
           {filtered.map(u => {
             const uid = u.userId;
-            const curCohort = u.cohortId || getUserCohort(uid) || '';
-            const curTrack  = getUserTrack(uid) || '';
-            const curLead   = getUserLead(uid);
-            const leadOpts  = leadsByTrack[curTrack] || LEADS;
+            const committed = {
+              cohort: u.cohortId || getUserCohort(uid) || '',
+              track:  getUserTrack(uid) || '',
+              lead:   getUserLead(uid)?.id || '',
+            };
+            const cur = {
+              cohort: draft[uid]?.cohort ?? committed.cohort,
+              track:  draft[uid]?.track  ?? committed.track,
+              lead:   draft[uid]?.lead   ?? committed.lead,
+            };
+            const leadOpts = leadsByTrack[cur.track] || LEADS;
+            const isDirty  = draft[uid] !== undefined;
             return (
-              <div key={uid} className="lb-row" style={{ gridTemplateColumns: '48px 1.4fr 160px 180px 200px' }}>
+              <div key={uid} className="lb-row" style={{
+                gridTemplateColumns: '48px 1.4fr 160px 180px 200px 24px',
+                background: isDirty ? 'rgba(201,229,0,0.03)' : 'transparent',
+                borderLeft: isDirty ? '2px solid var(--lime)' : '2px solid transparent',
+                transition: 'all 0.12s',
+              }}>
                 <AvatarWithRing name={u.name} size={34} tier={u.tier || 'entry'} />
                 <div>
                   <div className="lb-name">{u.name}</div>
                   <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.06em', marginTop: 2 }}>{u.email}</div>
                 </div>
-                <select value={curCohort} onChange={e => { assignUserToCohort(uid, e.target.value); setTick(t => t + 1); }} style={selectStyle}>
+                <select value={cur.cohort} onChange={e => patch(uid, 'cohort', e.target.value)} style={selectStyle(uid, 'cohort')}>
                   <option value="">— Unassigned —</option>
                   {all.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
-                <select value={curTrack} onChange={e => { assignUserToTrack(uid, e.target.value); setTick(t => t + 1); }} style={selectStyle}>
+                <select value={cur.track} onChange={e => patch(uid, 'track', e.target.value)} style={selectStyle(uid, 'track')}>
                   <option value="">— Unassigned —</option>
                   {TRACKS.map(t => <option key={t.code} value={t.code}>{t.short} — {t.name}</option>)}
                 </select>
-                <select value={curLead?.id || ''} onChange={e => { assignUserToLead(uid, e.target.value); setTick(t => t + 1); }} style={selectStyle}>
+                <select value={cur.lead} onChange={e => patch(uid, 'lead', e.target.value)} style={selectStyle(uid, 'lead')}>
                   <option value="">— Unassigned —</option>
-                  <optgroup label={'In ' + (TRACKS.find(t => t.code === curTrack)?.short || curTrack || 'Track')}>
+                  <optgroup label={'In ' + (TRACKS.find(t => t.code === cur.track)?.short || cur.track || 'Track')}>
                     {leadOpts.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
                   </optgroup>
-                  {LEADS.filter(l => l.track !== curTrack).length > 0 && (
+                  {LEADS.filter(l => l.track !== cur.track).length > 0 && (
                     <optgroup label="Other tracks">
-                      {LEADS.filter(l => l.track !== curTrack).map(l => {
+                      {LEADS.filter(l => l.track !== cur.track).map(l => {
                         const tr = TRACKS.find(t => t.code === l.track);
                         return <option key={l.id} value={l.id}>{l.name} ({tr?.short})</option>;
                       })}
                     </optgroup>
                   )}
                 </select>
+                {/* Per-row dirty indicator */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {isDirty && (
+                    <div title="Unsaved changes" style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--lime)', boxShadow: '0 0 6px var(--lime)' }} />
+                  )}
+                </div>
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Bottom save bar when table is long */}
+      {hasPending && filtered.length > 4 && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--off-white-07)' }}>
+          <button className="btn btn-ghost" onClick={discardAll}>
+            <i className="fa-solid fa-xmark" /> DISCARD ALL
+          </button>
+          <button className="btn btn-primary" onClick={saveAll} style={{ minWidth: 180, justifyContent: 'center' }}>
+            <i className="fa-solid fa-floppy-disk" /> SAVE {pendingCount} CHANGE{pendingCount !== 1 ? 'S' : ''}
+          </button>
         </div>
       )}
     </div>

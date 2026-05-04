@@ -1,5 +1,5 @@
 {
   "rewrites": [
-    { "source": "/(.*)", "destination": "/Exonaut Platform.html" }
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

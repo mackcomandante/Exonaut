@@ -119,6 +119,11 @@ function App() {
     'cmdr-health': ['COMMANDER', 'Cohort Health'],
     'cmdr-eow':    ['COMMANDER', 'Exonaut of the Week'],
     'cmdr-announce': ['COMMANDER', 'Announcements'],
+    'cmdr-managers': ['COMMANDER', 'Manager Management'],
+    'cmdr-assign': ['COMMANDER', 'Exonaut Assignment'],
+    'cmdr-board':  ['COMMANDER', 'Message Board'],
+    'cmdr-programs': ['COMMANDER', 'Program Management'],
+    'lead-programs': ['LEAD', 'Program Management'],
     // Platform Admin
     'pa-cohorts':  ['PLATFORM ADMIN', 'Cohort Management'],
     'pa-managers': ['PLATFORM ADMIN', 'Manager Management'],
@@ -157,6 +162,7 @@ function App() {
     else if (route === 'lead-roster') page = <LeadRoster />;
     else if (route === 'lead-queue')  page = <LeadQueue onNavigate={navigate} />;
     else if (route === 'lead-announce') page = <LeadAnnounce />;
+    else if (route === 'lead-programs') page = <ProgramManagement roleScope="lead" />;
     else if (route === 'lead-profile') page = <RoleProfile roleKey="lead" />;
     else if (route === 'community')   page = <CommunityPage />;
     else if (route === 'kudos')       page = <KudosFeed onGive={() => setKudosOpen(true)} />;
@@ -174,6 +180,10 @@ function App() {
     else if (route === 'cmdr-eow')    page = <CommanderEOW />;
     else if (route === 'cmdr-announce') page = <CommanderAnnounce />;
     else if (route === 'cmdr-profile') page = <RoleProfile roleKey="commander" />;
+    else if (route === 'cmdr-managers') page = <AdminManagers />;
+    else if (route === 'cmdr-assign')  page = <AdminAssign />;
+    else if (route === 'cmdr-board')   page = <CommunityBoard />;
+    else if (route === 'cmdr-programs') page = <ProgramManagement roleScope="commander" />;
     else if (route === 'community')   page = <CommunityPage />;
     else if (route === 'kudos')       page = <KudosFeed onGive={() => setKudosOpen(true)} />;
     else if (route === 'notifications') page = <NotificationsPage />;
@@ -243,11 +253,12 @@ function LeadSidebar({ current, onNavigate, onSignOut }) {
     { id: 'community',   label: 'Community',     icon: 'fa-users-rectangle' },
   ];
   const links = [
-    { id: 'lead-home',   label: 'Track Command', icon: 'fa-satellite-dish' },
-    { id: 'lead-queue',  label: 'Review Queue',  icon: 'fa-clipboard-check', count: pendingCount },
-    { id: 'lead-roster', label: 'Roster',        icon: 'fa-users' },
-    { id: 'lead-announce', label: 'Announcements', icon: 'fa-bullhorn' },
-    { id: 'kudos',       label: 'Kudos',         icon: 'fa-hand-sparkles' },
+    { id: 'lead-home',     label: 'Track Command',     icon: 'fa-satellite-dish' },
+    { id: 'lead-queue',    label: 'Review Queue',       icon: 'fa-clipboard-check', count: pendingCount },
+    { id: 'lead-roster',   label: 'Roster',             icon: 'fa-users' },
+    { id: 'lead-programs', label: 'Program Management', icon: 'fa-rocket' },
+    { id: 'lead-announce', label: 'Announcements',      icon: 'fa-bullhorn' },
+    { id: 'kudos',         label: 'Kudos',              icon: 'fa-hand-sparkles' },
   ];
   return (
     <aside className="sidebar">
@@ -294,19 +305,29 @@ function LeadSidebar({ current, onNavigate, onSignOut }) {
 }
 
 function CommanderSidebar({ current, onNavigate, onSignOut }) {
+  const profile = window.loadRoleProfile ? window.loadRoleProfile('commander') : {};
+  const cmdrName   = profile.name   || 'Mack Comandante';
+  const cmdrAvatar = profile.avatar || null;
+
   const me = [
     { id: 'cmdr-profile', label: 'My Profile', icon: 'fa-id-badge' },
     { id: 'community',     label: 'Community',      icon: 'fa-users-rectangle' },
   ];
-  const links = [
+  const orgLinks = [
     { id: 'cmdr-home',     label: 'Command Bridge', icon: 'fa-tower-observation' },
     { id: 'cmdr-leads',    label: 'Mission Leads',  icon: 'fa-user-shield' },
     { id: 'cmdr-exonauts', label: 'Exonauts',       icon: 'fa-user-astronaut' },
     { id: 'cmdr-esc',      label: 'Escalations',    icon: 'fa-triangle-exclamation', count: ESCALATIONS.length },
     { id: 'cmdr-health',   label: 'Cohort Health',  icon: 'fa-heart-pulse' },
     { id: 'cmdr-eow',      label: 'Exonaut of Week', icon: 'fa-trophy' },
-    { id: 'cmdr-announce', label: 'Announcements', icon: 'fa-bullhorn' },
+    { id: 'cmdr-announce', label: 'Announcements',  icon: 'fa-bullhorn' },
     { id: 'kudos',         label: 'Kudos',          icon: 'fa-hand-sparkles' },
+    { id: 'cmdr-board',    label: 'Message Board',  icon: 'fa-comments' },
+  ];
+  const adminLinks = [
+    { id: 'cmdr-programs', label: 'Program Management', icon: 'fa-rocket' },
+    { id: 'cmdr-managers', label: 'Manager Management', icon: 'fa-user-tie' },
+    { id: 'cmdr-assign',   label: 'Exonaut Assignment', icon: 'fa-user-plus' },
   ];
   return (
     <aside className="sidebar">
@@ -315,10 +336,13 @@ function CommanderSidebar({ current, onNavigate, onSignOut }) {
         <div className="sidebar-tag" style={{ color: 'var(--amber)' }}>COMMAND · v2.0</div>
       </div>
       <div className="sidebar-user" style={{ cursor: 'pointer' }} onClick={() => onNavigate('cmdr-profile')} title="Open my profile">
-        <AvatarWithRing name="Mack Comandante" size={36} tier="corps" />
+        {cmdrAvatar
+          ? <img src={cmdrAvatar} alt={cmdrName} style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--amber)', flexShrink: 0 }} />
+          : <AvatarWithRing name={cmdrName} size={36} tier="corps" />
+        }
         <div className="sidebar-user-info">
-          <div className="sidebar-user-name">Mack Comandante</div>
-          <div className="sidebar-user-tier" style={{ color: 'var(--amber)' }}>DIRECTOR · FOUNDER</div>
+          <div className="sidebar-user-name">{cmdrName}</div>
+          <div className="sidebar-user-tier" style={{ color: 'var(--amber)' }}>MISSION COMMANDER</div>
         </div>
       </div>
 
@@ -336,11 +360,18 @@ function CommanderSidebar({ current, onNavigate, onSignOut }) {
 
       <nav className="sidebar-nav">
         <div className="sidebar-nav-section">Org View</div>
-        {links.map(l => (
+        {orgLinks.map(l => (
           <div key={l.id} className={'sidebar-link' + (current === l.id ? ' active' : '')} onClick={() => onNavigate(l.id)}>
             <i className={'fa-solid ' + l.icon} style={{ color: l.id === 'cmdr-esc' ? 'var(--red)' : undefined }} />
             <span>{l.label}</span>
             {l.count ? <span className="badge-count" style={{ background: 'var(--red)', color: 'white' }}>{l.count}</span> : null}
+          </div>
+        ))}
+        <div className="sidebar-nav-section">Management</div>
+        {adminLinks.map(l => (
+          <div key={l.id} className={'sidebar-link' + (current === l.id ? ' active' : '')} onClick={() => onNavigate(l.id)}>
+            <i className={'fa-solid ' + l.icon} />
+            <span>{l.label}</span>
           </div>
         ))}
       </nav>
@@ -361,7 +392,16 @@ function CohortSwitcher() {
   const { cohort, cohortId, all, setSelected } = useCohort();
   const [open, setOpen] = React.useState(false);
 
-  const cohortUsers = USERS.filter(u => (u.cohort || 'c2627') === cohortId);
+  const registeredUsers = window.useRegisteredUsers ? window.useRegisteredUsers() : [];
+  function countCohortUsers(cid) {
+    const seedCount = (typeof USERS !== 'undefined' ? USERS : [])
+      .filter(u => (u.cohort || 'c2627') === cid).length;
+    const regCount = registeredUsers
+      .filter(u => u.role === 'exonaut' && (window.getUserCohort ? window.getUserCohort(u.userId) : (u.cohortId || 'c2627')) === cid)
+      .length;
+    return seedCount + regCount;
+  }
+  const cohortCount = countCohortUsers(cohortId);
   const accent = cohort?.status === 'active' ? 'var(--lime)' : 'var(--lavender)';
 
   return (
@@ -384,7 +424,7 @@ function CohortSwitcher() {
             {cohort?.name || 'No cohort'}
           </div>
           <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.06em', marginTop: 2 }}>
-            {cohortUsers.length} EXONAUT{cohortUsers.length === 1 ? '' : 'S'} · {(cohort?.status || '').toUpperCase()}
+            {cohortCount} EXONAUT{cohortCount === 1 ? '' : 'S'} · {(cohort?.status || '').toUpperCase()}
           </div>
         </div>
         <i className={`fa-solid fa-chevron-${open ? 'up' : 'down'}`} style={{ color: 'var(--off-white-40)', fontSize: 10 }} />
@@ -398,7 +438,7 @@ function CohortSwitcher() {
           display: 'flex', flexDirection: 'column', gap: 2,
         }}>
           {all.map(c => {
-            const count = USERS.filter(u => (u.cohort || 'c2627') === c.id).length;
+            const count = countCohortUsers(c.id);
             const isActive = c.id === cohortId;
             const cAccent = c.status === 'active' ? 'var(--lime)' : c.status === 'upcoming' ? 'var(--sky)' : 'var(--lavender)';
             return (

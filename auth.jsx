@@ -520,13 +520,30 @@ function Onboarding({ onComplete }) {
                 <div className="t-heading" style={{ fontSize: 16, fontFamily: 'var(--font-mono)' }}>{(ME_ID || 'PENDING').toUpperCase().slice(0,8)}-2026</div>
                 <div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)', marginTop: 6, letterSpacing: '0.08em' }}>Track and cohort will be assigned by your Admin.</div>
               </div>
-              <div style={{ fontFamily: 'var(--font-serif)', fontSize: 18, lineHeight: 1.7, color: 'var(--off-white)', fontStyle: 'italic', paddingTop: 24, borderTop: '1px solid var(--off-white-07)' }}>
-                "I show up before I'm asked. I lift before I climb. I ship before I'm ready.<br/>
-                I build the map for the next Exonaut, and I carry the ones I meet.<br/>
-                I am not here to wait. I am here to build."
-              </div>
-              <div style={{ marginTop: 24, fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--off-white-40)', letterSpacing: '0.1em' }}>
-                — SIGNED MACK COMANDANTE · FOUNDER
+
+              <div style={{ paddingTop: 24, borderTop: '1px solid var(--off-white-07)' }}>
+                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 20, color: 'var(--lime)', letterSpacing: '0.04em', marginBottom: 24 }}>
+                  I am an Exonaut.
+                </div>
+
+                {[
+                  'I did not come here to pass time. I came here to build something real — solving real problems, for real clients, real communities, and a real future.',
+                  'I pledge to show up fully — not just in presence, but in ownership. Every mission I take on, I own completely. I do not wait to be told twice. I do not ship halfway. I do not leave my team behind.',
+                  'I pledge to grow without ego — to ask when I don\'t know, to teach what I learn, and to take feedback as fuel. I am not here to prove I\'m already great. I am here to become greater.',
+                  'I pledge to serve my client with integrity — to show up with the professionalism of someone who has been trusted with something that matters. Because they have.',
+                  'I pledge to find the next Exonaut — to pay forward the opportunity given to me, to actively seek, recruit, and champion someone who deserves this seat as much as I did.',
+                  'I pledge to protect this culture — to call out mediocrity, celebrate excellence, and never let cynicism replace ambition in this room.',
+                  'I understand that when this cohort ends, I do not leave. I launch. I become Exonaut Corps — a permanent part of the ecosystem I helped build.',
+                ].map((para, i) => (
+                  <p key={i} style={{ fontFamily: 'var(--font-serif)', fontSize: 16, lineHeight: 1.8, color: 'var(--off-white)', margin: '0 0 18px 0' }}>
+                    {para}
+                  </p>
+                ))}
+
+                <div style={{ marginTop: 28, paddingTop: 20, borderTop: '1px solid var(--off-white-07)', fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 18, color: 'var(--off-white)', letterSpacing: '0.02em', lineHeight: 1.5 }}>
+                  We don't wait for the map.<br />
+                  We build it.
+                </div>
               </div>
             </div>
 

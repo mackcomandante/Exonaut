@@ -2083,4 +2083,7 @@ function PointsLedger({ userId }) {
   );
 }
 
+// Expose mission store globally so roles.jsx ProgramManagement can access it
+window.__missionStore = __missionStore;
+
 Object.assign(window, { MissionsList, KudosFeed, RitualsPage, AnnouncementsPage, NotificationsPage, AdminPanel, AlumniPage, SettingsPage, CommunityPage, CertsBadgesPage });

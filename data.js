@@ -133,7 +133,7 @@ const ME_RANK = USERS.sort((a,b) => b.points - a.points).findIndex(u => u.id ===
 // Director (Mission Commander) → Managers (Mission Leads, 1 per track) → Interns (Exonauts)
 const COMMANDER = {
   id: 'cmdr-01', name: 'Mack Comandante', role: 'director',
-  title: 'Mission Commander · Founder',
+  title: 'Mission Commander',
   yearsAtExoasia: 4, cohortsRun: 3,
 };
 

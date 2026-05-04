@@ -133,10 +133,9 @@ function KudosModal({ onClose, onSent }) {
   const registeredUsers = window.useRegisteredUsers ? window.useRegisteredUsers() : [];
 
   // Identify who's posting — reads live role profile so name/identity is always current.
+  // Role is stored under 'exo:authRole' (set at login) or 'exo:role' (current view).
   const me = React.useMemo(() => {
-    let auth = {};
-    try { auth = JSON.parse(localStorage.getItem('exo:auth') || '{}'); } catch (e) {}
-    const role = auth.role || 'exonaut';
+    const role = localStorage.getItem('exo:authRole') || localStorage.getItem('exo:role') || 'exonaut';
     const rp = window.loadRoleProfile;
     if (role === 'lead') {
       const p = rp ? rp('lead') : {};
@@ -150,7 +149,10 @@ function KudosModal({ onClose, onSent }) {
       const p = rp ? rp('admin') : {};
       return { id: 'admin-ops', name: p.name || 'Ops Admin',          role: 'admin',     badge: 'ADMIN' };
     }
-    return { id: (typeof ME_ID !== 'undefined') ? ME_ID : 'u14', name: (typeof ME !== 'undefined') ? ME.name : 'You', role: 'exonaut', badge: null };
+    // Exonaut — use their real name from Supabase session if available
+    const exoName = localStorage.getItem('exo:userName') || ((typeof ME !== 'undefined') ? ME.name : 'You');
+    const exoId   = localStorage.getItem('exo:userId')   || ((typeof ME_ID !== 'undefined') ? ME_ID : 'u14');
+    return { id: exoId, name: exoName, role: 'exonaut', badge: null };
   }, []);
 
   // Recipient pool = registered users + static USERS, minus self.
