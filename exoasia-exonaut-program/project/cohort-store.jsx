@@ -340,6 +340,18 @@
 
   function weekWindowLabel(cohort, week) {
     const normalized = cohort ? { ...cohort, start: cohort.start || cohort.startDate, end: cohort.end || cohort.demoDay } : cohort;
+    const start = parseDate(normalized?.start);
+    if (start && start.getTime() > Date.now()) {
+      const now = new Date();
+      const manila = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+      const day = manila.getDay() || 7;
+      const monday = new Date(manila);
+      monday.setDate(manila.getDate() - day + 1);
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+      const fmt = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'Asia/Manila' }).toUpperCase();
+      return `${fmt(monday)} - ${fmt(sunday)}, ${sunday.getFullYear()}`;
+    }
     if (window.EOW?.weekWindow) return window.EOW.weekWindow(normalized, week).label;
     return [normalized?.start, normalized?.end].filter(Boolean).join(' - ');
   }

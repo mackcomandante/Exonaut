@@ -17,7 +17,7 @@ function profileAsExonautRow(profile, ledger = []) {
     cohort: profile.cohortId || 'c2627',
     avatarUrl: profile.avatarUrl || '',
     points,
-    tier: points >= 300 ? 'prime' : points >= 100 ? 'builder' : 'entry',
+    tier: window.getTierKeyForPoints ? window.getTierKeyForPoints(points) : (points >= 300 ? 'prime' : points >= 100 ? 'builder' : 'entry'),
     change: (seed % 7) - 2,
     badges: 2 + (seed % 5),
     p1,

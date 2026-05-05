@@ -10,11 +10,11 @@ function Leaderboard({ onBack }) {
   const [tierFilter, setTierFilter] = React.useState('all');
   const [sortPillar, setSortPillar] = React.useState(null);
 
-  let filtered = rowsBase.map(u => ({
-    ...u,
-    tier: u.points >= 900 ? 'apex' : u.points >= 600 ? 'elite' : u.points >= 300 ? 'prime' : u.points >= 100 ? 'builder' : 'entry',
-    badges: MILESTONES.filter(m => u.points >= m.at).length,
-  }));
+  const rankedBase = React.useMemo(
+    () => window.rankExonautRows ? window.rankExonautRows(rowsBase) : [...rowsBase].sort((a,b) => b.points - a.points).map((u, i) => ({ ...u, cohortRank: i + 1 })),
+    [rowsBase]
+  );
+  let filtered = [...rankedBase];
 
   if (trackFilter !== 'all') filtered = filtered.filter(u => u.track === trackFilter);
   if (tierFilter !== 'all') filtered = filtered.filter(u => u.tier === tierFilter);
@@ -85,7 +85,7 @@ function Leaderboard({ onBack }) {
             <div>RANK</div><div></div><div>EXONAUT</div><div className="col-track">TRACK</div><div className="col-bars">P1 · P2 · P3</div><div>{tab === 'week' ? 'WK PTS' : sortPillar ? `${sortPillar.toUpperCase()}` : 'POINTS'}</div><div className="col-change">Δ</div><div>BDG</div>
           </div>
           {filtered.map((u, i) => {
-            const rank = i + 1;
+            const rank = (tab === 'cohort' && !sortPillar) ? (u.cohortRank || i + 1) : i + 1;
             const top = rank <= 3 ? ` top-${rank}` : '';
             const track = TRACKS.find(t => t.code === u.track);
             const displayPts = tab === 'week' ? u.weekPoints : sortPillar ? u[sortPillar] : u.points;

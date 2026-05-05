@@ -272,36 +272,7 @@ function Onboarding({ onComplete }) {
 }
 
 function RoleAuthScreen({ onAuthComplete }) {
-  const ROLE_OPTIONS = [
-    { id: 'exonaut', label: 'Exonaut', sub: 'Intern', icon: 'fa-user-astronaut', accent: 'var(--lime)' },
-    { id: 'commander', label: 'Commander', sub: 'Director', icon: 'fa-star', accent: 'var(--amber)' },
-    { id: 'admin', label: 'Admin', sub: 'Platform', icon: 'fa-shield-halved', accent: 'var(--sky)' },
-  ];
-  const TEST_ACCOUNTS = [
-    {
-      role: 'exonaut',
-      label: 'Exonaut',
-      name: 'Test Exonaut',
-      email: 'exonaut.test@exoasia.hub',
-      password: 'ExonautTest123!',
-    },
-    {
-      role: 'commander',
-      label: 'Commander',
-      name: 'Test Mission Commander',
-      email: 'commander.test@exoasia.hub',
-      password: 'ExonautTest123!',
-    },
-    {
-      role: 'admin',
-      label: 'Admin',
-      name: 'Test Platform Admin',
-      email: 'admin.test@exoasia.hub',
-      password: 'ExonautTest123!',
-    },
-  ];
-
-  const [selectedRole, setSelectedRole] = React.useState('exonaut');
+  const selectedRole = 'exonaut';
   const [mode, setMode] = React.useState('signin');
   const [email, setEmail] = React.useState('maya.chen@exoasia.hub');
   const [password, setPassword] = React.useState('');
@@ -310,21 +281,7 @@ function RoleAuthScreen({ onAuthComplete }) {
   const [loading, setLoading] = React.useState(false);
   const [authError, setAuthError] = React.useState('');
 
-  const selected = ROLE_OPTIONS.find(r => r.id === selectedRole) || ROLE_OPTIONS[0];
   const isSignup = mode === 'signup';
-
-  function selectRole(role) {
-    setSelectedRole(role);
-  }
-
-  function useTestAccount(account, nextMode) {
-    setSelectedRole(account.role);
-    setMode(nextMode || mode);
-    setFullName(account.name);
-    setEmail(account.email);
-    setPassword(account.password);
-    setAuthError('');
-  }
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -392,35 +349,10 @@ function RoleAuthScreen({ onAuthComplete }) {
         </div>
 
         <div className="card-hud" style={{ background: 'var(--bg-darkest)', border: '1px solid var(--off-white-07)', borderRadius: 6, padding: 32 }}>
-          <div className="t-label" style={{ marginBottom: 10, color: selected.accent }}>SECURE ACCESS</div>
-          <h1 className="t-title" style={{ fontSize: 34, margin: '0 0 10px 0' }}>{selected.label} Portal</h1>
+          <div className="t-label" style={{ marginBottom: 10 }}>SECURE ACCESS</div>
+          <h1 className="t-title" style={{ fontSize: 34, margin: '0 0 10px 0' }}>Exonaut Portal</h1>
           <div style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 16, color: 'var(--lavender)', marginBottom: 26 }}>
             "We don't wait for the map. We build it."
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginBottom: 22 }}>
-            {ROLE_OPTIONS.map(role => (
-              <button key={role.id} type="button" onClick={() => selectRole(role.id)}
-                style={{
-                  padding: '12px 10px',
-                  background: selectedRole === role.id ? 'rgba(201,242,74,0.12)' : 'var(--off-white-07)',
-                  border: '1px solid ' + (selectedRole === role.id ? role.accent : 'var(--off-white-15)'),
-                  borderRadius: 4,
-                  color: selectedRole === role.id ? role.accent : 'var(--off-white-68)',
-                  cursor: 'pointer',
-                  display: 'grid',
-                  gridTemplateColumns: '24px 1fr',
-                  gap: 8,
-                  alignItems: 'center',
-                  textAlign: 'left',
-                }}>
-                <i className={'fa-solid ' + role.icon} />
-                <span>
-                  <span className="t-heading" style={{ display: 'block', fontSize: 12, color: selectedRole === role.id ? role.accent : 'var(--off-white)' }}>{role.label}</span>
-                  <span className="t-mono" style={{ display: 'block', fontSize: 8, color: 'var(--off-white-40)', letterSpacing: '0.12em' }}>{role.sub.toUpperCase()}</span>
-                </span>
-              </button>
-            ))}
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 20 }}>
@@ -431,37 +363,10 @@ function RoleAuthScreen({ onAuthComplete }) {
             </button>
             <button type="button" onClick={() => setMode('signup')}
               className={isSignup ? 'btn btn-primary' : 'btn btn-ghost'}
-              title={'Create a ' + selected.label + ' account'}
+              title="Create an Exonaut account"
               style={{ justifyContent: 'center' }}>
               CREATE ACCOUNT
             </button>
-          </div>
-
-          <div style={{ marginBottom: 20, padding: 14, background: 'var(--off-white-07)', border: '1px solid var(--off-white-15)', borderRadius: 4 }}>
-            <div className="t-label-muted" style={{ marginBottom: 10 }}>TEST STAFF ACCOUNTS</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
-              {TEST_ACCOUNTS.map(account => {
-                const roleMeta = ROLE_OPTIONS.find(r => r.id === account.role) || ROLE_OPTIONS[0];
-                return (
-                  <button key={account.role} type="button" onClick={() => useTestAccount(account, isSignup ? 'signup' : 'signin')}
-                    style={{
-                      padding: '10px 8px',
-                      background: selectedRole === account.role ? 'rgba(201,242,74,0.12)' : 'var(--bg-darkest)',
-                      border: '1px solid ' + (selectedRole === account.role ? roleMeta.accent : 'var(--off-white-15)'),
-                      borderRadius: 3,
-                      color: selectedRole === account.role ? roleMeta.accent : 'var(--off-white-68)',
-                      cursor: 'pointer',
-                      textAlign: 'left',
-                    }}>
-                    <span className="t-heading" style={{ display: 'block', fontSize: 11, color: selectedRole === account.role ? roleMeta.accent : 'var(--off-white)' }}>{account.label}</span>
-                    <span className="t-mono" style={{ display: 'block', fontSize: 8, color: 'var(--off-white-40)', letterSpacing: '0.06em', marginTop: 3 }}>{account.email}</span>
-                  </button>
-                );
-              })}
-            </div>
-            <div className="t-body" style={{ marginTop: 10, fontSize: 11, color: 'var(--off-white-40)', lineHeight: 1.4 }}>
-              Password for all test staff accounts: <span className="t-mono" style={{ color: 'var(--off-white-68)' }}>ExonautTest123!</span>
-            </div>
           </div>
 
           <form onSubmit={handleSubmit}>
@@ -498,7 +403,7 @@ function RoleAuthScreen({ onAuthComplete }) {
               {loading
                 ? <><i className="fa-solid fa-circle-notch fa-spin" /> AUTHENTICATING...</>
                 : isSignup
-                  ? <><i className="fa-solid fa-user-plus" /> CREATE {selected.label.toUpperCase()} ACCOUNT</>
+                  ? <><i className="fa-solid fa-user-plus" /> CREATE ACCOUNT</>
                   : <><i className="fa-solid fa-arrow-right-to-bracket" /> SIGN IN</>}
             </button>
             <button type="button" className="btn btn-ghost" style={{ width: '100%', justifyContent: 'center' }}>
@@ -508,7 +413,7 @@ function RoleAuthScreen({ onAuthComplete }) {
 
           <div className="t-body" style={{ marginTop: 16, fontSize: 12, color: 'var(--off-white-40)', lineHeight: 1.45 }}>
             {isSignup
-              ? 'New accounts start from the selected role. Admin can later change the role without changing email or password.'
+              ? 'New accounts start as Exonaut accounts. Admin can later change the role without changing email or password.'
               : 'Sign-in uses the role assigned to this account. If Admin promotes an Exonaut to Lead, the same email and password opens the Lead console.'}
           </div>
 

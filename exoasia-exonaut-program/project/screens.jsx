@@ -567,9 +567,14 @@ function KudosFeed({ onGive }) {
     : kudos.all.filter(k => k.to === meId || k.from === meId);
 
   function resolveKudosPerson(userId, storedName) {
+    const cleanName = (name) => {
+      const raw = String(name || '').trim();
+      if (!raw || raw.includes('@')) return '';
+      return raw.split(' · ')[0].split(' | ')[0].replace(/\s*\[[^\]]+\]\s*/g, '').trim();
+    };
     const p = (profiles || []).find(x => x.id === userId);
-    if (p) return { name: storedName || p.fullName || p.email || 'Exonaut', tier: p.role === 'exonaut' ? 'gold' : 'corps', avatarUrl: p.avatarUrl || '' };
-    if (storedName) return { name: storedName, tier: 'gold', avatarUrl: '' };
+    if (p) return { name: cleanName(storedName) || p.fullName || 'Exonaut', tier: p.role === 'exonaut' ? 'elite' : 'corps', avatarUrl: p.avatarUrl || '' };
+    if (cleanName(storedName)) return { name: cleanName(storedName), tier: 'elite', avatarUrl: '' };
     return resolveAuthor(userId, null);
   }
 
@@ -1278,7 +1283,7 @@ function makeSocials(name, id) {
 
 function getCommunityMembers(profiles, ledger = [], subs = [], projectState = {}) {
   // Active = Supabase user_profiles across roles. Alumni can be added later.
-  const activeTierFor = (u) => u.points >= 900 ? 'platinum' : u.points >= 600 ? 'gold' : u.points >= 300 ? 'silver' : 'bronze';
+  const activeTierFor = (u) => window.getTierKeyForPoints ? window.getTierKeyForPoints(u.points) : (u.points >= 900 ? 'apex' : u.points >= 600 ? 'elite' : u.points >= 300 ? 'prime' : u.points >= 100 ? 'builder' : 'entry');
   const roleLabel = (role) => {
     if (role === 'lead') return 'Mission Lead';
     if (role === 'commander') return 'Mission Commander';
@@ -1342,7 +1347,7 @@ function getCommunityMembers(profiles, ledger = [], subs = [], projectState = {}
       role: roleLabel(p.role),
       track: trackCode,
       points,
-      tier: p.role === 'exonaut' ? (points >= 300 ? 'prime' : 'builder') : 'corps',
+      tier: p.role === 'exonaut' ? activeTierFor({ points }) : 'corps',
       badges: earnedBadges.length,
       earnedBadges,
       status: 'active',

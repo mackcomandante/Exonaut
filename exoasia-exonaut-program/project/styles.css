@@ -13,6 +13,7 @@
 
   --card-base: #FFFFFF;       /* raised card */
   --card-hover: #FFFDF7;
+  --deep-black: #FFFFFF;
 
   --ink: #1B1930;             /* primary text, near-black with violet */
   --ink-soft: #3A3652;
@@ -1662,6 +1663,91 @@ img, svg { display: block; max-width: 100%; }
   text-transform: uppercase;
 }
 
+.credential-category-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.credential-category-card {
+  display: grid;
+  grid-template-columns: 36px 1fr;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 82px;
+  padding: 14px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  background: var(--card-base);
+  color: var(--ink);
+  text-align: left;
+  box-shadow: var(--shadow-card);
+  transition: all 180ms ease;
+}
+.credential-category-card:hover,
+.credential-category-card.active {
+  border-color: var(--lime);
+  background: var(--lime-wash);
+  transform: translateY(-1px);
+}
+.credential-category-icon {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  background: var(--bg-maroon);
+  color: var(--ink);
+}
+.credential-category-title,
+.credential-category-meta {
+  display: block;
+}
+.credential-category-title {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 13px;
+  line-height: 1.25;
+}
+.credential-category-meta {
+  margin-top: 4px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--ink-muted);
+  letter-spacing: 0.04em;
+}
+.credential-category-detail {
+  padding: 20px;
+  margin-bottom: 16px;
+}
+.credential-requirement-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 16px;
+}
+.credential-requirement {
+  padding: 12px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  background: var(--bg-maroon);
+}
+.credential-requirement-name {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 12px;
+  color: var(--ink);
+}
+.credential-requirement-detail {
+  margin-top: 4px;
+  font-family: var(--font-display);
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--ink-soft);
+}
+
 /* ============================================================
    MISSION DETAIL
    ============================================================ */
@@ -2128,6 +2214,12 @@ body[data-density="compact"] .pillar-card { padding: 16px; }
   .profile-stat { border-right: none; border-bottom: 1px solid var(--hairline); }
 }
 @media (max-width: 760px) {
+  .credential-category-grid {
+    grid-template-columns: 1fr;
+  }
+  .credential-requirement-list {
+    grid-template-columns: 1fr;
+  }
   .sidebar { display: none; }
   .main { margin-left: 0; }
   .content { padding: 18px 16px 48px; }

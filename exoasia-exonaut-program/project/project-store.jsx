@@ -1377,6 +1377,69 @@ function CertificatesBadgesPage() {
   const liveBadges = useLiveBadges(profile.id);
   const next = MILESTONES.find(m => total < m.at);
   const certificateReady = total >= 900;
+  const [selectedCategory, setSelectedCategory] = React.useState('milestone');
+  const badgeCategories = [
+    {
+      id: 'milestone',
+      title: 'Milestone Tier Badges',
+      meta: '4 Badges · Automatic',
+      description: 'Triggered automatically by total point thresholds. All include a PDF certificate.',
+      icon: 'fa-chart-line',
+      items: [
+        { name: 'Bronze Builder', detail: '100 total points · Automatic system trigger' },
+        { name: 'Silver Strategist', detail: '300 total points · Automatic system trigger' },
+        { name: 'Gold Innovator', detail: '600 total points · Automatic system trigger' },
+        { name: 'Platinum Disruptor', detail: '900 total points · Automatic system trigger' },
+      ],
+    },
+    {
+      id: 'track',
+      title: 'Track Completion Badges',
+      meta: '7 Badges · Automatic',
+      description: 'Awarded when every mission in the assigned track is graded Good or Excellent. Triggered upon final mission approval. All include a PDF certificate.',
+      icon: 'fa-route',
+      items: [
+        { name: 'AI Strategist', detail: 'Track 01 · AI Strategy' },
+        { name: 'Venture Builder', detail: 'Track 02 · EBELI Ventures' },
+        { name: 'L&D Champion', detail: 'Track 03 · Learning & Dev' },
+        { name: 'Experience Maker', detail: 'Track 04 · Events' },
+        { name: 'AI Dev Builder', detail: 'Track 05 · Software Dev' },
+        { name: 'Policy Analyst', detail: 'Track 06 · Research & Policy' },
+        { name: 'Content Creator', detail: 'Track 07 · Social Media' },
+      ],
+    },
+    {
+      id: 'pillar',
+      title: 'Pillar Badges',
+      meta: '4 Badges · Manual',
+      description: 'Specific performance pillars requiring manual nomination or confirmation.',
+      icon: 'fa-layer-group',
+      items: [
+        { name: 'Delivery Machine', detail: 'Project · 0 late submissions, 50%+ Excellent grades, and Capstone presented. Nominated by ML and awarded by Admin.' },
+        { name: 'Innovation Catalyst', detail: 'Project · Most impactful idea voted by peers and Mission Leads at Week 11. Awarded by Admin, 1 per cohort.' },
+        { name: 'Client Champion', detail: 'Client · 4-5 star client score, 3 touchpoints, 2 deliverables accepted, and 0 complaints. Confirmed by ML and awarded by Admin.' },
+        { name: 'Talent Scout', detail: 'Recruitment · 1 recruit accepted offer and completes Week 1. System trigger with Admin confirmation. Repeatable.' },
+      ],
+    },
+    {
+      id: 'special',
+      title: 'Special Award Badges',
+      meta: '7 Badges · Manual',
+      description: 'High-level recognition awards with admin confirmation and varying frequencies.',
+      icon: 'fa-trophy',
+      items: [
+        { name: 'Perfect Trifecta', detail: 'All 3 Pillar badges earned in the same cohort. Awarded by Admin, 0-2 per cohort.' },
+        { name: 'Track MVP', detail: 'Highest scorer in track based on mission grades, ML rating, and Demo Day. Awarded by Admin, 1 per track.' },
+        { name: 'Intern of the Week', detail: 'Most points in the calendar week. System identifies top 3; Admin selects weekly.' },
+        { name: 'Most Likely to Disrupt', detail: 'Peer anonymous vote at Week 11. Awarded at Demo Day, 1 per cohort.' },
+        { name: 'Culture Carrier', detail: 'Most peer kudos received across 12 weeks. System calculates; Admin confirms, 1 per cohort.' },
+        { name: 'Full Cycle', detail: 'Track complete, 1 client deliverable accepted, and 1 recruit submitted. System + Admin confirmation.' },
+        { name: 'Pipeline Builder', detail: '2+ successful recruit placements, can span cohorts. System automatic on 2nd placement.' },
+      ],
+    },
+  ];
+  const activeCategory = badgeCategories.find(c => c.id === selectedCategory) || badgeCategories[0];
+  const categoryBadges = liveBadges.filter(b => b.category === activeCategory.id);
   return (
     <div className="enter">
       <div className="section-head">
@@ -1405,8 +1468,38 @@ function CertificatesBadgesPage() {
           {next && <div className="t-body" style={{ marginTop: 10, color: 'var(--lime)' }}>{next.at - total} points to {next.name}</div>}
         </div>
       </div>
+      <div className="credential-category-grid">
+        {badgeCategories.map(category => (
+          <button
+            key={category.id}
+            className={'credential-category-card' + (selectedCategory === category.id ? ' active' : '')}
+            onClick={() => setSelectedCategory(category.id)}
+          >
+            <span className="credential-category-icon"><i className={'fa-solid ' + category.icon} /></span>
+            <span>
+              <span className="credential-category-title">{category.title}</span>
+              <span className="credential-category-meta">{category.meta}</span>
+            </span>
+          </button>
+        ))}
+      </div>
+      <div className="card-panel credential-category-detail">
+        <div>
+          <div className="t-label" style={{ marginBottom: 6 }}>{activeCategory.meta}</div>
+          <h2 className="t-heading" style={{ fontSize: 18, margin: 0 }}>{activeCategory.title}</h2>
+          <div className="t-body" style={{ marginTop: 6 }}>{activeCategory.description}</div>
+        </div>
+        <div className="credential-requirement-list">
+          {activeCategory.items.map(item => (
+            <div key={item.name} className="credential-requirement">
+              <div className="credential-requirement-name">{item.name}</div>
+              <div className="credential-requirement-detail">{item.detail}</div>
+            </div>
+          ))}
+        </div>
+      </div>
       <div className="badge-grid">
-        {liveBadges.map(b => (
+        {categoryBadges.map(b => (
           <div key={b.code} className={'badge' + (!b.earned ? ' locked' : '')}>
             <div className="badge-medallion"><BadgeMedallion badge={b} size={60} /></div>
             <div className="badge-name">{b.name}</div>

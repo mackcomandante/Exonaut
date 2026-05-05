@@ -9,7 +9,14 @@ function Sidebar({ current, onNavigate, onSignOut }) {
   const hasAssignedProject = window.__projectStore.visibleProjects(profile).length > 0;
   const hasProjectTasks = window.__projectStore.firstOfficerTasks(profile.id).length || projectState.assignees.some(a => a.userId === profile.id);
   const displayName = profile.fullName || ME.name;
-  const tier = ME.tier || 'entry';
+  const { total: livePoints } = useComputedPoints(profile.id);
+  const rowsFromProfiles = useSupabaseExonautRows();
+  const rankedRows = React.useMemo(
+    () => window.rankExonautRows ? window.rankExonautRows(rowsFromProfiles) : [...rowsFromProfiles].sort((a,b) => b.points - a.points).map((u, i) => ({ ...u, cohortRank: i + 1 })),
+    [rowsFromProfiles]
+  );
+  const liveRank = rankedRows.find(u => u.id === profile.id)?.cohortRank || 1;
+  const tier = window.getTierKeyForPoints ? window.getTierKeyForPoints(livePoints) : (livePoints >= 300 ? 'prime' : livePoints >= 100 ? 'builder' : 'entry');
   const me = [
     { id: 'profile',     label: 'My Profile',  icon: 'fa-id-badge' },
     { id: 'community',   label: 'Community',   icon: 'fa-users' },
@@ -46,7 +53,7 @@ function Sidebar({ current, onNavigate, onSignOut }) {
         <div className="sidebar-user-info">
           <div className="sidebar-user-name">{displayName}</div>
           <div className="sidebar-user-tier" style={{ color: TIERS[tier].color }}>
-            {TIERS[ME.tier].short} · #{ME_RANK}
+            {TIERS[tier].short} · #{liveRank}
           </div>
         </div>
       </div>

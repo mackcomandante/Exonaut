@@ -19,10 +19,17 @@ function Profile({ onOpenMission, onTriggerBadge }) {
   const displayName = profile.fullName || ME.name;
   const track = TRACKS.find(t => t.code === (profile.trackCode || ME.track)) || TRACKS[0];
   const cohort = window.getActiveCohort?.(profile) || COHORTS.find(c => c.id === (profile.cohortId || ME.cohort)) || COHORT;
-  const tier = ME.tier || 'entry';
   const missions = useMissions();
 
   const { total: livePoints, delta: liveDelta } = useComputedPoints(profile.id);
+  const rowsFromProfiles = useSupabaseExonautRows();
+  const rankedRows = React.useMemo(
+    () => window.rankExonautRows ? window.rankExonautRows(rowsFromProfiles) : [...rowsFromProfiles].sort((a,b) => b.points - a.points).map((u, i) => ({ ...u, cohortRank: i + 1 })),
+    [rowsFromProfiles]
+  );
+  const liveRank = rankedRows.find(u => u.id === profile.id)?.cohortRank || 1;
+  const tier = window.getTierKeyForPoints ? window.getTierKeyForPoints(livePoints) : (livePoints >= 300 ? 'prime' : livePoints >= 100 ? 'builder' : 'entry');
+  const cohortSize = rankedRows.length || COHORT.size;
   const { breakdown } = useUserPoints(profile.id);
   const liveBadges = useLiveBadges(profile.id);
   const earnedBadges = liveBadges.filter(b => b.earned);
@@ -84,7 +91,7 @@ function Profile({ onOpenMission, onTriggerBadge }) {
           <AvatarWithRing name={displayName} avatarUrl={profile.avatarUrl} size={140} tier={tier} />
         </div>
         <div>
-          <div className="t-label" style={{ marginBottom: 10 }}>EXONAUT · #14 / 30 · {TIERS[ME.tier].short}</div>
+          <div className="t-label" style={{ marginBottom: 10 }}>EXONAUT · #{liveRank} / {cohortSize} · {TIERS[tier].short}</div>
           <h1 className="profile-name">{displayName}</h1>
           <div className="profile-meta-row">
             <span><span className="meta-k">TRACK</span>{track.name}</span>
@@ -189,7 +196,7 @@ function Profile({ onOpenMission, onTriggerBadge }) {
         </div>
         <div className="profile-stat">
           <div className="k">Rank in Cohort</div>
-          <div className="v">#{ME_RANK}<span style={{ color: 'var(--off-white-40)', fontSize: 14, marginLeft: 4 }}>/ 30</span></div>
+          <div className="v">#{liveRank}<span style={{ color: 'var(--off-white-40)', fontSize: 14, marginLeft: 4 }}>/ {cohortSize}</span></div>
         </div>
         <div className="profile-stat">
           <div className="k">

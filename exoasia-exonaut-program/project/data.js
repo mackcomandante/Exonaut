@@ -66,6 +66,48 @@ const TIERS = {
   corps:   { label: 'Exonaut Corps',  short: 'CORPS',    color: '#B095C5', min: null },
 };
 
+function getTierKeyForPoints(points = 0) {
+  const total = Number(points) || 0;
+  if (total >= TIERS.apex.min) return 'apex';
+  if (total >= TIERS.elite.min) return 'elite';
+  if (total >= TIERS.prime.min) return 'prime';
+  if (total >= TIERS.builder.min) return 'builder';
+  return 'entry';
+}
+
+function getTierProgressForPoints(points = 0) {
+  const total = Number(points) || 0;
+  const tier = getTierKeyForPoints(total);
+  const ordered = ['entry', 'builder', 'prime', 'elite', 'apex'];
+  const nextKey = ordered[ordered.indexOf(tier) + 1] || null;
+  return {
+    tier,
+    current: TIERS[tier],
+    next: nextKey ? TIERS[nextKey] : null,
+    pointsOver: Math.max(0, total - (TIERS[tier].min || 0)),
+    pointsToNext: nextKey ? Math.max(0, TIERS[nextKey].min - total) : 0,
+  };
+}
+
+function getMilestoneBadgeCount(points = 0) {
+  const total = Number(points) || 0;
+  return BADGES.filter(b => b.category === 'milestone').filter(b => {
+    const threshold = Number((b.subtitle || '').match(/\d+/)?.[0] || 0);
+    return threshold && total >= threshold;
+  }).length;
+}
+
+function rankExonautRows(rows = []) {
+  return [...rows]
+    .map(u => ({
+      ...u,
+      tier: u.tier === 'corps' ? 'corps' : getTierKeyForPoints(u.points),
+      badges: Math.max(Number(u.badges) || 0, getMilestoneBadgeCount(u.points)),
+    }))
+    .sort((a, b) => (Number(b.points) || 0) - (Number(a.points) || 0) || String(a.name || '').localeCompare(String(b.name || '')))
+    .map((u, i) => ({ ...u, cohortRank: i + 1 }));
+}
+
 // Supabase profiles are the source of truth for active users.
 const USERS = [];
 
@@ -727,4 +769,5 @@ Object.assign(window, {
   COMMANDER, LEADS, PENDING_SUBS, ESCALATIONS, ROLE_IDENTITIES,
   DIRECTIVES,
   POINTS_RUBRIC, UNIVERSAL_WEEKS, TRACK_BRIEFS, DISCOVERY_TIERS, PROSPECTS,
+  getTierKeyForPoints, getTierProgressForPoints, getMilestoneBadgeCount, rankExonautRows,
 });

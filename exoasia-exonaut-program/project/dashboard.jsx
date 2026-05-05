@@ -26,6 +26,15 @@ function HeroStats() {
   const activeCohort = window.getActiveCohort?.(profile) || COHORT;
   const cohortMembers = window.getUsersForCohort?.(activeCohort?.id || profile.cohortId || ME.cohort) || [];
   const { total: livePoints, delta: liveDelta } = useComputedPoints(profile.id);
+  const rowsFromProfiles = useSupabaseExonautRows();
+  const rankedRows = React.useMemo(
+    () => window.rankExonautRows ? window.rankExonautRows(rowsFromProfiles) : [...rowsFromProfiles].sort((a,b) => b.points - a.points).map((u, i) => ({ ...u, cohortRank: i + 1 })),
+    [rowsFromProfiles]
+  );
+  const liveRank = rankedRows.find(u => u.id === profile.id)?.cohortRank || 1;
+  const tierProgress = window.getTierProgressForPoints
+    ? window.getTierProgressForPoints(livePoints)
+    : { tier: 'entry', current: TIERS.entry, next: TIERS.builder, pointsOver: livePoints, pointsToNext: Math.max(0, 100 - livePoints) };
   const liveBadges = useLiveBadges(profile.id);
   const missions = useMissions();
   const { projects, tasks, assignees } = useProjects();
@@ -37,11 +46,11 @@ function HeroStats() {
       <StatCell label="TOTAL POINTS" icon="fa-bolt" value={livePoints} lime
         meta={liveDelta > 0 ? `AUTO · +${liveDelta} JUST GRADED` : 'AUTO · +85 THIS WEEK'} metaDir="up" />
       <StatCell label="RANK" icon="fa-ranking-star"
-        value={`#${ME_RANK}`} unit={`of ${cohortMembers.length || COHORT.size}`}
+        value={`#${liveRank}`} unit={`of ${rankedRows.length || cohortMembers.length || COHORT.size}`}
         meta="+3 vs LAST WK" metaDir="up" />
       <StatCell label="TIER" icon="fa-shield-halved"
-        value="PRIME" unit={`·\u00A0${livePoints - TIERS.prime.min} over`}
-        meta={`${Math.max(0, 600 - livePoints)} TO ELITE`} metaDir="flat" />
+        value={tierProgress.current.short} unit={`·\u00A0${tierProgress.pointsOver} over`}
+        meta={tierProgress.next ? `${tierProgress.pointsToNext} TO ${tierProgress.next.short}` : 'TOP TIER'} metaDir="flat" />
       <StatCell label="TRACK" icon="fa-bullseye"
         value={completed} unit={`of ${missions.length}`}
         meta={`${missions.filter(m => m.status !== 'approved').length} ACTIVE`} metaDir="flat" />
@@ -304,7 +313,10 @@ function ProjectFeed() {
 function LeaderboardSnapshot({ onView }) {
   const { profile } = useCurrentUserProfile();
   const rowsFromProfiles = useSupabaseExonautRows();
-  const sorted = [...rowsFromProfiles].sort((a,b) => b.points - a.points);
+  const sorted = React.useMemo(
+    () => window.rankExonautRows ? window.rankExonautRows(rowsFromProfiles) : [...rowsFromProfiles].sort((a,b) => b.points - a.points).map((u, i) => ({ ...u, cohortRank: i + 1 })),
+    [rowsFromProfiles]
+  );
   const meIdx = sorted.findIndex(u => u.id === profile.id);
   const rows = [
     ...sorted.slice(0, 3),

@@ -339,10 +339,9 @@ function sameRoster(profile, trackCode, cohortId) {
 
 function CrownStatusPill({ crown }) {
   if (!crown) return <span className="status-pill">NO CROWN</span>;
-  const days = Math.max(0, Math.ceil((crown.dueAt - Date.now()) / 86400000));
   return (
-    <span className="status-pill" style={{ color: days <= 2 ? 'var(--amber)' : 'var(--platinum)', borderColor: days <= 2 ? 'rgba(244,197,66,0.35)' : 'rgba(127,227,255,0.35)' }}>
-      <i className="fa-solid fa-crown" /> {days}D LEFT
+    <span className="status-pill" style={{ color: 'var(--platinum)', borderColor: 'rgba(127,227,255,0.35)' }}>
+      <i className="fa-solid fa-crown" /> ACTIVE
     </span>
   );
 }
@@ -372,12 +371,10 @@ function PassTheCrownPage() {
 
   const roster = (profiles || []).filter(p => sameRoster(p, crown.trackCode, crown.cohortId) && p.id !== profile.id);
   const pending = window.__crownStore.all().requests.find(r => r.status === 'pending' && r.trackCode === crown.trackCode);
-  const canRotate = Date.now() >= crown.dueAt;
 
   async function submit() {
     setError('');
     try {
-      if (!canRotate) throw new Error('The crown can be passed after the two-week rotation date.');
       await window.__crownStore.requestCrownTransfer({
         trackCode: crown.trackCode,
         fromUserId: profile.id,
@@ -413,18 +410,9 @@ function PassTheCrownPage() {
         </div>
       )}
 
-      {!canRotate && (
-        <div className="card-panel" style={{ borderLeft: '2px solid var(--platinum)', padding: 18, marginBottom: 18 }}>
-          <div className="t-label" style={{ color: 'var(--platinum)', marginBottom: 6 }}>ROTATION NOT DUE YET</div>
-          <div className="t-body" style={{ color: 'var(--off-white-68)' }}>
-            You can request the handoff after the two-week crown period ends.
-          </div>
-        </div>
-      )}
-
       <div className="card-panel" style={{ padding: 24 }}>
         <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.1em', marginBottom: 8 }}>NEW CROWN HOLDER</div>
-        <select value={toUserId} onChange={e => setToUserId(e.target.value)} disabled={!!pending || !canRotate} style={{
+        <select value={toUserId} onChange={e => setToUserId(e.target.value)} disabled={!!pending} style={{
           width: '100%', padding: '10px 12px', background: 'var(--deep-black)', color: 'var(--off-white)',
           border: '1px solid var(--off-white-15)', borderRadius: 2, fontFamily: 'var(--font-mono)', fontSize: 11,
         }}>
@@ -433,13 +421,13 @@ function PassTheCrownPage() {
         </select>
 
         <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.1em', margin: '16px 0 6px' }}>HANDOFF NOTE</div>
-        <textarea value={note} onChange={e => setNote(e.target.value)} rows={4} disabled={!!pending || !canRotate}
+        <textarea value={note} onChange={e => setNote(e.target.value)} rows={4} disabled={!!pending}
           placeholder="Summarize current queue status, risks, and why this handoff is ready for Commander approval."
           style={{ width: '100%', padding: 10, background: 'var(--deep-black)', color: 'var(--off-white)', border: '1px solid var(--off-white-15)', borderRadius: 2, fontFamily: 'var(--font-display)', fontSize: 12, outline: 'none', resize: 'vertical' }} />
 
         {error && <div className="t-body" style={{ marginTop: 12, color: 'var(--red)' }}>{error}</div>}
 
-        <button className="btn btn-primary" disabled={!toUserId || !!pending || !canRotate} onClick={submit} style={{ marginTop: 16, opacity: (!toUserId || pending || !canRotate) ? 0.5 : 1 }}>
+        <button className="btn btn-primary" disabled={!toUserId || !!pending} onClick={submit} style={{ marginTop: 16, opacity: (!toUserId || pending) ? 0.5 : 1 }}>
           <i className="fa-solid fa-paper-plane" /> SEND TO COMMANDER
         </button>
       </div>

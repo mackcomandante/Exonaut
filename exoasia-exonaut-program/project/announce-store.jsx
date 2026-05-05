@@ -1,7 +1,7 @@
 // ============================================================================
 // Announce store — Lead, Commander, and Platform Admin can post announcements.
-// Persists to localStorage.  Seeded from the hardcoded list in screens.jsx if
-// that const exists at init.  Audience scoping:
+// Persists to Supabase with localStorage fallback.  Seeded from the hardcoded
+// list in screens.jsx if that const exists at init.  Audience scoping:
 //   { kind: 'all' }                                 → every Exonaut
 //   { kind: 'cohorts', cohorts: [id, id] }          → members of these cohorts
 //   { kind: 'tracks',  tracks:  [code, code] }      → members of these tracks
@@ -50,10 +50,96 @@
 
   const listeners = new Set();
   const state = loadState();
+  let loadedRemote = false;
 
   function notify() {
     persist(state);
     listeners.forEach(fn => fn());
+  }
+
+  async function currentUserId() {
+    if (!window.__db || !window.__db.auth) return null;
+    const session = await window.__db.auth.getSession();
+    return session?.data?.session?.user?.id || null;
+  }
+
+  function fromRow(row) {
+    return {
+      id: row.id,
+      type: row.type || 'info',
+      title: row.title || 'Untitled',
+      body: row.body || '',
+      from: row.author_name || 'Mission Commander',
+      fromRole: row.author_role || 'commander',
+      audience: row.audience || { kind: 'all' },
+      createdAt: row.created_at ? new Date(row.created_at).getTime() : Date.now(),
+      pinned: !!row.pinned,
+      link: row.link || null,
+      createdBy: row.created_by || null,
+    };
+  }
+
+  function toRow(a, createdBy) {
+    return {
+      id: a.id,
+      type: a.type || 'info',
+      title: a.title || 'Untitled',
+      body: a.body || '',
+      author_name: a.from || 'Mission Commander',
+      author_role: a.fromRole || 'commander',
+      audience: a.audience || { kind: 'all' },
+      pinned: !!a.pinned,
+      link: a.link || null,
+      created_by: a.createdBy || createdBy || null,
+      created_at: a.createdAt ? new Date(a.createdAt).toISOString() : new Date().toISOString(),
+    };
+  }
+
+  function reactionsFromRows(rows) {
+    const grouped = {};
+    (rows || []).forEach(r => {
+      if (!grouped[r.announcement_id]) grouped[r.announcement_id] = {};
+      grouped[r.announcement_id][r.emoji] = (grouped[r.announcement_id][r.emoji] || 0) + 1;
+    });
+    return grouped;
+  }
+
+  async function refreshRemote() {
+    if (!window.__db) return state;
+    const [annRes, reactRes] = await Promise.all([
+      window.__db.from('announcements').select('*').order('created_at', { ascending: false }),
+      window.__db.from('announcement_reactions').select('*'),
+    ]);
+    if (annRes.error) {
+      console.warn('Could not load announcements:', annRes.error.message || annRes.error);
+      return state;
+    }
+    loadedRemote = true;
+    if ((annRes.data || []).length === 0 && state.announcements.length) {
+      const createdBy = await currentUserId();
+      const { error: seedError } = await window.__db
+        .from('announcements')
+        .upsert(state.announcements.map(a => toRow(a, createdBy)), { onConflict: 'id' });
+      if (seedError) console.warn('Could not seed announcements:', seedError.message || seedError);
+      return state;
+    }
+    state.announcements = (annRes.data || []).map(fromRow);
+    if (!reactRes.error) state.reactions = reactionsFromRows(reactRes.data || []);
+    else console.warn('Could not load announcement reactions:', reactRes.error.message || reactRes.error);
+    notify();
+    return state;
+  }
+
+  function subscribeRemote() {
+    if (!window.__db) return () => {};
+    const channel = window.__db
+      .channel('announcements-store-' + Math.random().toString(36).slice(2))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, () => refreshRemote())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'announcement_reactions' }, () => refreshRemote())
+      .subscribe();
+    return () => {
+      if (window.__db && channel) window.__db.removeChannel(channel);
+    };
   }
 
   function timeAgo(ts) {
@@ -159,6 +245,15 @@
       };
       state.announcements.unshift(a);
       notify();
+      if (window.__db) {
+        currentUserId().then(createdBy => {
+          a.createdBy = createdBy;
+          return window.__db.from('announcements').upsert(toRow(a, createdBy), { onConflict: 'id' });
+        }).then(({ error }) => {
+          if (error) console.warn('Could not save announcement:', error.message || error);
+          else refreshRemote();
+        });
+      }
       return a;
     },
     update(id, patch) {
@@ -166,6 +261,12 @@
       if (!a) return null;
       Object.assign(a, patch);
       notify();
+      if (window.__db) {
+        window.__db.from('announcements').update(toRow(a)).eq('id', id).then(({ error }) => {
+          if (error) console.warn('Could not update announcement:', error.message || error);
+          else refreshRemote();
+        });
+      }
       return a;
     },
     remove(id) {
@@ -174,6 +275,11 @@
       state.announcements.splice(i, 1);
       delete state.reactions[id];
       notify();
+      if (window.__db) {
+        window.__db.from('announcements').delete().eq('id', id).then(({ error }) => {
+          if (error) console.warn('Could not delete announcement:', error.message || error);
+        });
+      }
       return true;
     },
     togglePin(id) {
@@ -181,6 +287,12 @@
       if (!a) return;
       a.pinned = !a.pinned;
       notify();
+      if (window.__db) {
+        window.__db.from('announcements').update({ pinned: a.pinned }).eq('id', id).then(({ error }) => {
+          if (error) console.warn('Could not pin announcement:', error.message || error);
+          else refreshRemote();
+        });
+      }
     },
 
     // Reactions ---------------------------------------------------------------
@@ -188,6 +300,17 @@
       if (!state.reactions[announceId]) state.reactions[announceId] = {};
       state.reactions[announceId][emoji] = (state.reactions[announceId][emoji] || 0) + 1;
       notify();
+      if (window.__db) {
+        currentUserId().then(userId => window.__db.from('announcement_reactions').insert({
+          id: 'ar-' + announceId + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+          announcement_id: announceId,
+          emoji,
+          user_id: userId,
+        })).then(({ error }) => {
+          if (error) console.warn('Could not save announcement reaction:', error.message || error);
+          else refreshRemote();
+        });
+      }
     },
     reactionsFor(announceId) { return state.reactions[announceId] || {}; },
 
@@ -203,7 +326,12 @@
 
   window.useAnnouncements = function useAnnouncements() {
     const [, setTick] = React.useState(0);
-    React.useEffect(() => store.subscribe(() => setTick(t => t + 1)), []);
+    React.useEffect(() => {
+      const unsub = store.subscribe(() => setTick(t => t + 1));
+      if (!loadedRemote) refreshRemote();
+      const unsubRemote = subscribeRemote();
+      return () => { unsub(); unsubRemote(); };
+    }, []);
     return {
       all: store.all(),
       visibleTo: store.visibleTo,

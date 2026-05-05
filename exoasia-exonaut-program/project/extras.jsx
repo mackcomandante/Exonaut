@@ -140,7 +140,7 @@ function LegacyKudosModal({ onClose, onSent }) {
       id: profile.id || ME_ID,
       name: profile.fullName || ME.name || 'You',
       role,
-      badge: role === 'exonaut' ? null : role.toUpperCase(),
+      badge: role === 'admin' ? 'Exonaut credential' : (role === 'exonaut' ? null : role.toUpperCase()),
     };
   }, [profile.id, profile.fullName, profile.role]);
 
@@ -201,9 +201,7 @@ function LegacyKudosModal({ onClose, onSent }) {
         <select className="select" value={recipient} onChange={(e) => setRecipient(e.target.value)} style={{ marginBottom: 14 }} size={filteredPool.length > 0 ? Math.min(6, filteredPool.length + 1) : 1}>
           <option value="">Select a community member…</option>
           {filteredPool.map(u => {
-            const trackShort = (typeof TRACKS !== 'undefined') ? TRACKS.find(t => t.code === u.track)?.short : u.track;
-            const label = [u.name, trackShort, u.status === 'alumni' ? 'ALUMNI · ' + u.cohort : null].filter(Boolean).join(' · ');
-            return <option key={u.id} value={u.id}>{label}</option>;
+            return <option key={u.id} value={u.id}>{u.name}</option>;
           })}
         </select>
 
@@ -334,7 +332,7 @@ function KudosModal({ onClose, onSent }) {
       id: profile.id || ME_ID,
       name: profile.fullName || ME.name || 'You',
       role,
-      badge: role === 'exonaut' ? null : role.toUpperCase(),
+      badge: role === 'admin' ? 'Exonaut credential' : (role === 'exonaut' ? null : role.toUpperCase()),
     };
   }, [profile.id, profile.fullName, profile.role]);
 
@@ -348,7 +346,7 @@ function KudosModal({ onClose, onSent }) {
   const pool = React.useMemo(() => {
     const fromProfiles = (profiles || []).map(p => ({
       id: p.id,
-      name: p.fullName || p.email || 'Exonaut',
+      name: p.fullName || 'Exonaut',
       email: p.email || '',
       track: p.trackCode || '',
       cohort: p.cohortId || 'c2627',
@@ -430,7 +428,7 @@ function KudosModal({ onClose, onSent }) {
 
         <label className="t-label-muted" style={{ display: 'block', marginBottom: 6 }}>RECIPIENT</label>
         <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search cohort members by name or email..."
+          placeholder="Search cohort members by name..."
           style={{
             width: '100%', padding: '9px 12px', marginBottom: 8,
             background: 'var(--deep-black)', color: 'var(--off-white)',
@@ -440,9 +438,7 @@ function KudosModal({ onClose, onSent }) {
         <select className="select" value={recipient} onChange={(e) => setRecipient(e.target.value)} style={{ marginBottom: 14 }} size={filteredPool.length > 0 ? Math.min(6, filteredPool.length + 1) : 1}>
           <option value="">{pool.length ? 'Select a cohort member...' : 'No cohort members available'}</option>
           {filteredPool.map(u => {
-            const trackShort = (typeof TRACKS !== 'undefined') ? TRACKS.find(t => t.code === u.track)?.short : u.track;
-            const label = [u.name, u.email, trackShort].filter(Boolean).join(' · ');
-            return <option key={u.id} value={u.id}>{label}</option>;
+            return <option key={u.id} value={u.id}>{u.name}</option>;
           })}
         </select>
         {sendError && (
