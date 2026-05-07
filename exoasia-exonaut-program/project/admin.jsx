@@ -289,6 +289,7 @@ function AdminCohortFilter() {
 // -------- Platform Admin sidebar --------
 function PlatformAdminSidebar({ current, onNavigate, onSignOut }) {
   const { profile } = useCurrentUserProfile();
+  const { unreadCount } = useNotifications(profile);
   const displayName = profile.fullName || 'Platform Admin';
   const me = [
     { id: 'pa-profile',  label: 'My Profile',         icon: 'fa-id-badge' },
@@ -302,6 +303,7 @@ function PlatformAdminSidebar({ current, onNavigate, onSignOut }) {
     { id: 'pa-projects', label: 'Project Builder',     icon: 'fa-diagram-project' },
     { id: 'pa-users',    label: 'User Directory',     icon: 'fa-address-book' },
     { id: 'pa-console',  label: 'System Console',     icon: 'fa-shield-halved' },
+    { id: 'pa-manual-credit', label: 'Manual Credit', icon: 'fa-clipboard-check' },
     { id: 'pa-removals', label: 'Removals',           icon: 'fa-user-slash' },
     { id: 'pa-announce', label: 'Announcements',      icon: 'fa-bullhorn' },
     { id: 'kudos',       label: 'Kudos',              icon: 'fa-hand-sparkles' },
@@ -343,7 +345,7 @@ function PlatformAdminSidebar({ current, onNavigate, onSignOut }) {
       </nav>
 
       <div className="sidebar-footer">
-        <button title="Notifications" onClick={() => onNavigate('notifications')}><i className="fa-solid fa-bell" /><span style={{ position: 'absolute', top: 6, right: 6, width: 6, height: 6, borderRadius: '50%', background: 'var(--sky)' }} /></button>
+        <button title="Notifications" onClick={() => onNavigate('notifications')}><i className="fa-solid fa-bell" />{unreadCount > 0 && <span style={{ position: 'absolute', top: 6, right: 6, width: 6, height: 6, borderRadius: '50%', background: 'var(--sky)' }} />}</button>
         <button title="Settings" onClick={() => onNavigate('settings')}><i className="fa-solid fa-gear" /></button>
         <button title="Log out" onClick={onSignOut}><i className="fa-solid fa-right-from-bracket" /></button>
       </div>

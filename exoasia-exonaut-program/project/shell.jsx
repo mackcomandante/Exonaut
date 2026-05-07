@@ -2,6 +2,7 @@
 
 function Sidebar({ current, onNavigate, onSignOut }) {
   const { profile } = useCurrentUserProfile();
+  const { unreadCount } = useNotifications(profile);
   useCrownState();
   const projectState = useProjects();
   const crown = window.__crownStore.getUserCrown(profile.id);
@@ -37,6 +38,7 @@ function Sidebar({ current, onNavigate, onSignOut }) {
     { id: 'lead-home',      label: 'Track Command', icon: 'fa-satellite-dish' },
     { id: 'lead-queue',     label: 'Review Queue',  icon: 'fa-clipboard-check' },
     { id: 'lead-roster',    label: 'Roster',        icon: 'fa-users' },
+    { id: 'lead-manual-credit', label: 'Manual Credit', icon: 'fa-clipboard-check' },
     { id: 'lead-announce',  label: 'Announcements', icon: 'fa-bullhorn' },
     { id: 'lead-removals',  label: 'Removals',      icon: 'fa-user-slash' },
     { id: 'crown-pass',     label: 'Pass Crown',    icon: 'fa-crown' },
@@ -128,7 +130,7 @@ function Sidebar({ current, onNavigate, onSignOut }) {
       <div className="sidebar-footer">
         <button title="Notifications" onClick={() => onNavigate('notifications')}>
           <i className="fa-solid fa-bell" />
-          <span style={{ position: 'absolute', top: 6, right: 6, width: 6, height: 6, borderRadius: '50%', background: 'var(--lime)' }} />
+          {unreadCount > 0 && <span style={{ position: 'absolute', top: 6, right: 6, width: 6, height: 6, borderRadius: '50%', background: 'var(--lime)' }} />}
         </button>
         <button title="Settings" onClick={() => onNavigate('settings')}><i className="fa-solid fa-gear" /></button>
         <button title="Log out" onClick={onSignOut}><i className="fa-solid fa-right-from-bracket" /></button>
@@ -139,6 +141,7 @@ function Sidebar({ current, onNavigate, onSignOut }) {
 
 function Topbar({ crumbs, onNavigate }) {
   const { profile } = useCurrentUserProfile();
+  const { unreadCount } = useNotifications(profile);
   const cohort = window.getActiveCohort?.(profile) || COHORT;
   const weekTotal = window.getCohortWeekTotal?.(cohort) || COHORT.weekTotal;
   const [time, setTime] = React.useState('');
@@ -174,7 +177,7 @@ function Topbar({ crumbs, onNavigate }) {
                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--off-white-68)', position: 'relative', padding: '0 6px' }}
                 title="Notifications">
           <i className="fa-solid fa-bell" />
-          <span style={{ position: 'absolute', top: -2, right: 0, width: 6, height: 6, borderRadius: '50%', background: 'var(--lime)' }} />
+          {unreadCount > 0 && <span style={{ position: 'absolute', top: -2, right: 0, width: 6, height: 6, borderRadius: '50%', background: 'var(--lime)' }} />}
         </button>
         <span className="topbar-live"><span className="pulse" /> LIVE</span>
       </div>

@@ -317,6 +317,7 @@ function LegacyMissionsList({ onOpenMission }) {
 function WeeklyMissionsList({ onOpenMission }) {
   const missions = useMissions();
   const subs = useSubs();
+  const manualCredits = useManualCredits();
   const { profile } = useCurrentUserProfile();
   const activeCohort = window.getActiveCohort?.(profile) || COHORT;
   const cohortName = activeCohort?.name || COHORT.name;
@@ -337,7 +338,34 @@ function WeeklyMissionsList({ onOpenMission }) {
     rejected: { cls: 'status-overdue', label: 'REJECTED' },
   };
 
-  const submissionFor = (missionId) => subs.find(s => s.exonautId === profile.id && s.missionId === missionId);
+  const normalizeManualLabel = (value) => String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+
+  const manualCreditFor = (mission) => manualCredits.credits.find(c => {
+    if (c.userId !== profile.id) return false;
+    if (c.activityType !== 'track_task') return false;
+    if ((c.cohortId || 'c2627') !== myCohort) return false;
+    if (c.relatedId && c.relatedId === mission.id) return true;
+    return normalizeManualLabel(c.relatedLabel) && normalizeManualLabel(c.relatedLabel) === normalizeManualLabel(mission.title);
+  });
+
+  const submissionFor = (missionId) => {
+    const direct = subs.find(s => s.exonautId === profile.id && s.missionId === missionId);
+    if (direct) return direct;
+    const mission = missions.find(m => m.id === missionId);
+    const credit = mission ? manualCreditFor(mission) : null;
+    if (!credit) return null;
+    return {
+      id: 'manual-credit-' + credit.id,
+      missionId,
+      missionTitle: mission?.title || credit.relatedLabel || missionId,
+      exonautId: profile.id,
+      state: 'approved',
+      grade: credit.grade || 'approved',
+      feedback: credit.evidenceNote || 'Credited manually from pre-platform evidence.',
+      pointsAwarded: Number(credit.points) || Number(mission?.points) || 0,
+      manualCredit: true,
+    };
+  };
 
   const taskStatus = (mission) => {
     const sub = submissionFor(mission.id);
@@ -404,7 +432,7 @@ function WeeklyMissionsList({ onOpenMission }) {
         if (statusFilter === 'active') return group.status !== 'approved';
         return true;
       });
-  }, [scopedMissions, subs, filter, statusFilter, profile.id]);
+  }, [scopedMissions, subs, manualCredits.credits, filter, statusFilter, profile.id]);
 
   return (
     <div className="enter">
@@ -866,50 +894,37 @@ function AnnouncementsPage() {
 }
 
 // ========== NOTIFICATIONS ==========
-const NOTIFICATIONS = [
-  { type: 'badge', title: 'You earned Silver Strategist', sub: '300-point milestone · +0 pts (badge-only)', time: '2h ago', icon: 'fa-medal', unread: true,
-    share: { kind: 'badge', payload: { code: 'MIL-SLV', name: 'Silver Strategist', subtitle: '300 points milestone', category: 'milestone', color: '#A8B4BE' } } },
-  { type: 'kudos', title: 'Priya sent you kudos', sub: '"Your Kestrel brief was absurdly clean…"', time: '4h ago', icon: 'fa-hand-sparkles', unread: true },
-  { type: 'rank', title: 'Rank update: #17 → #14', sub: 'You moved up 3 positions this week', time: '8h ago', icon: 'fa-arrow-trend-up', unread: true },
-  { type: 'points', title: '+40 points awarded', sub: 'Track Orientation · graded EXCELLENT', time: 'Yesterday', icon: 'fa-bolt', unread: false,
-    share: { kind: 'citation', payload: { id: 'CIT-TRK-ORI', title: 'Track Orientation', grade: 'Excellent', pointsAwarded: 40, color: '#C9F24A', feedback: 'Strong grasp of the full track arc. Reading of the 12-week rhythm and pillar weighting is unusually clear for week 1.' } } },
-  { type: 'mission', title: 'New mission assigned', sub: 'Competitive Landscape Analysis · due in 2 days', time: 'Yesterday', icon: 'fa-bullseye', unread: false },
-  { type: 'award', title: 'You were named Intern of the Week', sub: 'Week 2 · +25 pts · Community vote', time: '3d ago', icon: 'fa-trophy', unread: false,
-    share: { kind: 'award', payload: { code: 'SPL-IOW', name: 'Intern of the Week', subtitle: 'Week 2 · community-voted', color: '#FFB020' } } },
-  { type: 'announce', title: 'Mack posted an announcement', sub: 'Midpoint Fire Check scheduled · OCT 28', time: '2d ago', icon: 'fa-bullhorn', unread: false },
-];
-
 function NotificationsPage() {
   const { profile } = useCurrentUserProfile();
-  const { tasks, assignees } = useProjects();
-  const projectNotifications = tasks
-    .filter(t => assignees.some(a => a.taskId === t.id && a.userId === profile.id) || t.consultedId === profile.id)
-    .slice(0, 6)
-    .map(t => ({
-      type: 'project',
-      title: t.taskClass === 'critical' ? 'Critical project task' : 'Project task update',
-      sub: `${t.title} · ${window.__projectStore.deadlineState(t)} · +${t.points} pts`,
-      time: t.dueDate || 'Project Feed',
-      icon: t.taskClass === 'critical' ? 'fa-bolt' : 'fa-list-check',
-      unread: t.taskClass === 'critical' && t.status === 'assigned',
-    }));
-  const notifications = [...projectNotifications, ...NOTIFICATIONS];
+  const { notifications, unreadCount, markRead, markAllRead, timeAgo, loaded, error } = useNotifications(profile);
   return (
     <div className="enter">
       <div className="section-head">
         <div>
-          <div className="t-label" style={{ marginBottom: 8 }}>REAL-TIME · 3 UNREAD</div>
+          <div className="t-label" style={{ marginBottom: 8 }}>REAL-TIME · {unreadCount} UNREAD</div>
           <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>Notifications</h1>
         </div>
-        <button className="btn btn-ghost">MARK ALL READ</button>
+        <button className="btn btn-ghost" disabled={!unreadCount} onClick={markAllRead}>MARK ALL READ</button>
       </div>
 
       <div className="card-panel" style={{ padding: 0 }}>
+        {error && (
+          <div className="t-body" style={{ padding: 24, color: 'var(--amber)' }}>{error}</div>
+        )}
+        {loaded && notifications.length === 0 && (
+          <div style={{ padding: 40, textAlign: 'center' }}>
+            <i className="fa-solid fa-bell-slash" style={{ fontSize: 32, color: 'var(--off-white-40)', marginBottom: 12 }} />
+            <div className="t-heading" style={{ fontSize: 14, margin: '0 0 6px 0' }}>No notifications yet</div>
+            <div className="t-body" style={{ fontSize: 12, color: 'var(--off-white-68)' }}>
+              Project assignments, reviews, announcements, badges, and point events will appear here in real time.
+            </div>
+          </div>
+        )}
         {notifications.map((n, i) => (
-          <div key={i} style={{
+          <div key={n.id} onClick={() => markRead(n.id)} style={{
             display: 'grid', gridTemplateColumns: '40px 1fr auto auto', gap: 16,
             padding: '18px 24px', borderBottom: i < notifications.length - 1 ? '1px solid var(--off-white-07)' : 'none',
-            background: n.unread ? 'rgba(201,229,0,0.03)' : 'transparent',
+            background: !n.read ? 'rgba(201,229,0,0.03)' : 'transparent',
             alignItems: 'center', cursor: 'pointer', transition: 'background 150ms',
           }}>
             <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--bg-dark)', border: '1px solid var(--off-white-07)', display: 'grid', placeItems: 'center', color: 'var(--ink)' }}>
@@ -917,11 +932,11 @@ function NotificationsPage() {
             </div>
             <div>
               <div className="t-heading" style={{ fontSize: 13, textTransform: 'none', letterSpacing: 0 }}>
-                {n.title} {n.unread && <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: 'var(--lime)', marginLeft: 6, verticalAlign: 'middle' }} />}
+                {n.title} {!n.read && <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: 'var(--lime)', marginLeft: 6, verticalAlign: 'middle' }} />}
               </div>
               <div className="t-body" style={{ fontSize: 13, marginTop: 2 }}>{n.sub}</div>
             </div>
-            <div>
+            <div onClick={e => e.stopPropagation()}>
               {n.share && (
                 <ShareButton
                   kind={n.share.kind}
@@ -931,14 +946,13 @@ function NotificationsPage() {
                 />
               )}
             </div>
-            <div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)' }}>{n.time}</div>
+            <div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)' }}>{timeAgo(n.createdAt)}</div>
           </div>
         ))}
       </div>
     </div>
   );
 }
-
 // ========== ADMIN PANEL ==========
 function AdminPanel() {
   const missions = useMissions();

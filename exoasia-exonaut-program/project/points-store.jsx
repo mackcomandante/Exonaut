@@ -96,6 +96,27 @@
     const local = toEntry(row);
     state = { ...state, ledger: [local, ...state.ledger.filter(e => e.id !== row.id)] };
     notify();
+    if (window.__notifStore && row.user_id && !['project', 'kudos', 'manual', 'mission'].includes(row.source_type)) {
+      window.__notifStore.add({
+        toUserId: row.user_id,
+        type: 'points',
+        title: `+${row.points} points awarded`,
+        sub: row.note || 'Approved work',
+        icon: 'fa-bolt',
+        share: {
+          kind: 'citation',
+          payload: {
+            id: 'CIT-' + row.source_id,
+            title: row.note || 'Approved work',
+            grade: 'Approved',
+            pointsAwarded: row.points,
+            color: '#C9F24A',
+            feedback: row.note || 'Approved work.',
+          },
+        },
+        metadata: { sourceType: row.source_type, sourceId: row.source_id },
+      });
+    }
 
     if (window.__db) {
       const { error } = await window.__db.from('point_ledger').upsert(row, { onConflict: 'id' });

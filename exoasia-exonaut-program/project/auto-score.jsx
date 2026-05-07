@@ -172,6 +172,17 @@
             badge.earned = true;
             badge.date = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toUpperCase();
             persistUserBadge(ME_ID, badge, 'system', { threshold: m.at });
+            if (window.__notifStore) {
+              window.__notifStore.add({
+                toUserId: ME_ID,
+                type: 'badge',
+                title: 'You earned ' + badge.name,
+                sub: (badge.subtitle || (m.at + ' points')) + ' milestone',
+                icon: 'fa-medal',
+                share: { kind: 'badge', payload: badge },
+                metadata: { badgeCode: badge.code, threshold: m.at },
+              });
+            }
             setTimeout(() => onCelebrate('badge', { badge }), 900);
           }
         }

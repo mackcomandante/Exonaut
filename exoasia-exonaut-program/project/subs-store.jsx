@@ -192,6 +192,60 @@ function missionForSubmission(sub) {
   return (window.__missionStore?.all() || []).find(m => m.id === sub.missionId);
 }
 
+async function currentGraderId() {
+  if (!window.__db?.auth) return localStorage.getItem('exo:userId') || null;
+  const session = await window.__db.auth.getSession();
+  return session?.data?.session?.user?.id || localStorage.getItem('exo:userId') || null;
+}
+
+async function upsertManualApprovedSubmission({ id, missionId, missionTitle, exonautId, grade = 'approved', feedback = '', pointsAwarded = 0, gradedBy = null, gradedAt = null }) {
+  if (!missionId || !exonautId) return null;
+  const existing = subStore.subs.find(s => s.exonautId === exonautId && s.missionId === missionId);
+  const now = gradedAt || new Date().toISOString();
+  const next = {
+    ...(existing || {}),
+    id: existing?.id || id || ('manual-sub-' + missionId + '-' + exonautId),
+    missionId,
+    missionTitle: missionTitle || existing?.missionTitle || missionId,
+    exonautId,
+    submittedAt: existing?.submittedAt || 'manual credit',
+    submittedAtIso: existing?.submittedAtIso || now,
+    deliverable: existing?.deliverable || 'manual-credit',
+    wordCount: existing?.wordCount || 0,
+    isLate: !!existing?.isLate,
+    fileName: existing?.fileName || '',
+    fileSize: existing?.fileSize || '',
+    fileType: existing?.fileType || '',
+    filePath: existing?.filePath || '',
+    note: existing?.note || 'Credited manually from pre-platform evidence.',
+    state: 'approved',
+    grade,
+    feedback,
+    pointsAwarded: Number(pointsAwarded) || 0,
+    gradedBy,
+    gradedAt: now,
+  };
+
+  subStore.subs = existing
+    ? subStore.subs.map(s => s.id === existing.id ? next : s)
+    : [next, ...subStore.subs];
+  notifySubs();
+
+  if (window.__db) {
+    const row = submissionToRow(next);
+    row.submitted_at = next.submittedAtIso;
+    row.graded_by = gradedBy;
+    row.graded_at = now;
+    const { error } = await window.__db.from('mission_submissions').upsert(row, { onConflict: 'id' });
+    if (error) {
+      console.warn('Could not save manual approved submission:', error.message || error);
+      throw error;
+    }
+    refreshSubs();
+  }
+  return next;
+}
+
 // Lead-facing: grade a sub.
 const gradeSubmission = ({ subId, grade, feedback }) => {
   const sub = subStore.subs.find(s => s.id === subId);
@@ -239,6 +293,30 @@ const gradeSubmission = ({ subId, grade, feedback }) => {
         awardedAt: gradedAt,
       });
     }
+    if (sub && window.__notifStore) {
+      const missionTitle = mission?.title || sub.missionTitle || 'Track task';
+      window.__notifStore.add({
+        toUserId: sub.exonautId,
+        type: state === 'approved' ? 'mission-graded' : 'mission-review',
+        title: state === 'approved' ? `${missionTitle} approved` : `${missionTitle} reviewed`,
+        sub: state === 'approved'
+          ? `${grade} - +${pointsAwarded} pts`
+          : `${grade} - ${feedback || 'Review available'}`,
+        icon: state === 'approved' ? 'fa-circle-check' : 'fa-comment-dots',
+        share: state === 'approved' ? {
+          kind: 'citation',
+          payload: {
+            id: 'CIT-' + subId,
+            title: missionTitle,
+            grade,
+            pointsAwarded,
+            color: '#C9F24A',
+            feedback: feedback || 'Approved by Track Lead.',
+          },
+        } : null,
+        metadata: { submissionId: subId, missionId: sub.missionId, state, grade },
+      });
+    }
     refreshSubs();
   })();
 };
@@ -257,13 +335,51 @@ const getSubmissionFileUrl = async (sub) => {
   return data?.signedUrl || '';
 };
 
-const getMySubmission = (missionId) =>
-  subStore.subs.find(s => s.exonautId === getActiveUserId() && s.missionId === missionId);
+function normalizeManualCreditLabel(value) {
+  return String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+const getMySubmission = (missionId) => {
+  const userId = getActiveUserId();
+  const direct = subStore.subs.find(s => s.exonautId === userId && s.missionId === missionId);
+  if (direct) return direct;
+  const mission = (window.__missionStore?.all?.() || []).find(m => m.id === missionId);
+  const credit = window.__manualCreditStore?.all?.().find(c => {
+    if (c.userId !== userId || c.activityType !== 'track_task') return false;
+    if (c.relatedId && c.relatedId === missionId) return true;
+    return mission && normalizeManualCreditLabel(c.relatedLabel) === normalizeManualCreditLabel(mission.title);
+  });
+  if (!credit) return null;
+  return {
+    id: 'manual-credit-' + credit.id,
+    missionId,
+    missionTitle: mission?.title || credit.relatedLabel || missionId,
+    exonautId: userId,
+    submittedAt: 'manual credit',
+    submittedAtIso: credit.creditedAt,
+    deliverable: 'manual-credit',
+    wordCount: 0,
+    isLate: false,
+    fileName: '',
+    fileSize: '',
+    fileType: '',
+    filePath: '',
+    note: 'Credited manually from pre-platform evidence.',
+    state: 'approved',
+    grade: credit.grade || 'approved',
+    feedback: credit.evidenceNote || '',
+    pointsAwarded: Number(credit.points) || Number(mission?.points) || 0,
+    gradedBy: credit.creditedBy,
+    gradedAt: credit.creditedAt,
+    manualCredit: true,
+  };
+};
 
 Object.assign(window, {
   useSubs,
   submitDeliverable,
   gradeSubmission,
+  upsertManualApprovedSubmission,
   getMySubmission,
   getSubmissionFileUrl,
   refreshSubs,

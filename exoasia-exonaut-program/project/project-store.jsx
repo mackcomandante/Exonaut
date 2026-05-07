@@ -286,15 +286,6 @@
       class: row.task_class,
       deadlineState: deadlineState(toTask(row)),
     });
-    if (!data.id && row.task_class === 'critical' && data.responsibleId && window.__notifStore) {
-      window.__notifStore.add({
-        toUserId: data.responsibleId,
-        type: 'project-task',
-        title: 'CRITICAL TASK ASSIGNED',
-        sub: `${row.title} needs acceptance ASAP.`,
-        icon: 'fa-bolt',
-      });
-    }
     if (!data.id && data.consultedId && window.__notifStore) {
       window.__notifStore.add({
         toUserId: data.consultedId,
@@ -389,6 +380,17 @@
         const { error } = await window.__db.from('project_task_assignees').upsert(rows, { onConflict: 'task_id,user_id' });
         if (error) throw error;
       }
+      const task = state.tasks.find(t => t.id === taskId);
+      if (task && window.__notifStore) {
+        (userIds || []).forEach(userId => window.__notifStore.add({
+          toUserId: userId,
+          type: 'project-task',
+          title: task.taskClass === 'critical' ? 'CRITICAL TASK ASSIGNED' : 'PROJECT TASK ASSIGNED',
+          sub: `${task.title} · ${deadlineState(task)} · +${task.points} pts`,
+          icon: task.taskClass === 'critical' ? 'fa-bolt' : 'fa-list-check',
+          metadata: { taskId },
+        }));
+      }
       await logActivity(taskId, 'assignees_updated', { count: rows.length });
       await refresh();
     },
@@ -416,6 +418,19 @@
         window.__db.from('project_tasks').update({ status: 'submitted', submitted_note: note || '' }).eq('id', taskId),
       ]);
       if (insertResult.error || taskResult.error) throw insertResult.error || taskResult.error;
+      const task = state.tasks.find(t => t.id === taskId);
+      if (task && window.__notifStore) {
+        [task.trackLeadId, task.secondOfficerId, task.accountableId].filter(Boolean).forEach(userId => {
+          if (userId !== submittedBy) window.__notifStore.add({
+            toUserId: userId,
+            type: 'project-submission',
+            title: 'PROJECT TASK SUBMITTED',
+            sub: task.title,
+            icon: 'fa-cloud-arrow-up',
+            metadata: { taskId, submittedBy },
+          });
+        });
+      }
       await logActivity(taskId, 'submission_added', { submittedBy, hasFile: !!fileUrl, hasLink: !!linkUrl });
       await refresh();
     },
@@ -430,6 +445,20 @@
       };
       const { error } = await window.__db.from('project_task_comments').insert(row);
       if (error) throw error;
+      const task = state.tasks.find(t => t.id === taskId);
+      if (task && window.__notifStore) {
+        const assigneeIds = state.assignees.filter(a => a.taskId === taskId).map(a => a.userId);
+        [...new Set([...assigneeIds, task.trackLeadId, task.secondOfficerId].filter(Boolean))]
+          .filter(userId => userId !== authorId)
+          .forEach(userId => window.__notifStore.add({
+            toUserId: userId,
+            type: kind === 'revision' ? 'project-revision' : 'project-comment',
+            title: kind === 'revision' ? 'REVISION REQUESTED' : 'PROJECT COMMENT ADDED',
+            sub: task.title,
+            icon: kind === 'revision' ? 'fa-rotate-left' : 'fa-comment',
+            metadata: { taskId, commentId: row.id },
+          }));
+      }
       await logActivity(taskId, kind === 'revision' ? 'revision_requested' : 'comment_added', { comment });
       await refresh();
     },
@@ -472,6 +501,27 @@
       if (rows.length) {
         const { error } = await window.__db.from('point_ledger').upsert(rows, { onConflict: 'id' });
         if (error) throw error;
+      }
+      if (window.__notifStore) {
+        recipients.forEach(userId => window.__notifStore.add({
+          toUserId: userId,
+          type: 'points',
+          title: `+${task.points} project points awarded`,
+          sub: task.title,
+          icon: 'fa-bolt',
+          share: {
+            kind: 'citation',
+            payload: {
+              id: 'CIT-' + taskId,
+              title: task.title,
+              grade: 'Approved',
+              pointsAwarded: task.points,
+              color: '#C9F24A',
+              feedback: note || 'Approved project task.',
+            },
+          },
+          metadata: { taskId },
+        }));
       }
       if (window.__pointsStore) {
         recipients.forEach(userId => {

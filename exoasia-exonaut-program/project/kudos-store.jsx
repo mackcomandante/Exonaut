@@ -142,6 +142,30 @@
     }
   }
 
+  function notifyKudos(k) {
+    if (!window.__notifStore) return;
+    const giverName = k.fromName || 'Someone';
+    const receiverName = k.toName || 'someone';
+    window.__notifStore.add({
+      toUserId: k.to,
+      type: 'kudos',
+      title: giverName + ' sent you kudos',
+      sub: `"${k.msg}" · +${Number(k.receiverPoints || 0.25)} culture pts`,
+      icon: 'fa-hand-sparkles',
+      metadata: { kudosId: k.id, fromUserId: k.from, points: Number(k.receiverPoints || 0.25) },
+    });
+    window.__notifStore.add({
+      toUserId: k.from,
+      type: 'kudos',
+      title: 'Kudos sent to ' + receiverName,
+      sub: Number(k.giverPoints || 0) > 0
+        ? `You earned +${Number(k.giverPoints)} culture pts`
+        : 'Weekly giver point cap reached',
+      icon: 'fa-hand-sparkles',
+      metadata: { kudosId: k.id, toUserId: k.to, points: Number(k.giverPoints || 0) },
+    });
+  }
+
   const store = {
     all() {
       return [...state.kudos].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
@@ -203,6 +227,7 @@
       }
 
       if (canAward) await awardKudosPoints(k);
+      if (canAward) notifyKudos(k);
       return k;
     },
     timeAgo,

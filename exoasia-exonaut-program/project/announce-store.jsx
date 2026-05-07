@@ -254,6 +254,16 @@
           else refreshRemote();
         });
       }
+      if (window.__notifStore) {
+        window.__notifStore.add({
+          type: 'announce',
+          title: (a.from || 'Mission Commander') + ' posted an announcement',
+          sub: a.title,
+          icon: a.type === 'urgent' ? 'fa-bolt' : 'fa-bullhorn',
+          audience: a.audience || { kind: 'all' },
+          metadata: { announcementId: a.id },
+        });
+      }
       return a;
     },
     update(id, patch) {

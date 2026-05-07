@@ -116,10 +116,10 @@ function App() {
 
   const routeAllowedForRole = (role, routeId) => {
     const exonautRoutes = ['dashboard', 'leaderboard', 'profile', 'mission', 'missions', 'credentials', 'projects', 'first-projects', 'project-tasks', 'community', 'kudos', 'rituals', 'announce', 'notifications', 'alumni', 'settings'];
-    const trackOpsRoutes = ['lead-home', 'lead-roster', 'lead-queue', 'lead-grade', 'lead-announce', 'lead-removals', 'crown-pass'];
-    const leadRoutes = ['lead-home', 'lead-roster', 'lead-queue', 'lead-grade', 'lead-announce', 'lead-removals', 'lead-projects', 'lead-project-tasks', 'lead-profile', 'community', 'kudos', 'notifications', 'settings'];
-    const commanderRoutes = ['cmdr-home', 'cmdr-profile', 'cmdr-leads', 'cmdr-projects', 'cmdr-exonauts', 'cmdr-esc', 'cmdr-health', 'cmdr-eow', 'cmdr-crowns', 'cmdr-removals', 'cmdr-announce', 'community', 'kudos', 'notifications', 'settings'];
-    const adminRoutes = ['pa-cohorts', 'pa-missions', 'pa-projects', 'pa-managers', 'pa-assign', 'pa-users', 'pa-console', 'pa-removals', 'pa-announce', 'pa-profile', 'community', 'kudos', 'notifications', 'settings'];
+    const trackOpsRoutes = ['lead-home', 'lead-roster', 'lead-queue', 'lead-grade', 'lead-manual-credit', 'lead-announce', 'lead-removals', 'crown-pass'];
+    const leadRoutes = ['lead-home', 'lead-roster', 'lead-queue', 'lead-grade', 'lead-manual-credit', 'lead-announce', 'lead-removals', 'lead-projects', 'lead-project-tasks', 'lead-profile', 'community', 'kudos', 'notifications', 'settings'];
+    const commanderRoutes = ['cmdr-home', 'cmdr-profile', 'cmdr-leads', 'cmdr-projects', 'cmdr-exonauts', 'cmdr-esc', 'cmdr-health', 'cmdr-eow', 'cmdr-crowns', 'cmdr-removals', 'cmdr-manual-credit', 'cmdr-announce', 'community', 'kudos', 'notifications', 'settings'];
+    const adminRoutes = ['pa-cohorts', 'pa-missions', 'pa-projects', 'pa-managers', 'pa-assign', 'pa-users', 'pa-console', 'pa-manual-credit', 'pa-removals', 'pa-announce', 'pa-profile', 'community', 'kudos', 'notifications', 'settings'];
     const routeBase = (routeId || '').split(':')[0];
     if (role === 'lead') return leadRoutes.includes(routeBase);
     if (role === 'commander') return commanderRoutes.includes(routeBase);
@@ -194,6 +194,7 @@ function App() {
     'lead-roster': ['LEAD', 'Roster'],
     'lead-queue':  ['LEAD', 'Review Queue'],
     'lead-grade':  ['LEAD', 'Grade Submission'],
+    'lead-manual-credit': ['LEAD', 'Manual Activity Credit'],
     'lead-announce': ['LEAD', 'Announcements'],
     'lead-projects': ['LEAD', 'Projects'],
     'lead-project-tasks': ['LEAD', 'Project Tasks'],
@@ -211,6 +212,7 @@ function App() {
     'cmdr-eow':    ['COMMANDER', 'Exonaut of the Week'],
     'cmdr-crowns': ['COMMANDER', 'Crown Transfers'],
     'cmdr-removals': ['COMMANDER', 'Removal Approvals'],
+    'cmdr-manual-credit': ['COMMANDER', 'Manual Activity Credit'],
     'cmdr-announce': ['COMMANDER', 'Announcements'],
     // Platform Admin
     'pa-cohorts':  ['PLATFORM ADMIN', 'Cohort Management'],
@@ -220,6 +222,7 @@ function App() {
     'pa-assign':   ['PLATFORM ADMIN', 'Exonaut Assignment'],
     'pa-users':    ['PLATFORM ADMIN', 'User Directory'],
     'pa-console':  ['PLATFORM ADMIN', 'System Console'],
+    'pa-manual-credit': ['PLATFORM ADMIN', 'Manual Activity Credit'],
     'pa-removals': ['PLATFORM ADMIN', 'Removal Execution'],
     'pa-announce': ['PLATFORM ADMIN', 'Announcements'],
     'pa-profile':  ['PLATFORM ADMIN', 'Profile'],
@@ -256,6 +259,7 @@ function App() {
     else if (hasTrackOps && route === 'lead-roster') page = <LeadRoster />;
     else if (hasTrackOps && route === 'lead-queue') page = <LeadQueue onNavigate={navigate} />;
     else if (hasTrackOps && route === 'lead-announce') page = <LeadAnnounce />;
+    else if (hasTrackOps && route === 'lead-manual-credit') page = <ManualActivityCreditPage />;
     else if (hasTrackOps && route === 'lead-removals') page = <LeadRemovalsPanel />;
     else if (hasTrackOps && route === 'crown-pass') page = <PassTheCrownPage />;
     else if (hasTrackOps && gradeMatch) page = <LeadGrade subId={subId} onBack={() => navigate('lead-queue')} />;
@@ -269,6 +273,7 @@ function App() {
     else if (route === 'lead-roster') page = <LeadRoster />;
     else if (route === 'lead-queue')  page = <LeadQueue onNavigate={navigate} />;
     else if (route === 'lead-announce') page = <LeadAnnounce />;
+    else if (route === 'lead-manual-credit') page = <ManualActivityCreditPage />;
     else if (route === 'lead-removals') page = <LeadRemovalsPanel />;
     else if (route === 'lead-projects') page = <ProjectsPage />;
     else if (route === 'lead-project-tasks') page = <ProjectTasksPage />;
@@ -290,6 +295,7 @@ function App() {
     else if (route === 'cmdr-eow')    page = <CommanderEOW />;
     else if (route === 'cmdr-crowns') page = <CommanderCrownTransfers />;
     else if (route === 'cmdr-removals') page = <CommanderRemovalsPage />;
+    else if (route === 'cmdr-manual-credit') page = <ManualActivityCreditPage />;
     else if (route === 'cmdr-announce') page = <CommanderAnnounce />;
     else if (route === 'cmdr-profile') page = <RoleProfile roleKey="commander" />;
     else if (route === 'community')   page = <CommunityPage />;
@@ -306,6 +312,7 @@ function App() {
     else if (route === 'pa-assign')  page = <AdminAssign />;
     else if (route === 'pa-users')   page = <AdminUsers />;
     else if (route === 'pa-console') page = <AdminPanel />;
+    else if (route === 'pa-manual-credit') page = <ManualActivityCreditPage />;
     else if (route === 'pa-removals') page = <AdminRemovalsPage />;
     else if (route === 'pa-announce') page = <AdminAnnounce />;
     else if (route === 'pa-profile') page = <RoleProfile roleKey="admin" />;
@@ -354,6 +361,7 @@ function App() {
 // ========== Role-specific sidebars ==========
 function LeadSidebar({ current, onNavigate, onSignOut }) {
   const { profile } = useCurrentUserProfile();
+  const { unreadCount } = useNotifications(profile);
   const { profiles } = useUserProfiles();
   useProjects();
   const isFirstOfficer = window.__projectStore.userIsFirstOfficer(profile.id);
@@ -383,6 +391,7 @@ function LeadSidebar({ current, onNavigate, onSignOut }) {
     { id: 'lead-roster', label: 'Roster',        icon: 'fa-users' },
     { id: 'lead-projects', label: 'Projects',    icon: 'fa-diagram-project' },
     ...(isFirstOfficer || hasProjectTasks ? [{ id: 'lead-project-tasks', label: 'Project Tasks', icon: 'fa-list-check' }] : []),
+    { id: 'lead-manual-credit', label: 'Manual Credit', icon: 'fa-clipboard-check' },
     { id: 'lead-announce', label: 'Announcements', icon: 'fa-bullhorn' },
     { id: 'kudos',       label: 'Kudos',         icon: 'fa-hand-sparkles' },
   ];
@@ -422,7 +431,7 @@ function LeadSidebar({ current, onNavigate, onSignOut }) {
         </div>
       </nav>
       <div className="sidebar-footer">
-        <button title="Notifications" onClick={() => onNavigate('notifications')}><i className="fa-solid fa-bell" /><span style={{ position: 'absolute', top: 6, right: 6, width: 6, height: 6, borderRadius: '50%', background: 'var(--platinum)' }} /></button>
+        <button title="Notifications" onClick={() => onNavigate('notifications')}><i className="fa-solid fa-bell" />{unreadCount > 0 && <span style={{ position: 'absolute', top: 6, right: 6, width: 6, height: 6, borderRadius: '50%', background: 'var(--platinum)' }} />}</button>
         <button title="Settings" onClick={() => onNavigate('settings')}><i className="fa-solid fa-gear" /></button>
         <button title="Log out" onClick={onSignOut}><i className="fa-solid fa-right-from-bracket" /></button>
       </div>
@@ -432,6 +441,7 @@ function LeadSidebar({ current, onNavigate, onSignOut }) {
 
 function CommanderSidebar({ current, onNavigate, onSignOut }) {
   const { profile } = useCurrentUserProfile();
+  const { unreadCount } = useNotifications(profile);
   const escalations = useEscalations();
   const displayName = profile.fullName || 'Mission Commander';
   const me = [
@@ -448,6 +458,7 @@ function CommanderSidebar({ current, onNavigate, onSignOut }) {
     { id: 'cmdr-eow',      label: 'Exonaut of Week', icon: 'fa-trophy' },
     { id: 'cmdr-crowns',   label: 'Crown Transfers', icon: 'fa-crown' },
     { id: 'cmdr-removals', label: 'Removals',        icon: 'fa-user-slash' },
+    { id: 'cmdr-manual-credit', label: 'Manual Credit', icon: 'fa-clipboard-check' },
     { id: 'cmdr-announce', label: 'Announcements', icon: 'fa-bullhorn' },
     { id: 'kudos',         label: 'Kudos',          icon: 'fa-hand-sparkles' },
   ];
@@ -488,7 +499,7 @@ function CommanderSidebar({ current, onNavigate, onSignOut }) {
         ))}
       </nav>
       <div className="sidebar-footer">
-        <button title="Notifications" onClick={() => onNavigate('notifications')}><i className="fa-solid fa-bell" /><span style={{ position: 'absolute', top: 6, right: 6, width: 6, height: 6, borderRadius: '50%', background: 'var(--amber)' }} /></button>
+        <button title="Notifications" onClick={() => onNavigate('notifications')}><i className="fa-solid fa-bell" />{unreadCount > 0 && <span style={{ position: 'absolute', top: 6, right: 6, width: 6, height: 6, borderRadius: '50%', background: 'var(--amber)' }} />}</button>
         <button title="Settings" onClick={() => onNavigate('settings')}><i className="fa-solid fa-gear" /></button>
         <button title="Log out" onClick={onSignOut}><i className="fa-solid fa-right-from-bracket" /></button>
       </div>
