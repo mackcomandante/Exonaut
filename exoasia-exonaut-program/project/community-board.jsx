@@ -214,7 +214,7 @@ function ThreadRow({ thread, me, onOpen }) {
       <div style={{ minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
           {thread.pinned && (
-            <span style={{ padding: '1px 6px', background: 'var(--lime)', color: 'var(--deep-black)', fontFamily: 'var(--font-mono)', fontSize: 8, letterSpacing: '0.12em', fontWeight: 700, borderRadius: 2 }}>
+            <span style={{ padding: '1px 6px', background: 'var(--lime)', color: 'var(--on-lime)', fontFamily: 'var(--font-mono)', fontSize: 8, letterSpacing: '0.12em', fontWeight: 700, borderRadius: 2 }}>
               <i className="fa-solid fa-thumbtack" style={{ marginRight: 4 }} />PINNED
             </span>
           )}
@@ -383,7 +383,7 @@ function ThreadView({ threadId, me, onBack }) {
               }}>Cancel</button>
               <button onClick={submitReply} disabled={replyText.trim().length < 2} style={{
                 padding: '6px 12px', background: replyText.trim().length >= 2 ? 'var(--lime)' : 'var(--off-white-15)',
-                color: replyText.trim().length >= 2 ? 'var(--deep-black)' : 'var(--off-white-40)',
+                color: replyText.trim().length >= 2 ? 'var(--on-lime)' : 'var(--off-white-40)',
                 border: 'none', borderRadius: 2, cursor: replyText.trim().length >= 2 ? 'pointer' : 'not-allowed',
                 fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.08em', fontWeight: 700, textTransform: 'uppercase',
               }}>Post Reply</button>
@@ -489,7 +489,7 @@ function CommentNode({ threadId, comment, me, depth }) {
             }}>Cancel</button>
             <button onClick={submit} disabled={replyText.trim().length < 2} style={{
               padding: '5px 10px', background: replyText.trim().length >= 2 ? 'var(--lime)' : 'var(--off-white-15)',
-              color: replyText.trim().length >= 2 ? 'var(--deep-black)' : 'var(--off-white-40)',
+              color: replyText.trim().length >= 2 ? 'var(--on-lime)' : 'var(--off-white-40)',
               border: 'none', borderRadius: 2, cursor: replyText.trim().length >= 2 ? 'pointer' : 'not-allowed',
               fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '0.08em', fontWeight: 700, textTransform: 'uppercase',
             }}>Reply</button>
@@ -597,7 +597,7 @@ function ThreadCompose({ open, onClose, defaultChannel, me }) {
           }}>Cancel</button>
           <button onClick={submit} disabled={!canPost} style={{
             padding: '9px 16px', background: canPost ? 'var(--lime)' : 'var(--off-white-15)',
-            color: canPost ? 'var(--deep-black)' : 'var(--off-white-40)',
+            color: canPost ? 'var(--on-lime)' : 'var(--off-white-40)',
             border: 'none', borderRadius: 2, cursor: canPost ? 'pointer' : 'not-allowed',
             fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.08em', fontWeight: 700, textTransform: 'uppercase',
           }}><i className="fa-solid fa-paper-plane" style={{ marginRight: 6 }} />Post Thread</button>

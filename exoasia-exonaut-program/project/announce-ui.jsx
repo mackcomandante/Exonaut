@@ -184,7 +184,7 @@ function AnnounceCompose({ open, onClose, initial, authorRole, authorName, restr
                     padding: '6px 12px',
                     background: audKind === k ? 'var(--lime)' : 'var(--off-white-07)',
                     border: '1px solid ' + (audKind === k ? 'var(--lime)' : 'var(--off-white-15)'),
-                    borderRadius: 2, color: audKind === k ? 'var(--deep-black)' : 'var(--off-white-68)',
+                    borderRadius: 2, color: audKind === k ? 'var(--on-lime)' : 'var(--off-white-68)',
                     cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '0.08em', fontWeight: 700,
                   }}>{label.toUpperCase()}</button>
                 );
@@ -340,7 +340,7 @@ function AnnouncementCard({ a, onReact, onEdit, onDelete, onPin, isAuthor }) {
         <div style={{
           position: 'absolute', top: 10, right: 12,
           padding: '2px 7px', background: 'var(--lime)', borderRadius: 2,
-          color: 'var(--deep-black)', fontFamily: 'var(--font-mono)', fontSize: 8, letterSpacing: '0.1em', fontWeight: 700,
+          color: 'var(--on-lime)', fontFamily: 'var(--font-mono)', fontSize: 8, letterSpacing: '0.1em', fontWeight: 700,
         }}>
           <i className="fa-solid fa-thumbtack" style={{ marginRight: 4 }} />PINNED
         </div>
@@ -357,7 +357,7 @@ function AnnouncementCard({ a, onReact, onEdit, onDelete, onPin, isAuthor }) {
           {isNew && (
             <span style={{
               padding: '1px 6px', background: 'var(--lime)', borderRadius: 2,
-              color: 'var(--deep-black)', fontFamily: 'var(--font-mono)', fontSize: 8, letterSpacing: '0.1em', fontWeight: 700,
+              color: 'var(--on-lime)', fontFamily: 'var(--font-mono)', fontSize: 8, letterSpacing: '0.1em', fontWeight: 700,
             }}>NEW</span>
           )}
         </div>

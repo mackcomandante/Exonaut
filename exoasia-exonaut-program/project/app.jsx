@@ -346,7 +346,7 @@ function App() {
         <button onClick={() => setKudosOpen(true)}
           style={{
             position: 'fixed', bottom: 20, right: 80, zIndex: 140,
-            background: 'var(--lime)', color: 'var(--bg-deep)',
+            background: 'var(--lime)', color: 'var(--on-lime)',
             border: 'none', borderRadius: '50%', width: 48, height: 48,
             display: 'grid', placeItems: 'center', fontSize: 16, fontWeight: 700,
             boxShadow: 'var(--lime-glow)', cursor: 'pointer',
@@ -432,6 +432,7 @@ function LeadSidebar({ current, onNavigate, onSignOut }) {
       </nav>
       <div className="sidebar-footer">
         <button title="Notifications" onClick={() => onNavigate('notifications')}><i className="fa-solid fa-bell" />{unreadCount > 0 && <span style={{ position: 'absolute', top: 6, right: 6, width: 6, height: 6, borderRadius: '50%', background: 'var(--platinum)' }} />}</button>
+        <ThemeToggle compact />
         <button title="Settings" onClick={() => onNavigate('settings')}><i className="fa-solid fa-gear" /></button>
         <button title="Log out" onClick={onSignOut}><i className="fa-solid fa-right-from-bracket" /></button>
       </div>
@@ -500,6 +501,7 @@ function CommanderSidebar({ current, onNavigate, onSignOut }) {
       </nav>
       <div className="sidebar-footer">
         <button title="Notifications" onClick={() => onNavigate('notifications')}><i className="fa-solid fa-bell" />{unreadCount > 0 && <span style={{ position: 'absolute', top: 6, right: 6, width: 6, height: 6, borderRadius: '50%', background: 'var(--amber)' }} />}</button>
+        <ThemeToggle compact />
         <button title="Settings" onClick={() => onNavigate('settings')}><i className="fa-solid fa-gear" /></button>
         <button title="Log out" onClick={onSignOut}><i className="fa-solid fa-right-from-bracket" /></button>
       </div>

@@ -1149,6 +1149,7 @@ function AlumniPage() {
 // ========== SETTINGS ==========
 function SettingsPage() {
   const [prefs, setPrefs] = React.useState({ emailMissions: true, emailWeekly: true, inApp: true, privacy: 'cohort' });
+  const { isDark, toggleTheme } = useThemeMode();
   return (
     <div className="enter">
       <div className="section-head">
@@ -1174,6 +1175,15 @@ function SettingsPage() {
               </div>
             </label>
           ))}
+          <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0' }}>
+            <span style={{ fontFamily: 'var(--font-display)', fontSize: 13, color: 'var(--off-white)' }}>Dark mode</span>
+            <div onClick={toggleTheme}
+                 style={{ width: 40, height: 22, borderRadius: 11, background: isDark ? 'var(--lime)' : 'var(--off-white-15)', cursor: 'pointer', position: 'relative', transition: 'background 200ms' }}>
+              <div style={{ position: 'absolute', top: 2, left: isDark ? 20 : 2, width: 18, height: 18, borderRadius: '50%', background: 'var(--bg-deep)', transition: 'left 200ms', display: 'grid', placeItems: 'center', fontSize: 8, color: 'var(--ink)' }}>
+                <i className={'fa-solid ' + (isDark ? 'fa-moon' : 'fa-sun')} />
+              </div>
+            </div>
+          </label>
         </div>
 
         <div className="card-panel">

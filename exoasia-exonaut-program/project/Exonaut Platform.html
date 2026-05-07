@@ -13,6 +13,12 @@
 <!-- Font Awesome 6.5+ via cdnjs per brand spec -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
 
+<script>
+  try {
+    const theme = localStorage.getItem('exo:theme') || 'light';
+    document.documentElement.dataset.theme = theme === 'dark' ? 'dark' : 'light';
+  } catch (e) {}
+</script>
 <link rel="stylesheet" href="styles.css?v=7" />
 
 <script>
@@ -26,6 +32,12 @@
 </script>
 </head>
 <body>
+<script>
+  try {
+    const theme = localStorage.getItem('exo:theme') || 'light';
+    document.body.dataset.theme = theme === 'dark' ? 'dark' : 'light';
+  } catch (e) {}
+</script>
 <div id="app"></div>
 
 <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>

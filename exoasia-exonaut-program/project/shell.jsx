@@ -1,5 +1,54 @@
 // Shell: sidebar, topbar, app frame
 
+const THEME_KEY = 'exo:theme';
+const themeListeners = new Set();
+let activeTheme = getStoredTheme();
+
+function getStoredTheme() {
+  try { return localStorage.getItem(THEME_KEY) || 'light'; } catch (e) { return 'light'; }
+}
+
+function applyTheme(theme) {
+  const next = theme === 'dark' ? 'dark' : 'light';
+  activeTheme = next;
+  document.body.dataset.theme = next;
+  document.documentElement.dataset.theme = next;
+  try { localStorage.setItem(THEME_KEY, next); } catch (e) {}
+  themeListeners.forEach(fn => fn(next));
+}
+
+function useThemeMode() {
+  const [theme, setTheme] = React.useState(activeTheme);
+  React.useEffect(() => {
+    applyTheme(theme);
+  }, [theme]);
+  React.useEffect(() => {
+    themeListeners.add(setTheme);
+    return () => themeListeners.delete(setTheme);
+  }, []);
+  const toggleTheme = React.useCallback(() => {
+    setTheme(current => current === 'dark' ? 'light' : 'dark');
+  }, []);
+  return { theme, isDark: theme === 'dark', toggleTheme };
+}
+
+function ThemeToggle({ compact = false }) {
+  const { isDark, toggleTheme } = useThemeMode();
+  return (
+    <button
+      className={compact ? 'theme-toggle compact' : 'theme-toggle'}
+      type="button"
+      onClick={toggleTheme}
+      title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+      aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+      aria-pressed={isDark}
+    >
+      <i className={'fa-solid ' + (isDark ? 'fa-sun' : 'fa-moon')} />
+      {!compact && <span>{isDark ? 'Light' : 'Dark'}</span>}
+    </button>
+  );
+}
+
 function Sidebar({ current, onNavigate, onSignOut }) {
   const { profile } = useCurrentUserProfile();
   const { unreadCount } = useNotifications(profile);
@@ -132,6 +181,7 @@ function Sidebar({ current, onNavigate, onSignOut }) {
           <i className="fa-solid fa-bell" />
           {unreadCount > 0 && <span style={{ position: 'absolute', top: 6, right: 6, width: 6, height: 6, borderRadius: '50%', background: 'var(--lime)' }} />}
         </button>
+        <ThemeToggle compact />
         <button title="Settings" onClick={() => onNavigate('settings')}><i className="fa-solid fa-gear" /></button>
         <button title="Log out" onClick={onSignOut}><i className="fa-solid fa-right-from-bracket" /></button>
       </div>
@@ -179,10 +229,11 @@ function Topbar({ crumbs, onNavigate }) {
           <i className="fa-solid fa-bell" />
           {unreadCount > 0 && <span style={{ position: 'absolute', top: -2, right: 0, width: 6, height: 6, borderRadius: '50%', background: 'var(--lime)' }} />}
         </button>
+        <ThemeToggle compact />
         <span className="topbar-live"><span className="pulse" /> LIVE</span>
       </div>
     </div>
   );
 }
 
-Object.assign(window, { Sidebar, Topbar });
+Object.assign(window, { Sidebar, Topbar, ThemeToggle, useThemeMode, applyTheme });

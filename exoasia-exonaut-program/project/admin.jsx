@@ -346,6 +346,7 @@ function PlatformAdminSidebar({ current, onNavigate, onSignOut }) {
 
       <div className="sidebar-footer">
         <button title="Notifications" onClick={() => onNavigate('notifications')}><i className="fa-solid fa-bell" />{unreadCount > 0 && <span style={{ position: 'absolute', top: 6, right: 6, width: 6, height: 6, borderRadius: '50%', background: 'var(--sky)' }} />}</button>
+        <ThemeToggle compact />
         <button title="Settings" onClick={() => onNavigate('settings')}><i className="fa-solid fa-gear" /></button>
         <button title="Log out" onClick={onSignOut}><i className="fa-solid fa-right-from-bracket" /></button>
       </div>
@@ -1833,7 +1834,7 @@ function RosterAddRow({ user, onAdd }) {
         title="Add to roster"
         style={{
           background: 'var(--lime)', border: 'none', borderRadius: 2,
-          color: 'var(--deep-black)', cursor: 'pointer', padding: '4px 10px', fontSize: 10, fontWeight: 700,
+          color: 'var(--on-lime)', cursor: 'pointer', padding: '4px 10px', fontSize: 10, fontWeight: 700,
           fontFamily: 'var(--font-mono)', letterSpacing: '0.06em',
         }}><i className="fa-solid fa-plus" style={{ marginRight: 4 }} />ADD</button>
     </div>
