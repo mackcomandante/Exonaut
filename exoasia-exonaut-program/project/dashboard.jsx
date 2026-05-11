@@ -37,10 +37,15 @@ function HeroStats() {
     : { tier: 'entry', current: TIERS.entry, next: TIERS.builder, pointsOver: livePoints, pointsToNext: Math.max(0, 100 - livePoints) };
   const liveBadges = useLiveBadges(profile.id);
   const missions = useMissions();
+  useManualCredits();
   const { projects, tasks, assignees } = useProjects();
   const earnedCount = liveBadges.filter(b => b.earned).length;
-  const subs = useSubs();
-  const completed = subs.filter(s => s.exonautId === profile.id && s.state === 'approved').length;
+  useSubs();
+  const myTrack = profile.trackCode || ME.track || 'AIS';
+  const myCohort = activeCohort?.id || profile.cohortId || ME.cohort || 'c2627';
+  const trackMissions = missions.filter(m => (m.cohortId || 'c2627') === myCohort && (!m.track || m.track === myTrack));
+  const completed = trackMissions.filter(m => window.getSubmissionForMission?.(m, profile.id, myCohort)?.state === 'approved').length;
+  const activeCount = Math.max(0, trackMissions.length - completed);
   return (
     <div className="stat-grid card-hud">
       <StatCell label="TOTAL POINTS" icon="fa-bolt" value={livePoints} lime
@@ -52,8 +57,8 @@ function HeroStats() {
         value={tierProgress.current.short} unit={`·\u00A0${tierProgress.pointsOver} over`}
         meta={tierProgress.next ? `${tierProgress.pointsToNext} TO ${tierProgress.next.short}` : 'TOP TIER'} metaDir="flat" />
       <StatCell label="TRACK" icon="fa-bullseye"
-        value={completed} unit={`of ${missions.length}`}
-        meta={`${missions.filter(m => m.status !== 'approved').length} ACTIVE`} metaDir="flat" />
+        value={completed} unit={`of ${trackMissions.length}`}
+        meta={`${activeCount} ACTIVE`} metaDir="flat" />
       <StatCell label="PROJECT" icon="fa-diagram-project"
         value={tasks.filter(t => assignees.some(a => a.taskId === t.id && a.userId === profile.id)).length}
         unit={`of ${projects.length}`}
@@ -87,6 +92,7 @@ function PillarGrid() {
   const { profile } = useCurrentUserProfile();
   const { breakdown } = useUserPoints(profile.id);
   const missions = useMissions();
+  useManualCredits();
   const projectMissions = missions.filter(m => m.pillar === 'project' || m.pillar === 'missions').slice(0, 3);
   const missionPoints = (breakdown.missions || 0) + (breakdown.project || 0);
   return (
@@ -98,14 +104,17 @@ function PillarGrid() {
           {projectMissions.length === 0 && (
             <div className="t-body" style={{ fontSize: 12, color: 'var(--off-white-40)' }}>No track tasks yet.</div>
           )}
-          {projectMissions.map(m => (
-            <div key={m.id} style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 600, letterSpacing: '0.05em', gap: 8 }}>
-              <span style={{ color: 'var(--off-white-68)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.title}</span>
-              <span className={'status-pill status-' + (m.status === 'approved' ? 'approved' : m.status === 'in-progress' ? 'in-progress' : 'not-started')}>
-                {m.status === 'approved' ? 'APPR' : m.status === 'in-progress' ? 'WIP' : 'NEW'}
-              </span>
-            </div>
-          ))}
+          {projectMissions.map(m => {
+            const liveStatus = window.getSubmissionForMission?.(m, profile.id, profile.cohortId || ME.cohort)?.state || m.status;
+            return (
+              <div key={m.id} style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 600, letterSpacing: '0.05em', gap: 8 }}>
+                <span style={{ color: 'var(--off-white-68)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.title}</span>
+                <span className={'status-pill status-' + (liveStatus === 'approved' ? 'approved' : liveStatus === 'in-progress' ? 'in-progress' : liveStatus === 'pending' ? 'submitted' : 'not-started')}>
+                  {liveStatus === 'approved' ? 'APPR' : liveStatus === 'in-progress' ? 'WIP' : liveStatus === 'pending' ? 'SUB' : 'NEW'}
+                </span>
+              </div>
+            );
+          })}
         </div>
       </PillarCard>
 
@@ -179,6 +188,7 @@ function RitualTracker() {
 
 function MissionFeed({ onOpenMission }) {
   const subs = useSubs();
+  useManualCredits();
   const { profile } = useCurrentUserProfile();
   const missions = useMissions();
   const myTrack = profile.trackCode || ME.track || 'AIS';
@@ -224,7 +234,8 @@ function MissionFeed({ onOpenMission }) {
           </div>
         )}
         {upcoming.map(m => {
-          const mySub = subs.find(s => s.exonautId === profile.id && s.missionId === m.id);
+          const mySub = window.getSubmissionForMission?.(m, profile.id, myCohort)
+            || subs.find(s => s.exonautId === profile.id && s.missionId === m.id);
           const liveStatus = mySub?.state === 'pending'
             ? 'submitted'
             : mySub?.state === 'approved'
@@ -246,6 +257,9 @@ function MissionFeed({ onOpenMission }) {
           };
           const s = isOverdue ? statusMap.overdue : statusMap[liveStatus];
           const track = m.track ? TRACKS.find(t => t.code === m.track) : null;
+          const awardedPoints = liveStatus === 'approved' && mySub?.pointsAwarded != null
+            ? Number(mySub.pointsAwarded)
+            : Number(m.points || 0);
           return (
             <div key={m.id} className="mission-row" onClick={() => onOpenMission(m.id)}>
               <div className="mission-meta">
@@ -256,7 +270,7 @@ function MissionFeed({ onOpenMission }) {
                   {isOverdue && <span style={{ color: 'var(--red)' }}> · OVERDUE {Math.abs(m.dueIn)}d</span>}
                 </div>
               </div>
-              <div className="mission-points"><span className="plus">+</span>{m.points}</div>
+              <div className="mission-points"><span className="plus">+</span>{awardedPoints}</div>
               <span className={'status-pill ' + s.cls}>{s.label}</span>
               <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); onOpenMission(m.id); }}>
                 {s.cta}

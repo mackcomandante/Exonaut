@@ -5,10 +5,18 @@ function Leaderboard({ onBack }) {
   const activeCohort = window.getActiveCohort?.(profile) || COHORT;
   const demoDay = window.getCohortDemoDay?.(activeCohort) || COHORT.demoDay;
   const rowsBase = useSupabaseExonautRows();
+  usePoints();
+  useManualCredits();
   const [tab, setTab] = React.useState('cohort');
   const [trackFilter, setTrackFilter] = React.useState('all');
   const [tierFilter, setTierFilter] = React.useState('all');
   const [sortPillar, setSortPillar] = React.useState(null);
+  const weekNumber = window.EOW?.currentWeek?.(activeCohort) || COHORT.week || 1;
+  const activeWeekWindow = window.EOW?.weekWindow?.(activeCohort, weekNumber) || null;
+  const formatPoints = (value) => {
+    const n = Number(value || 0);
+    return Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/\.?0+$/, '');
+  };
 
   const rankedBase = React.useMemo(
     () => window.rankExonautRows ? window.rankExonautRows(rowsBase) : [...rowsBase].sort((a,b) => b.points - a.points).map((u, i) => ({ ...u, cohortRank: i + 1 })),
@@ -24,7 +32,12 @@ function Leaderboard({ onBack }) {
   else filtered.sort((a,b) => b.points - a.points);
 
   if (tab === 'week') {
-    filtered = filtered.map(u => ({ ...u, weekPoints: u.points })).sort((a,b) => b.weekPoints - a.weekPoints);
+    filtered = filtered
+      .map(u => ({
+        ...u,
+        weekPoints: window.EOW?.weeklyPoints?.(u, weekNumber, activeCohort) || 0,
+      }))
+      .sort((a,b) => b.weekPoints - a.weekPoints || b.points - a.points);
   }
 
   return (
@@ -35,7 +48,7 @@ function Leaderboard({ onBack }) {
           <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>Leaderboard</h1>
         </div>
         <div className="t-mono" style={{ color: 'var(--off-white-40)', fontSize: 11, letterSpacing: '0.1em' }}>
-          {(activeCohort?.code || COHORT.code)} · {filtered.length} EXONAUTS
+          {(activeCohort?.code || COHORT.code)} · {tab === 'week' ? `WK ${String(weekNumber).padStart(2, '0')} · ${activeWeekWindow?.label || 'THIS WEEK'} · ` : ''}{filtered.length} EXONAUTS
         </div>
       </div>
 
@@ -102,7 +115,7 @@ function Leaderboard({ onBack }) {
                     <div className="seg p3" style={{ width: `${u.points ? (u.p3 / u.points) * 100 : 0}%` }} />
                   </div>
                 </div>
-                <div className="lb-points">{displayPts}</div>
+                <div className="lb-points">{formatPoints(displayPts)}</div>
                 <div className="col-change"><ChangeArrow n={u.change} /></div>
                 <div className="lb-badges">{u.badges}</div>
               </div>

@@ -339,21 +339,23 @@ function normalizeManualCreditLabel(value) {
   return String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 }
 
-const getMySubmission = (missionId) => {
-  const userId = getActiveUserId();
-  const direct = subStore.subs.find(s => s.exonautId === userId && s.missionId === missionId);
-  if (direct) return direct;
-  const mission = (window.__missionStore?.all?.() || []).find(m => m.id === missionId);
-  const credit = window.__manualCreditStore?.all?.().find(c => {
-    if (c.userId !== userId || c.activityType !== 'track_task') return false;
-    if (c.relatedId && c.relatedId === missionId) return true;
-    return mission && normalizeManualCreditLabel(c.relatedLabel) === normalizeManualCreditLabel(mission.title);
-  });
-  if (!credit) return null;
+const MANUAL_COMPLETION_GRADES = new Set(['approved', 'excellent', 'good', 'completed', 'manual_override']);
+
+function manualCreditMatchesMission(credit, mission, userId, cohortId) {
+  if (!credit || !mission) return false;
+  if (credit.userId !== userId || credit.activityType !== 'track_task') return false;
+  if (!MANUAL_COMPLETION_GRADES.has(String(credit.grade || '').toLowerCase())) return false;
+  if ((credit.cohortId || 'c2627') !== (cohortId || mission.cohortId || 'c2627')) return false;
+  if (credit.relatedId && normalizeManualCreditLabel(credit.relatedId) === normalizeManualCreditLabel(mission.id)) return true;
+  return normalizeManualCreditLabel(credit.relatedLabel) &&
+    normalizeManualCreditLabel(credit.relatedLabel) === normalizeManualCreditLabel(mission.title);
+}
+
+function manualSubmissionFromCredit(credit, mission, userId) {
   return {
     id: 'manual-credit-' + credit.id,
-    missionId,
-    missionTitle: mission?.title || credit.relatedLabel || missionId,
+    missionId: mission.id,
+    missionTitle: mission?.title || credit.relatedLabel || mission.id,
     exonautId: userId,
     submittedAt: 'manual credit',
     submittedAtIso: credit.creditedAt,
@@ -373,7 +375,25 @@ const getMySubmission = (missionId) => {
     gradedAt: credit.creditedAt,
     manualCredit: true,
   };
+}
+
+const getSubmissionForMission = (missionOrId, userId = getActiveUserId(), cohortId = null) => {
+  const missions = window.__missionStore?.all?.() || [];
+  const mission = typeof missionOrId === 'string'
+    ? missions.find(m => normalizeManualCreditLabel(m.id) === normalizeManualCreditLabel(missionOrId))
+    : missionOrId;
+  if (!mission) return null;
+  const direct = subStore.subs.find(s => s.exonautId === userId && normalizeManualCreditLabel(s.missionId) === normalizeManualCreditLabel(mission.id));
+  const credit = window.__manualCreditStore?.all?.().find(c => manualCreditMatchesMission(c, mission, userId, cohortId));
+  if (!credit) return direct || null;
+  if (!direct || direct.state !== 'approved') return manualSubmissionFromCredit(credit, mission, userId);
+  return {
+    ...direct,
+    pointsAwarded: direct.pointsAwarded ?? (Number(credit.points) || Number(mission.points) || 0),
+  };
 };
+
+const getMySubmission = (missionId) => getSubmissionForMission(missionId, getActiveUserId());
 
 Object.assign(window, {
   useSubs,
@@ -381,6 +401,8 @@ Object.assign(window, {
   gradeSubmission,
   upsertManualApprovedSubmission,
   getMySubmission,
+  getSubmissionForMission,
+  manualCreditMatchesMission,
   getSubmissionFileUrl,
   refreshSubs,
 });

@@ -372,6 +372,7 @@ function AdminCohorts() {
         role: p.role || 'exonaut',
         cohort: p.cohortId || 'c2627',
         track: p.trackCode || '',
+        avatarUrl: p.avatarUrl || '',
         supabaseProfile: true,
       }))
     : USERS.map(u => ({ ...u, role: 'exonaut', cohort: getUserCohort(u.id), track: getUserTrack(u.id) }));
@@ -493,7 +494,8 @@ function AdminCohorts() {
                 const track = row.track ? (TRACKS.find(t => t.code === row.track)?.short || row.track) : 'N/A';
                 const role = row.role ? row.role.toUpperCase() : 'N/A';
                 return (
-                  <div key={row.id} className="card-flat" style={{ display: 'grid', gridTemplateColumns: '1fr 90px 90px auto', alignItems: 'center', gap: 10 }}>
+                  <div key={row.id} className="card-flat" style={{ display: 'grid', gridTemplateColumns: '34px 1fr 90px 90px auto', alignItems: 'center', gap: 10 }}>
+                    <AvatarWithRing name={row.name} avatarUrl={row.avatarUrl} size={30} tier={row.role === 'exonaut' ? 'entry' : 'corps'} />
                     <div>
                       <div className="t-heading" style={{ fontSize: 13, textTransform: 'none', letterSpacing: 0 }}>{row.name}</div>
                       <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)' }}>{row.id}</div>
@@ -523,6 +525,7 @@ function AdminCohorts() {
             {unassignedRows.map(row => (
               <label key={row.id} className="card-flat" style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
                 <input type="checkbox" checked={selectedUsers.includes(row.id)} onChange={() => toggleSelected(row.id)} />
+                <AvatarWithRing name={row.name} avatarUrl={row.avatarUrl} size={28} tier={row.role === 'exonaut' ? 'entry' : 'corps'} />
                 <span className="t-heading" style={{ fontSize: 13, textTransform: 'none', letterSpacing: 0 }}>{row.name}</span>
               </label>
             ))}
@@ -579,6 +582,8 @@ function AdminCohorts() {
 function AdminAssign() {
   const { all, assignUserToCohort, unassignUserFromCohort, isUserUnassigned, getAssignments, assignUserToTrack, assignUserToLead } = useCohort();
   const { profiles, updateProfile } = useUserProfiles();
+  const { ledger } = usePoints();
+  const manualCredits = useManualCredits();
   const { scope } = useAdminScope();
   const tracks = useAdminTracks();
   const [, setTick] = React.useState(0);
@@ -592,15 +597,30 @@ function AdminAssign() {
     return map;
   }, []);
 
+  const pointsForUser = React.useCallback((userId) => {
+    const entries = ledger || [];
+    const ledgerTotal = entries
+      .filter(e => e.userId === userId)
+      .reduce((sum, e) => sum + Number(e.points || 0), 0);
+    const unsyncedManualTotal = (manualCredits.credits || [])
+      .filter(c => c.userId === userId)
+      .filter(c => !entries.some(e => e.id === c.pointLedgerId || (e.sourceType === 'manual' && e.sourceId === c.id)))
+      .reduce((sum, c) => sum + Number(c.points || 0), 0);
+    return ledgerTotal + unsyncedManualTotal;
+  }, [ledger, manualCredits.credits]);
+
   const rows = profiles.length
     ? profiles.map(p => ({
         id: p.id,
         name: p.fullName || p.email || 'Exonaut',
-        points: 0,
-        tier: 'entry',
+        points: pointsForUser(p.id),
+        tier: p.role === 'exonaut'
+          ? (window.getTierKeyForPoints ? window.getTierKeyForPoints(pointsForUser(p.id)) : 'entry')
+          : 'corps',
         cohort: p.cohortId || 'c2627',
         track: p.trackCode || 'AIS',
         role: p.role || 'exonaut',
+        avatarUrl: p.avatarUrl || '',
         supabaseProfile: true,
       }))
     : USERS.map(u => ({ ...u, role: 'exonaut', cohort: getUserCohort(u.id), track: getUserTrack(u.id) || 'AIS' }));
@@ -674,7 +694,7 @@ function AdminAssign() {
           };
           return (
             <div key={u.id} className="lb-row" style={{ gridTemplateColumns: '48px 1.4fr 80px 130px 150px 150px 180px' }}>
-              <AvatarWithRing name={u.name} size={34} tier={u.tier} />
+              <AvatarWithRing name={u.name} avatarUrl={u.avatarUrl} size={34} tier={u.tier} />
               <div className="lb-name">{u.name}</div>
               <div className="lb-points">{u.points}</div>
               <select value={u.role || 'exonaut'} onChange={async (e) => { if (u.supabaseProfile) await updateProfile(u.id, { role: e.target.value }); u.role = e.target.value; setTick(t => t + 1); }} style={selectStyle}>
@@ -727,10 +747,26 @@ function AdminAssign() {
 function AdminUsers() {
   const { all } = useCohort();
   const { profiles, updateProfile } = useUserProfiles();
+  const { ledger } = usePoints();
+  const manualCredits = useManualCredits();
+  const missions = useMissions();
+  useSubs();
   const { crowns } = useCrownState();
   const { scope } = useAdminScope();
+  const [selectedUserId, setSelectedUserId] = React.useState(null);
   const commanderCount = 1;
   const leadCount = (typeof LEADS !== 'undefined') ? LEADS.length : 0;
+  const pointsForUser = React.useCallback((userId) => {
+    const entries = ledger || [];
+    const ledgerTotal = entries
+      .filter(e => e.userId === userId)
+      .reduce((sum, e) => sum + Number(e.points || 0), 0);
+    const unsyncedManualTotal = (manualCredits.credits || [])
+      .filter(c => c.userId === userId)
+      .filter(c => !entries.some(e => e.id === c.pointLedgerId || (e.sourceType === 'manual' && e.sourceId === c.id)))
+      .reduce((sum, c) => sum + Number(c.points || 0), 0);
+    return ledgerTotal + unsyncedManualTotal;
+  }, [ledger, manualCredits.credits]);
 
   const profileRows = profiles.map(p => ({
     id: p.id,
@@ -738,12 +774,31 @@ function AdminUsers() {
     role: p.role === 'lead' ? 'exonaut' : p.role,
     cohort: p.cohortId || 'c2627',
     track: p.trackCode || '',
-    tier: p.role === 'exonaut' ? 'entry' : 'corps',
+    points: pointsForUser(p.id),
+    tier: p.role === 'exonaut'
+      ? (window.getTierKeyForPoints ? window.getTierKeyForPoints(pointsForUser(p.id)) : 'entry')
+      : 'corps',
+    avatarUrl: p.avatarUrl || '',
     supabaseProfile: true,
   }));
   const seedRows = USERS.map(u => ({ ...u, role: 'exonaut', cohort: getUserCohort(u.id), track: getUserTrack(u.id) }));
   const userRows = profileRows.length ? profileRows : seedRows;
   const scopedUsers = scope === 'all' ? userRows : userRows.filter(u => u.cohort === scope);
+  const selectedUser = userRows.find(u => u.id === selectedUserId);
+  const completedTasksFor = React.useCallback((user) => {
+    if (!user) return [];
+    return missions
+      .filter(m => (m.cohortId || 'c2627') === (user.cohort || 'c2627'))
+      .filter(m => !m.track || !user.track || m.track === user.track)
+      .map(m => {
+        const sub = window.getSubmissionForMission?.(m, user.id, user.cohort);
+        return sub?.state === 'approved'
+          ? { ...m, submission: sub, pointsAwarded: sub.pointsAwarded ?? m.points }
+          : null;
+      })
+      .filter(Boolean)
+      .sort((a, b) => Number(a.week || 0) - Number(b.week || 0) || String(a.id).localeCompare(String(b.id)));
+  }, [missions, manualCredits.credits, ledger]);
   const scopeLabel = scope === 'all' ? 'All Cohorts' : (all.find(c => c.id === scope)?.name || '—');
 
   return (
@@ -787,11 +842,22 @@ function AdminUsers() {
           const track = TRACKS.find(t => t.code === trackCode);
           const lead = getUserLead(u.id);
           return (
-            <div key={u.id} className="lb-row" style={{ gridTemplateColumns: '48px 1fr 120px 140px 120px 140px 100px' }}>
-              <AvatarWithRing name={u.name} size={34} tier={u.tier} />
+            <div
+              key={u.id}
+              className="lb-row"
+              onClick={() => setSelectedUserId(u.id)}
+              style={{ gridTemplateColumns: '48px 1fr 120px 140px 120px 140px 100px', cursor: 'pointer' }}
+              title="View completed track tasks"
+            >
+              <AvatarWithRing name={u.name} avatarUrl={u.avatarUrl} size={34} tier={u.tier} />
               <div className="lb-name">{u.name}</div>
               {u.supabaseProfile
-                ? <select value={u.role === 'lead' ? 'exonaut' : u.role} onChange={async (e) => updateProfile(u.id, { role: e.target.value })} style={{ background: 'var(--deep-black)', color: 'var(--off-white)', border: '1px solid var(--off-white-15)', borderRadius: 2, padding: '6px 8px', fontFamily: 'var(--font-mono)', fontSize: 10 }}>
+                ? <select
+                    value={u.role === 'lead' ? 'exonaut' : u.role}
+                    onClick={e => e.stopPropagation()}
+                    onChange={async (e) => updateProfile(u.id, { role: e.target.value })}
+                    style={{ background: 'var(--deep-black)', color: 'var(--off-white)', border: '1px solid var(--off-white-15)', borderRadius: 2, padding: '6px 8px', fontFamily: 'var(--font-mono)', fontSize: 10 }}
+                  >
                     {['exonaut','commander','admin'].map(r => <option key={r} value={r}>{r.toUpperCase()}</option>)}
                   </select>
                 : <div className="t-mono" style={{ fontSize: 10, color: 'var(--lime)', letterSpacing: '0.08em' }}>{u.role.toUpperCase()}</div>}
@@ -806,6 +872,73 @@ function AdminUsers() {
             </div>
           );
         })}
+      </div>
+      {selectedUser && (
+        <AdminUserTasksModal
+          user={selectedUser}
+          cohort={all.find(c => c.id === selectedUser.cohort)}
+          track={TRACKS.find(t => t.code === selectedUser.track)}
+          tasks={completedTasksFor(selectedUser)}
+          points={pointsForUser(selectedUser.id)}
+          onClose={() => setSelectedUserId(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function AdminUserTasksModal({ user, cohort, track, tasks, points, onClose }) {
+  return (
+    <div className="modal-scrim" onClick={onClose} style={{ zIndex: 260 }}>
+      <div className="modal-body" onClick={e => e.stopPropagation()} style={{ width: 'min(760px, 94vw)', padding: 0 }}>
+        <button className="modal-close" onClick={onClose} aria-label="Close">
+          <i className="fa-solid fa-xmark" />
+        </button>
+        <div style={{ padding: '24px 28px 18px', borderBottom: '1px solid var(--off-white-07)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, paddingRight: 38 }}>
+            <AvatarWithRing name={user.name} avatarUrl={user.avatarUrl} size={52} tier={user.tier} />
+            <div style={{ minWidth: 0 }}>
+              <div className="t-label" style={{ marginBottom: 5 }}>COMPLETED TRACK TASKS</div>
+              <h2 className="t-heading" style={{ fontSize: 22, margin: 0, textTransform: 'none', letterSpacing: 0 }}>{user.name}</h2>
+              <div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)', marginTop: 6, letterSpacing: '0.08em' }}>
+                {cohort?.name || user.cohort || 'No cohort'} · {track?.short || user.track || 'No track'} · {points} PTS
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ padding: 24, maxHeight: '62vh', overflowY: 'auto' }}>
+          {tasks.length === 0 && (
+            <div className="card-flat" style={{ padding: 22, textAlign: 'center' }}>
+              <div className="t-heading" style={{ fontSize: 14, marginBottom: 6 }}>No completed track tasks yet</div>
+              <div className="t-body" style={{ fontSize: 12, color: 'var(--off-white-68)' }}>
+                Approved submissions and approved manual track-task credits will appear here.
+              </div>
+            </div>
+          )}
+          {tasks.map(task => {
+            const sub = task.submission || {};
+            const isManual = !!sub.manualCredit || String(sub.deliverable || '').includes('manual');
+            return (
+              <div key={task.id} className="mission-row" style={{ cursor: 'default', marginBottom: 10 }}>
+                <div className="mission-meta">
+                  <div className="mission-id">{task.id}{task.week ? ' · WK ' + String(task.week).padStart(2, '0') : ''}</div>
+                  <div className="mission-title">{task.title}</div>
+                  <div className="mission-sub">
+                    {(task.track ? TRACKS.find(t => t.code === task.track)?.short : 'ALL-COHORT')} · {(task.pillar || 'MISSIONS').toUpperCase()} · {isManual ? 'MANUAL CREDIT' : 'APPROVED SUBMISSION'}
+                  </div>
+                  {sub.feedback && (
+                    <div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)', marginTop: 6 }}>
+                      {sub.feedback}
+                    </div>
+                  )}
+                </div>
+                <div className="mission-points"><span className="plus">+</span>{task.pointsAwarded || task.points || 0}</div>
+                <span className="status-pill status-approved">{(sub.grade || 'COMPLETED').toUpperCase()}</span>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
@@ -1163,7 +1296,7 @@ function AdminTrackControl() {
                 {active ? (
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-                      <AvatarWithRing name={lead?.fullName || lead?.email || 'Lead'} size={34} tier="corps" />
+                      <AvatarWithRing name={lead?.fullName || lead?.email || 'Lead'} avatarUrl={lead?.avatarUrl} size={34} tier="corps" />
                       <div style={{ minWidth: 0 }}>
                         <div className="t-heading" style={{ fontSize: 13, margin: 0, textTransform: 'none', letterSpacing: 0, color: 'var(--off-white)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {lead?.fullName || lead?.email || 'Unknown Exonaut'}
@@ -1222,7 +1355,7 @@ function AdminTrackControl() {
                         background: memberIsLead ? 'rgba(201,242,74,0.06)' : 'var(--off-white-04)',
                         borderRadius: 4,
                       }}>
-                        <AvatarWithRing name={p.fullName || p.email || 'Exonaut'} size={32} tier={memberIsLead ? 'corps' : 'entry'} />
+                        <AvatarWithRing name={p.fullName || p.email || 'Exonaut'} avatarUrl={p.avatarUrl} size={32} tier={memberIsLead ? 'corps' : 'entry'} />
                         <div style={{ minWidth: 0 }}>
                           <div className="t-heading" style={{ fontSize: 12, margin: 0, textTransform: 'none', letterSpacing: 0, color: 'var(--off-white)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {p.fullName || p.email || 'Exonaut'}

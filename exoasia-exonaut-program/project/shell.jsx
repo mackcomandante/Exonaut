@@ -60,6 +60,9 @@ function Sidebar({ current, onNavigate, onSignOut }) {
   const hasProjectTasks = window.__projectStore.firstOfficerTasks(profile.id).length || projectState.assignees.some(a => a.userId === profile.id);
   const displayName = profile.fullName || ME.name;
   const { total: livePoints } = useComputedPoints(profile.id);
+  const missions = useMissions();
+  useSubs();
+  useManualCredits();
   const rowsFromProfiles = useSupabaseExonautRows();
   const rankedRows = React.useMemo(
     () => window.rankExonautRows ? window.rankExonautRows(rowsFromProfiles) : [...rowsFromProfiles].sort((a,b) => b.points - a.points).map((u, i) => ({ ...u, cohortRank: i + 1 })),
@@ -67,13 +70,20 @@ function Sidebar({ current, onNavigate, onSignOut }) {
   );
   const liveRank = rankedRows.find(u => u.id === profile.id)?.cohortRank || 1;
   const tier = window.getTierKeyForPoints ? window.getTierKeyForPoints(livePoints) : (livePoints >= 300 ? 'prime' : livePoints >= 100 ? 'builder' : 'entry');
+  const myTrack = profile.trackCode || ME.track || 'AIS';
+  const myCohort = profile.cohortId || ME.cohort || 'c2627';
+  const activeTrackCount = missions.filter(m =>
+    (m.cohortId || 'c2627') === myCohort &&
+    (!m.track || m.track === myTrack) &&
+    window.getSubmissionForMission?.(m, profile.id, myCohort)?.state !== 'approved'
+  ).length;
   const me = [
     { id: 'profile',     label: 'My Profile',  icon: 'fa-id-badge' },
     { id: 'community',   label: 'Community',   icon: 'fa-users' },
   ];
   const links = [
     { id: 'dashboard',   label: 'Dashboard',   icon: 'fa-gauge-high' },
-    { id: 'missions',    label: 'Track',       icon: 'fa-bullseye', count: 3 },
+    { id: 'missions',    label: 'Track',       icon: 'fa-bullseye', count: activeTrackCount },
     { id: 'leaderboard', label: 'Leaderboard', icon: 'fa-ranking-star' },
     { id: 'credentials', label: 'Certificates', icon: 'fa-certificate' },
   ];

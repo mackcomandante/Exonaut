@@ -4,6 +4,7 @@ function MissionDetail({ missionId, onBack, onSubmitted }) {
   const missions = useMissions();
   const mission = missions.find(m => m.id === missionId) || missions[0];
   const subs = useSubs(); // reactive
+  useManualCredits(); // reactive for credits that were not synced into mission_submissions
   const { profile: currentProfile } = useCurrentUserProfile();
   const crownState = useCrownState();
   const { profiles } = useUserProfiles();

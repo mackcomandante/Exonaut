@@ -65,6 +65,21 @@
   // Weekly window for a cohort + week number. Week 1 = first Fri→Thu period.
   // Returns { weekNumber, startFri, endThu, label }.
   function weekWindow(cohort, weekNumber) {
+    const cohortStart = parseCohortDate(cohort?.start || cohort?.startDate);
+    if (cohortStart && cohortStart.getTime() > Date.now()) {
+      const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+      now.setHours(0, 0, 0, 0);
+      const day = now.getDay() || 7;
+      const currentMonday = new Date(now);
+      currentMonday.setDate(now.getDate() - day + 1);
+      const currentWeek = (typeof COHORT !== 'undefined' ? COHORT.week : 1) || 1;
+      const monday = new Date(currentMonday);
+      monday.setDate(currentMonday.getDate() + (weekNumber - currentWeek) * 7);
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+      sunday.setHours(23, 59, 59, 999);
+      return { weekNumber, startFri: monday, endThu: sunday, label: formatWindow(monday, sunday) };
+    }
     const w1 = weekOneStart(cohort);
     const startFri = new Date(w1.getTime() + (weekNumber - 1) * 7 * DAY_MS);
     const endThu   = new Date(startFri.getTime() + 7 * DAY_MS - 1);
@@ -77,12 +92,17 @@
   // Simpler implementation: return the week that contains "now", clamped
   // into the cohort's declared total if provided.
   function currentWeek(cohort) {
-    const w1 = weekOneStart(cohort);
+    const c = cohort || (typeof COHORTS !== 'undefined' ? COHORTS.find(x => x.status === 'active') : null);
+    const cohortStart = c ? parseCohortDate(c.start || c.startDate) : null;
+    if (cohortStart && cohortStart.getTime() > Date.now()) {
+      return Math.max(1, (typeof COHORT !== 'undefined' ? COHORT.week : 1) || 1);
+    }
+    const w1 = weekOneStart(c);
     const diffDays = Math.floor((Date.now() - w1.getTime()) / DAY_MS);
     let wk = Math.floor(diffDays / 7) + 1;
     if (wk < 1) wk = 1;
-    const start = cohort ? parseCohortDate(cohort.start || cohort.startDate) : null;
-    const end = cohort ? parseCohortDate(cohort.end || cohort.demoDay) : null;
+    const start = c ? parseCohortDate(c.start || c.startDate) : null;
+    const end = c ? parseCohortDate(c.end || c.demoDay) : null;
     const total = start && end && end > start
       ? Math.max(1, Math.ceil((end.getTime() - start.getTime() + 1) / DAY_MS / 7))
       : ((typeof COHORT !== 'undefined' ? COHORT.weekTotal : null) || 12);
@@ -98,13 +118,20 @@
     return formatMMMDD(a) + ' → ' + formatMMMDD(b);
   }
 
+  function cohortById(cohortId) {
+    return window.__cohortStore?.getById?.(cohortId)
+      || (typeof COHORTS !== 'undefined' ? COHORTS.find(c => c.id === cohortId) : null)
+      || null;
+  }
+
   // Daily delta for (user, dayIndex).  dayIndex = days since weekOneStart.
   // Baked around the user's overall tier so "top performers stay top" but
   // each week produces genuine churn.
   function dailyPoints(user, dayIndex) {
     const rng = mulberry32(strHash(user.id + ':' + dayIndex));
     // Base rate scales with total points (a mid-pack prime ~50pts / day avg).
-    const base = Math.max(4, Math.round((user.points || 100) / 7));
+    const base = Math.max(0, Math.round((user.points || 0) / 7));
+    if (base <= 0) return 0;
     // Per-day variance: -40% … +80%
     const v = -0.4 + rng() * 1.2;
     const raw = Math.round(base * (1 + v));
@@ -115,39 +142,118 @@
     return Math.max(0, raw);
   }
 
-  // Points earned by a user inside a given week window (inclusive).
-  function weeklyPoints(user, weekNumber) {
-    // dayIndex 0 = first Friday of week 1.
-    const base = (weekNumber - 1) * 7;
-    let sum = 0;
-    for (let i = 0; i < 7; i++) sum += dailyPoints(user, base + i);
-    return sum;
+  function pointEntryTime(entry) {
+    const raw = entry?.awardedAt || entry?.creditedAt || entry?.createdAt;
+    const ms = raw ? new Date(raw).getTime() : NaN;
+    return Number.isFinite(ms) ? ms : 0;
+  }
+
+  function weeklyEntriesForUser(user, weekNumber, cohort) {
+    const win = weekWindow(cohort, weekNumber);
+    const startMs = win.startFri.getTime();
+    const endMs = win.endThu.getTime();
+    const entries = ledgerEntries();
+    const ledgerRows = entries.filter(e => {
+      const ms = pointEntryTime(e);
+      return e.userId === user.id && ms >= startMs && ms <= endMs;
+    });
+    const unsyncedManualRows = manualCredits()
+      .filter(c => c.userId === user.id)
+      .filter(c => !entries.some(e => e.id === c.pointLedgerId || (e.sourceType === 'manual' && e.sourceId === c.id)))
+      .filter(c => {
+        const ms = pointEntryTime(c);
+        return ms >= startMs && ms <= endMs;
+      });
+    return [...ledgerRows, ...unsyncedManualRows];
+  }
+
+  // Points earned by a user inside the displayed week window.
+  function weeklyPoints(user, weekNumber, cohort = cohortById(user?.cohort)) {
+    return weeklyEntriesForUser(user, weekNumber, cohort)
+      .reduce((sum, e) => sum + Number(e.points || 0), 0);
   }
 
   // Per-day breakdown for a given week — useful for sparkline visuals.
-  function weeklyBreakdown(user, weekNumber) {
-    const base = (weekNumber - 1) * 7;
-    const DAYS = ['FRI','SAT','SUN','MON','TUE','WED','THU'];
-    return DAYS.map((label, i) => ({ day: label, points: dailyPoints(user, base + i) }));
+  function weeklyBreakdown(user, weekNumber, cohort = cohortById(user?.cohort)) {
+    const win = weekWindow(cohort, weekNumber);
+    const labels = [];
+    for (let i = 0; i < 7; i++) {
+      const day = new Date(win.startFri.getTime() + i * DAY_MS);
+      labels.push({
+        date: day,
+        day: ['SUN','MON','TUE','WED','THU','FRI','SAT'][day.getDay()],
+        points: 0,
+      });
+    }
+    weeklyEntriesForUser(user, weekNumber, cohort).forEach(entry => {
+      const ms = pointEntryTime(entry);
+      const idx = Math.floor((ms - win.startFri.getTime()) / DAY_MS);
+      if (idx >= 0 && idx < labels.length) labels[idx].points += Number(entry.points || 0);
+    });
+    return labels;
+  }
+
+  function ledgerEntries() {
+    return window.__pointsStore?.all?.().ledger || [];
+  }
+
+  function manualCredits() {
+    return window.__manualCreditStore?.all?.() || [];
+  }
+
+  function pointsForUser(userId) {
+    const entries = ledgerEntries();
+    const ledgerTotal = entries
+      .filter(e => e.userId === userId)
+      .reduce((sum, e) => sum + Number(e.points || 0), 0);
+    const unsyncedManualTotal = manualCredits()
+      .filter(c => c.userId === userId)
+      .filter(c => !entries.some(e => e.id === c.pointLedgerId || (e.sourceType === 'manual' && e.sourceId === c.id)))
+      .reduce((sum, c) => sum + Number(c.points || 0), 0);
+    return ledgerTotal + unsyncedManualTotal;
+  }
+
+  function liveExonautRows(cohortId) {
+    const profiles = Array.isArray(window.__profileDirectory) ? window.__profileDirectory : [];
+    if (!profiles.length) {
+      return (typeof getCohortUsers === 'function'
+        ? getCohortUsers(cohortId)
+        : USERS.filter(u => (u.cohort || 'c2627') === cohortId)
+      ).filter(u => !u.role || u.role === 'exonaut');
+    }
+    return profiles
+      .filter(p => (p.role || 'exonaut') === 'exonaut')
+      .filter(p => (p.cohortId || 'c2627') === cohortId)
+      .map(p => {
+        const points = pointsForUser(p.id);
+        return {
+          id: p.id,
+          name: p.fullName || p.email || 'Exonaut',
+          role: p.role || 'exonaut',
+          cohort: p.cohortId || 'c2627',
+          track: p.trackCode || 'AIS',
+          avatarUrl: p.avatarUrl || '',
+          points,
+          tier: window.getTierKeyForPoints ? window.getTierKeyForPoints(points) : (points >= 300 ? 'prime' : points >= 100 ? 'builder' : 'entry'),
+        };
+      });
   }
 
   // Top N per cohort for a given week. Returns array of
   // [{ user, cohortId, weekPoints, breakdown, rank, standoutDay }] sorted desc.
   function topOfWeek(cohortId, weekNumber, n = 3) {
-    if (typeof USERS === 'undefined') return [];
-    const users = (typeof getCohortUsers === 'function')
-      ? getCohortUsers(cohortId)
-      : USERS.filter(u => (u.cohort || 'c2627') === cohortId);
+    const cohort = cohortById(cohortId);
+    const users = liveExonautRows(cohortId);
 
     const scored = users.map(u => {
-      const weekPoints = weeklyPoints(u, weekNumber);
-      const breakdown = weeklyBreakdown(u, weekNumber);
+      const weekPoints = weeklyPoints(u, weekNumber, cohort);
+      const breakdown = weeklyBreakdown(u, weekNumber, cohort);
       const standoutDay = breakdown.reduce((best, d) => d.points > best.points ? d : best, breakdown[0]);
       return { user: u, cohortId, weekNumber, weekPoints, breakdown, standoutDay };
     });
 
-    scored.sort((a, b) => b.weekPoints - a.weekPoints);
-    return scored.slice(0, n).map((r, i) => ({ ...r, rank: i + 1 }));
+    scored.sort((a, b) => b.weekPoints - a.weekPoints || b.user.points - a.user.points);
+    return scored.filter(r => r.weekPoints > 0).slice(0, n).map((r, i) => ({ ...r, rank: i + 1 }));
   }
 
   // All cohorts, top 3 each, for a given week.
@@ -171,6 +277,8 @@
     dailyPoints,
     topOfWeek,
     allCohortsTop,
+    pointsForUser,
+    liveExonautRows,
     formatMMMDD,
     formatWindow,
   };

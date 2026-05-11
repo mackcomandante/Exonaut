@@ -87,6 +87,20 @@
     );
   }
 
+  function normalizeTaskId(value) {
+    return String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  }
+
+  function hasApprovedTrackSubmissionPoints(credit) {
+    if (credit.activityType !== 'track_task' || !credit.relatedId) return false;
+    return (window.__subStore?.subs || []).some(s =>
+      s.exonautId === credit.userId &&
+      normalizeTaskId(s.missionId) === normalizeTaskId(credit.relatedId) &&
+      s.state === 'approved' &&
+      Number(s.pointsAwarded || 0) > 0
+    );
+  }
+
   async function refresh() {
     if (!window.__db) {
       state.loaded = true;
@@ -126,7 +140,6 @@
 
       const creditedBy = await actorId();
       const creditId = data.id || genId();
-      const ledgerId = data.pointLedgerId || 'pts-manual-' + creditId;
       const credit = {
         id: creditId,
         userId: data.userId,
@@ -140,7 +153,7 @@
         pillar: data.pillar || 'missions',
         evidenceNote: String(data.evidenceNote || '').trim(),
         proofUrl: String(data.proofUrl || '').trim(),
-        pointLedgerId: ledgerId,
+        pointLedgerId: data.pointLedgerId || 'pts-manual-' + creditId,
         creditedBy,
         creditedAt: new Date().toISOString(),
         metadata: {
@@ -154,6 +167,9 @@
       if (!credit.evidenceNote) throw new Error('Add an evidence/source note.');
       if (!Number.isFinite(credit.points) || credit.points <= 0) throw new Error('Points must be greater than zero.');
 
+      const alreadyHasSubmissionPoints = hasApprovedTrackSubmissionPoints(credit);
+      if (alreadyHasSubmissionPoints) credit.pointLedgerId = '';
+
       if (window.__db) {
         const { error } = await window.__db.from('manual_activity_credits').insert(toRow(credit));
         if (error) {
@@ -165,22 +181,24 @@
         }
       }
 
-      const ledgerEntry = await window.__pointsStore.award({
-        id: ledgerId,
-        userId: credit.userId,
-        sourceType: 'manual',
-        sourceId: credit.id,
-        cohortId: credit.cohortId,
-        trackCode: credit.trackCode,
-        pillar: credit.pillar,
-        points: credit.points,
-        note: `${credit.relatedLabel || credit.activityType} - ${credit.grade}`,
-        awardedBy: creditedBy,
-        awardedAt: credit.creditedAt,
-      });
-      credit.pointLedgerId = ledgerEntry.id;
+      if (!alreadyHasSubmissionPoints) {
+        const ledgerEntry = await window.__pointsStore.award({
+          id: credit.pointLedgerId,
+          userId: credit.userId,
+          sourceType: 'manual',
+          sourceId: credit.id,
+          cohortId: credit.cohortId,
+          trackCode: credit.trackCode,
+          pillar: credit.pillar,
+          points: credit.points,
+          note: `${credit.relatedLabel || credit.activityType} - ${credit.grade}`,
+          awardedBy: creditedBy,
+          awardedAt: credit.creditedAt,
+        });
+        credit.pointLedgerId = ledgerEntry.id;
+      }
 
-      if (credit.activityType === 'track_task' && credit.relatedId && window.upsertManualApprovedSubmission) {
+      if (!alreadyHasSubmissionPoints && credit.activityType === 'track_task' && credit.relatedId && window.upsertManualApprovedSubmission) {
         try {
           await window.upsertManualApprovedSubmission({
             id: 'manual-sub-' + credit.id,
@@ -206,8 +224,10 @@
         window.__notifStore.add({
           toUserId: credit.userId,
           type: 'manual-credit',
-          title: `+${credit.points} manual credit awarded`,
-          sub: `${credit.relatedLabel || credit.activityType} - ${credit.grade}`,
+          title: alreadyHasSubmissionPoints ? 'Manual completion recorded' : `+${credit.points} manual credit awarded`,
+          sub: alreadyHasSubmissionPoints
+            ? `${credit.relatedLabel || credit.activityType} was already scored; no duplicate points added`
+            : `${credit.relatedLabel || credit.activityType} - ${credit.grade}`,
           icon: 'fa-clipboard-check',
           share: {
             kind: 'citation',

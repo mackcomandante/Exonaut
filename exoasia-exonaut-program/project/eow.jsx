@@ -20,6 +20,10 @@ function EowDatePill({ label, value, accent }) {
   );
 }
 
+function eowDayName(date) {
+  return ['SUN','MON','TUE','WED','THU','FRI','SAT'][date.getDay()];
+}
+
 // -------- Week stepper --------
 function EowWeekStepper({ weekNumber, totalWeeks, onChange, window: win }) {
   const canPrev = weekNumber > 1;
@@ -91,7 +95,7 @@ function EowSparkline({ breakdown, accent = 'var(--lime)' }) {
 // ============================================================================
 function EowWinnerCard({ entry, cohort, weekNumber, window: win, onShare }) {
   const { user, rank, weekPoints, breakdown } = entry;
-  const track = TRACKS.find(t => t.code === getUserTrack(user.id));
+  const track = TRACKS.find(t => t.code === (user.track || getUserTrack(user.id)));
   const manager = getUserLead(user.id);
 
   const medal = rank === 1 ? '#F4C542' : rank === 2 ? '#B8C2CE' : '#CD7F32';
@@ -123,7 +127,7 @@ function EowWinnerCard({ entry, cohort, weekNumber, window: win, onShare }) {
 
       {/* Identity row */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-        <AvatarWithRing name={user.name} size={64} tier={user.tier} />
+        <AvatarWithRing name={user.name} avatarUrl={user.avatarUrl} size={64} tier={user.tier} />
         <div style={{ minWidth: 0, flex: 1 }}>
           <h2 className="t-heading" style={{
             fontSize: 18, margin: '0 0 3px 0', textTransform: 'none', letterSpacing: 0,
@@ -156,7 +160,7 @@ function EowWinnerCard({ entry, cohort, weekNumber, window: win, onShare }) {
       {/* Sparkline */}
       <div style={{ padding: '10px 12px', background: 'var(--off-white-07)', borderRadius: 2 }}>
         <div className="t-mono" style={{ fontSize: 8, color: 'var(--off-white-40)', letterSpacing: '0.1em', marginBottom: 6 }}>
-          DAILY BREAKDOWN · FRI → THU
+          DAILY BREAKDOWN
         </div>
         <EowSparkline breakdown={breakdown} accent={accent} />
       </div>
@@ -197,7 +201,7 @@ function EowCohortSection({ cohort, winners, weekNumber, window: win, onShare })
             fontSize: 24, margin: 0, textTransform: 'none', letterSpacing: 0, color: 'var(--off-white)',
           }}>{cohort.name}</h2>
           <div className="t-body" style={{ marginTop: 4, fontSize: 12, color: 'var(--off-white-68)' }}>
-            Top 3 Exonauts for the Fri→Thu window closing {EOW.formatMMMDD(win.endThu)}.
+            Top 3 Exonauts for the weekly points window closing {EOW.formatMMMDD(win.endThu)}.
           </div>
         </div>
       </div>
@@ -226,7 +230,7 @@ function EowCohortSection({ cohort, winners, weekNumber, window: win, onShare })
 // ============================================================================
 function EowShareModal({ entry, cohort, weekNumber, window: win, onClose }) {
   const { user, rank, weekPoints, breakdown } = entry;
-  const track = TRACKS.find(t => t.code === getUserTrack(user.id));
+  const track = TRACKS.find(t => t.code === (user.track || getUserTrack(user.id)));
   const svgRef = React.useRef(null);
 
   const medal = rank === 1 ? '#F4C542' : rank === 2 ? '#B8C2CE' : '#CD7F32';
@@ -420,7 +424,7 @@ function EowShareModal({ entry, cohort, weekNumber, window: win, onClose }) {
                 );
               })}
               <text x="720" y="405" fontFamily="JetBrains Mono, monospace" fontSize="11" fill="#B8C2CE" letterSpacing="2">
-                DAILY · FRI → THU
+                DAILY POINTS
               </text>
 
               {/* footer */}
@@ -488,6 +492,9 @@ function EowShareModal({ entry, cohort, weekNumber, window: win, onClose }) {
 // ============================================================================
 function CommanderEOW() {
   const { all, cohortId } = useCohort();
+  useUserProfiles();
+  usePoints();
+  useManualCredits();
   const [weekNumber, setWeekNumber] = React.useState(() => EOW.currentWeek());
   const [share, setShare] = React.useState(null);   // { entry, cohort, weekNumber, window }
   const selectedCohort = all.find(c => c.id === cohortId) || all[0] || (typeof COHORT !== 'undefined' ? COHORT : null);
@@ -514,7 +521,7 @@ function CommanderEOW() {
           </div>
           <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>Weekly Honors</h1>
           <div className="t-body" style={{ marginTop: 6 }}>
-            Top 3 Exonauts per cohort, computed from points earned Fri → Thu. Generate LinkedIn-ready share cards for each winner.
+            Top 3 Exonauts per cohort, computed from points earned in the selected weekly window. Generate LinkedIn-ready share cards for each winner.
           </div>
         </div>
         <EowWeekStepper
@@ -527,8 +534,8 @@ function CommanderEOW() {
 
       {/* Window summary strip */}
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 22 }}>
-        <EowDatePill label="WINDOW OPENS" value={EOW.formatMMMDD(activeCohortWin.startFri) + ' · FRI 00:00'} accent="var(--lime)" />
-        <EowDatePill label="WINDOW CLOSES" value={EOW.formatMMMDD(activeCohortWin.endThu) + ' · THU 23:59'} accent="var(--sky)" />
+        <EowDatePill label="WINDOW OPENS" value={EOW.formatMMMDD(activeCohortWin.startFri) + ' · ' + eowDayName(activeCohortWin.startFri) + ' 00:00'} accent="var(--lime)" />
+        <EowDatePill label="WINDOW CLOSES" value={EOW.formatMMMDD(activeCohortWin.endThu) + ' · ' + eowDayName(activeCohortWin.endThu) + ' 23:59'} accent="var(--sky)" />
         <EowDatePill label="COHORTS ON PLATFORM" value={String(cohorts.length)} />
         <EowDatePill label="WINNERS COMPUTED" value={cohorts.reduce((s, c) => s + EOW.topOfWeek(c.id, weekNumber, 3).length, 0) + ' TOTAL'} />
       </div>

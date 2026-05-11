@@ -132,7 +132,7 @@ function ManualActivityCreditPage() {
     }
   }
 
-  const recent = credits.credits.slice(0, 8);
+  const recent = credits.credits;
   const nameOf = id => profiles.find(p => p.id === id)?.fullName || profiles.find(p => p.id === id)?.email || id;
 
   return (
@@ -230,16 +230,18 @@ function ManualActivityCreditPage() {
           </div>
         </div>
 
-        <div className="card-panel" style={{ padding: 22 }}>
+        <div className="card-panel" style={{ padding: 22, maxHeight: 'min(72vh, 680px)', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
           <div className="t-label" style={{ marginBottom: 14 }}>RECENT MANUAL CREDITS</div>
-          {recent.length === 0 && <div className="t-body" style={{ color: 'var(--off-white-68)' }}>No manual credits yet.</div>}
-          {recent.map(c => (
-            <div key={c.id} style={{ padding: '12px 0', borderBottom: '1px solid var(--off-white-07)' }}>
-              <div className="t-heading" style={{ fontSize: 13, textTransform: 'none', letterSpacing: 0 }}>{nameOf(c.userId)} - +{c.points}</div>
-              <div className="t-body" style={{ fontSize: 12 }}>{c.relatedLabel || c.activityType} - {c.grade}</div>
-              <div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)', marginTop: 4 }}>{c.evidenceNote}</div>
-            </div>
-          ))}
+          <div style={{ overflowY: 'auto', paddingRight: 8, minHeight: 0 }}>
+            {recent.length === 0 && <div className="t-body" style={{ color: 'var(--off-white-68)' }}>No manual credits yet.</div>}
+            {recent.map(c => (
+              <div key={c.id} style={{ padding: '12px 0', borderBottom: '1px solid var(--off-white-07)' }}>
+                <div className="t-heading" style={{ fontSize: 13, textTransform: 'none', letterSpacing: 0 }}>{nameOf(c.userId)} - +{c.points}</div>
+                <div className="t-body" style={{ fontSize: 12 }}>{c.relatedLabel || c.activityType} - {c.grade}</div>
+                <div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)', marginTop: 4 }}>{c.evidenceNote}</div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>

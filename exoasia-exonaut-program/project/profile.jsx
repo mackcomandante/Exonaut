@@ -33,12 +33,20 @@ function Profile({ onOpenMission, onTriggerBadge }) {
   const { breakdown } = useUserPoints(profile.id);
   const liveBadges = useLiveBadges(profile.id);
   const earnedBadges = liveBadges.filter(b => b.earned);
-  const subs = useSubs();
+  useSubs();
+  useManualCredits();
 
   const byCategory = (cat) => liveBadges.filter(b => b.category === cat);
 
-  const approvedSubs = subs.filter(s => s.exonautId === profile.id && s.state === 'approved');
-  const approvedMissions = approvedSubs.map(s => ({ ...(missions.find(m => m.id === s.missionId) || {}), ...s, id: s.missionId, title: s.missionTitle }));
+  const missionSubmission = (mission) => window.getSubmissionForMission?.(mission, profile.id, cohort.id || profile.cohortId || ME.cohort);
+  const approvedMissions = missions
+    .map(m => {
+      const sub = missionSubmission(m);
+      return sub?.state === 'approved'
+        ? { ...m, ...sub, id: m.id, title: m.title }
+        : null;
+    })
+    .filter(Boolean);
 
   function openEdit() {
     setDraft({
@@ -314,7 +322,13 @@ function Profile({ onOpenMission, onTriggerBadge }) {
             <span className="section-meta">{approvedMissions.length} COMPLETED</span>
           </div>
           <div>
-            {missions.map(m => (
+            {missions.map(m => {
+              const sub = missionSubmission(m);
+              const liveStatus = sub?.state || m.status || 'not-started';
+              const isApproved = liveStatus === 'approved';
+              const statusClass = isApproved ? 'approved' : liveStatus === 'pending' ? 'submitted' : liveStatus === 'needs-revision' ? 'in-progress' : liveStatus === 'rejected' ? 'overdue' : liveStatus === 'in-progress' ? 'in-progress' : 'not-started';
+              const points = isApproved && sub?.pointsAwarded != null ? sub.pointsAwarded : m.points;
+              return (
               <div key={m.id} className="mission-row" onClick={() => onOpenMission(m.id)}>
                 <div className="mission-meta">
                   <div className="mission-id">{m.id}</div>
@@ -324,16 +338,16 @@ function Profile({ onOpenMission, onTriggerBadge }) {
                   </div>
                 </div>
                 <div className="mission-points">
-                  {m.pointsAwarded ? <><span className="plus">+</span>{m.pointsAwarded}</> : <><span className="plus">+</span>{m.points}</>}
+                  <span className="plus">+</span>{points}
                 </div>
-                <span className={'status-pill status-' + (m.status === 'approved' ? 'approved' : m.status === 'in-progress' ? 'in-progress' : 'not-started')}>
-                  {m.status === 'approved' ? (m.grade || 'APPR').toUpperCase() : m.status.replace('-', ' ').toUpperCase()}
+                <span className={'status-pill status-' + statusClass}>
+                  {isApproved ? (sub?.grade || 'APPROVED').toUpperCase() : liveStatus.replace('-', ' ').toUpperCase()}
                 </span>
                 <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); onOpenMission(m.id); }}>
                   VIEW
                 </button>
               </div>
-            ))}
+            );})}
           </div>
         </div>
       )}

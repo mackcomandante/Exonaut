@@ -338,33 +338,9 @@ function WeeklyMissionsList({ onOpenMission }) {
     rejected: { cls: 'status-overdue', label: 'REJECTED' },
   };
 
-  const normalizeManualLabel = (value) => String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-
-  const manualCreditFor = (mission) => manualCredits.credits.find(c => {
-    if (c.userId !== profile.id) return false;
-    if (c.activityType !== 'track_task') return false;
-    if ((c.cohortId || 'c2627') !== myCohort) return false;
-    if (c.relatedId && c.relatedId === mission.id) return true;
-    return normalizeManualLabel(c.relatedLabel) && normalizeManualLabel(c.relatedLabel) === normalizeManualLabel(mission.title);
-  });
-
   const submissionFor = (missionId) => {
-    const direct = subs.find(s => s.exonautId === profile.id && s.missionId === missionId);
-    if (direct) return direct;
     const mission = missions.find(m => m.id === missionId);
-    const credit = mission ? manualCreditFor(mission) : null;
-    if (!credit) return null;
-    return {
-      id: 'manual-credit-' + credit.id,
-      missionId,
-      missionTitle: mission?.title || credit.relatedLabel || missionId,
-      exonautId: profile.id,
-      state: 'approved',
-      grade: credit.grade || 'approved',
-      feedback: credit.evidenceNote || 'Credited manually from pre-platform evidence.',
-      pointsAwarded: Number(credit.points) || Number(mission?.points) || 0,
-      manualCredit: true,
-    };
+    return mission ? window.getSubmissionForMission?.(mission, profile.id, myCohort) : null;
   };
 
   const taskStatus = (mission) => {
@@ -432,7 +408,7 @@ function WeeklyMissionsList({ onOpenMission }) {
         if (statusFilter === 'active') return group.status !== 'approved';
         return true;
       });
-  }, [scopedMissions, subs, manualCredits.credits, filter, statusFilter, profile.id]);
+  }, [scopedMissions, subs, manualCredits.credits, filter, statusFilter, profile.id, myCohort]);
 
   return (
     <div className="enter">
