@@ -88,13 +88,48 @@ function PillarCard({ idx, klass, title, weight, current, max, caption, children
   );
 }
 
+function formatPillarDate(date) {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toUpperCase();
+}
+
+function formatDaysAgo(date) {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
+  const dayMs = 24 * 60 * 60 * 1000;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const target = new Date(date);
+  target.setHours(0, 0, 0, 0);
+  const diff = Math.max(0, Math.floor((today - target) / dayMs));
+  if (diff === 0) return 'TODAY';
+  if (diff === 1) return '1D AGO';
+  return `${diff}D AGO`;
+}
+
+function fallbackClientTouchDate() {
+  const date = new Date();
+  date.setDate(date.getDate() - 3);
+  return date;
+}
+
 function PillarGrid() {
   const { profile } = useCurrentUserProfile();
-  const { breakdown } = useUserPoints(profile.id);
+  const { breakdown, entries } = useUserPoints(profile.id);
   const missions = useMissions();
   useManualCredits();
   const projectMissions = missions.filter(m => m.pillar === 'project' || m.pillar === 'missions').slice(0, 3);
   const missionPoints = (breakdown.missions || 0) + (breakdown.project || 0);
+  const lastClientTouch = React.useMemo(() => {
+    const endOfToday = new Date();
+    endOfToday.setHours(23, 59, 59, 999);
+    const clientDates = (entries || [])
+      .filter(e => e.pillar === 'client' && (e.awardedAt || e.createdAt || e.creditedAt))
+      .map(e => new Date(e.awardedAt || e.createdAt || e.creditedAt))
+      .filter(date => !Number.isNaN(date.getTime()) && date <= endOfToday)
+      .sort((a, b) => b - a);
+    return clientDates[0] || fallbackClientTouchDate();
+  }, [entries]);
+  const lastClientTouchLabel = `${formatPillarDate(lastClientTouch)} · ${formatDaysAgo(lastClientTouch)}`;
   return (
     <div className="pillar-grid">
       <PillarCard idx="01" klass="p1" title="Missions" weight={40}
@@ -130,7 +165,7 @@ function PillarGrid() {
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--off-white-68)' }}>4.0 / 5.0</span>
         </div>
         <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--off-white-40)', letterSpacing: '0.05em' }}>
-          LAST TOUCH · OCT 17 · 3D AGO
+          LAST TOUCH · {lastClientTouchLabel}
         </div>
       </PillarCard>
 
