@@ -290,9 +290,11 @@ function AdminCohortFilter() {
 function PlatformAdminSidebar({ current, onNavigate, onSignOut }) {
   const { profile } = useCurrentUserProfile();
   const { unreadCount } = useNotifications(profile);
+  const { unreadCount: messageUnread } = useMessages(profile);
   const displayName = profile.fullName || 'Platform Admin';
   const me = [
     { id: 'pa-profile',  label: 'My Profile',         icon: 'fa-id-badge' },
+    { id: 'messages',    label: 'Messages',           icon: 'fa-envelope', count: messageUnread },
     { id: 'community',   label: 'Community',          icon: 'fa-users-rectangle' },
   ];
   const links = [
@@ -328,6 +330,7 @@ function PlatformAdminSidebar({ current, onNavigate, onSignOut }) {
           <div key={l.id} className={'sidebar-link' + (current === l.id ? ' active' : '')} onClick={() => onNavigate(l.id)}>
             <i className={'fa-solid ' + l.icon} />
             <span>{l.label}</span>
+            {l.count ? <span className="badge-count">{l.count}</span> : null}
           </div>
         ))}
       </nav>

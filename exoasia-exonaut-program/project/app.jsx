@@ -115,11 +115,11 @@ function App() {
   };
 
   const routeAllowedForRole = (role, routeId) => {
-    const exonautRoutes = ['dashboard', 'leaderboard', 'profile', 'mission', 'missions', 'credentials', 'projects', 'first-projects', 'project-tasks', 'community', 'kudos', 'rituals', 'announce', 'notifications', 'alumni', 'settings'];
+    const exonautRoutes = ['dashboard', 'leaderboard', 'profile', 'mission', 'missions', 'credentials', 'projects', 'first-projects', 'project-tasks', 'messages', 'community', 'exonaut-guide', 'kudos', 'rituals', 'announce', 'notifications', 'alumni', 'settings'];
     const trackOpsRoutes = ['lead-home', 'lead-roster', 'lead-queue', 'lead-grade', 'lead-manual-credit', 'lead-announce', 'lead-removals', 'crown-pass'];
-    const leadRoutes = ['lead-home', 'lead-roster', 'lead-queue', 'lead-grade', 'lead-manual-credit', 'lead-announce', 'lead-removals', 'lead-projects', 'lead-project-tasks', 'lead-profile', 'community', 'kudos', 'notifications', 'settings'];
-    const commanderRoutes = ['cmdr-home', 'cmdr-profile', 'cmdr-leads', 'cmdr-projects', 'cmdr-exonauts', 'cmdr-esc', 'cmdr-health', 'cmdr-eow', 'cmdr-crowns', 'cmdr-removals', 'cmdr-manual-credit', 'cmdr-announce', 'community', 'kudos', 'notifications', 'settings'];
-    const adminRoutes = ['pa-cohorts', 'pa-missions', 'pa-projects', 'pa-managers', 'pa-assign', 'pa-users', 'pa-console', 'pa-manual-credit', 'pa-removals', 'pa-announce', 'pa-profile', 'community', 'kudos', 'notifications', 'settings'];
+    const leadRoutes = ['lead-home', 'lead-roster', 'lead-queue', 'lead-grade', 'lead-manual-credit', 'lead-announce', 'lead-removals', 'lead-projects', 'lead-project-tasks', 'lead-profile', 'messages', 'community', 'kudos', 'notifications', 'settings'];
+    const commanderRoutes = ['cmdr-home', 'cmdr-profile', 'cmdr-leads', 'cmdr-projects', 'cmdr-exonauts', 'cmdr-esc', 'cmdr-health', 'cmdr-eow', 'cmdr-crowns', 'cmdr-removals', 'cmdr-manual-credit', 'cmdr-announce', 'messages', 'community', 'kudos', 'notifications', 'settings'];
+    const adminRoutes = ['pa-cohorts', 'pa-missions', 'pa-projects', 'pa-managers', 'pa-assign', 'pa-users', 'pa-console', 'pa-manual-credit', 'pa-removals', 'pa-announce', 'pa-profile', 'messages', 'community', 'kudos', 'notifications', 'settings'];
     const routeBase = (routeId || '').split(':')[0];
     if (role === 'lead') return leadRoutes.includes(routeBase);
     if (role === 'commander') return commanderRoutes.includes(routeBase);
@@ -183,6 +183,8 @@ function App() {
     'first-projects': ['PROJECTS', 'Project Lead Board'],
     'project-tasks': ['PROJECTS', 'Project Tasks'],
     community:   ['EXONAUT', 'Community'],
+    messages:    ['COMMUNICATIONS', 'Messages'],
+    'exonaut-guide': ['EXONAUT', 'Exonaut Guide'],
     kudos:       ['EXONAUT', 'Kudos'],
     rituals:     ['EXONAUT', 'Rituals'],
     announce:    ['EXONAUT', 'Announcements'],
@@ -248,7 +250,9 @@ function App() {
     else if (route === 'projects') page = <ProjectsPage />;
     else if (route === 'first-projects') page = <FirstOfficerProjectsPage />;
     else if (route === 'project-tasks') page = <ProjectTasksPage />;
+    else if (route === 'messages')    page = <MessagesPage />;
     else if (route === 'community')   page = <CommunityPage />;
+    else if (route === 'exonaut-guide') page = <ExonautGuidePage />;
     else if (route === 'kudos')       page = <KudosFeed onGive={() => setKudosOpen(true)} />;
     else if (route === 'rituals')     page = <RitualsPage />;
     else if (route === 'announce')    page = <AnnouncementsPage />;
@@ -278,6 +282,7 @@ function App() {
     else if (route === 'lead-projects') page = <ProjectsPage />;
     else if (route === 'lead-project-tasks') page = <ProjectTasksPage />;
     else if (route === 'lead-profile') page = <RoleProfile roleKey="lead" />;
+    else if (route === 'messages')    page = <MessagesPage />;
     else if (route === 'community')   page = <CommunityPage />;
     else if (route === 'kudos')       page = <KudosFeed onGive={() => setKudosOpen(true)} />;
     else if (route === 'notifications') page = <NotificationsPage />;
@@ -298,6 +303,7 @@ function App() {
     else if (route === 'cmdr-manual-credit') page = <ManualActivityCreditPage />;
     else if (route === 'cmdr-announce') page = <CommanderAnnounce />;
     else if (route === 'cmdr-profile') page = <RoleProfile roleKey="commander" />;
+    else if (route === 'messages')    page = <MessagesPage />;
     else if (route === 'community')   page = <CommunityPage />;
     else if (route === 'kudos')       page = <KudosFeed onGive={() => setKudosOpen(true)} />;
     else if (route === 'notifications') page = <NotificationsPage />;
@@ -316,6 +322,7 @@ function App() {
     else if (route === 'pa-removals') page = <AdminRemovalsPage />;
     else if (route === 'pa-announce') page = <AdminAnnounce />;
     else if (route === 'pa-profile') page = <RoleProfile roleKey="admin" />;
+    else if (route === 'messages')   page = <MessagesPage />;
     else if (route === 'community')  page = <CommunityPage />;
     else if (route === 'kudos')      page = <KudosFeed onGive={() => setKudosOpen(true)} />;
     else if (route === 'notifications') page = <NotificationsPage />;
@@ -362,6 +369,7 @@ function App() {
 function LeadSidebar({ current, onNavigate, onSignOut }) {
   const { profile } = useCurrentUserProfile();
   const { unreadCount } = useNotifications(profile);
+  const { unreadCount: messageUnread } = useMessages(profile);
   const { profiles } = useUserProfiles();
   useProjects();
   const isFirstOfficer = window.__projectStore.userIsFirstOfficer(profile.id);
@@ -383,6 +391,7 @@ function LeadSidebar({ current, onNavigate, onSignOut }) {
   }).length;
   const me = [
     { id: 'lead-profile', label: 'My Profile', icon: 'fa-id-badge' },
+    { id: 'messages', label: 'Messages', icon: 'fa-envelope', count: messageUnread },
     { id: 'community',   label: 'Community',     icon: 'fa-users-rectangle' },
   ];
   const links = [
@@ -414,6 +423,7 @@ function LeadSidebar({ current, onNavigate, onSignOut }) {
           <div key={l.id} className={'sidebar-link' + (current === l.id ? ' active' : '')} onClick={() => onNavigate(l.id)}>
             <i className={'fa-solid ' + l.icon} />
             <span>{l.label}</span>
+            {l.count ? <span className="badge-count">{l.count}</span> : null}
           </div>
         ))}
         <div className="sidebar-nav-section">Track Ops</div>
@@ -443,10 +453,12 @@ function LeadSidebar({ current, onNavigate, onSignOut }) {
 function CommanderSidebar({ current, onNavigate, onSignOut }) {
   const { profile } = useCurrentUserProfile();
   const { unreadCount } = useNotifications(profile);
+  const { unreadCount: messageUnread } = useMessages(profile);
   const escalations = useEscalations();
   const displayName = profile.fullName || 'Mission Commander';
   const me = [
     { id: 'cmdr-profile', label: 'My Profile', icon: 'fa-id-badge' },
+    { id: 'messages',      label: 'Messages',   icon: 'fa-envelope', count: messageUnread },
     { id: 'community',     label: 'Community',      icon: 'fa-users-rectangle' },
   ];
   const links = [
@@ -483,6 +495,7 @@ function CommanderSidebar({ current, onNavigate, onSignOut }) {
           <div key={l.id} className={'sidebar-link' + (current === l.id ? ' active' : '')} onClick={() => onNavigate(l.id)}>
             <i className={'fa-solid ' + l.icon} />
             <span>{l.label}</span>
+            {l.count ? <span className="badge-count">{l.count}</span> : null}
           </div>
         ))}
       </nav>

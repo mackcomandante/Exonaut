@@ -52,6 +52,7 @@ function ThemeToggle({ compact = false }) {
 function Sidebar({ current, onNavigate, onSignOut }) {
   const { profile } = useCurrentUserProfile();
   const { unreadCount } = useNotifications(profile);
+  const { unreadCount: messageUnread } = useMessages(profile);
   useCrownState();
   const projectState = useProjects();
   const crown = window.__crownStore.getUserCrown(profile.id);
@@ -79,7 +80,9 @@ function Sidebar({ current, onNavigate, onSignOut }) {
   ).length;
   const me = [
     { id: 'profile',     label: 'My Profile',  icon: 'fa-id-badge' },
+    { id: 'messages',    label: 'Messages',    icon: 'fa-envelope', count: messageUnread },
     { id: 'community',   label: 'Community',   icon: 'fa-users' },
+    { id: 'exonaut-guide', label: 'Exonaut Guide', icon: 'fa-book-open' },
   ];
   const links = [
     { id: 'dashboard',   label: 'Dashboard',   icon: 'fa-gauge-high' },
@@ -127,6 +130,7 @@ function Sidebar({ current, onNavigate, onSignOut }) {
                onClick={() => onNavigate(l.id)}>
             <i className={'fa-solid ' + l.icon} />
             <span>{l.label}</span>
+            {l.count ? <span className="badge-count">{l.count}</span> : null}
           </div>
         ))}
         <div className="sidebar-nav-section">Program</div>
