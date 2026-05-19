@@ -51,6 +51,20 @@ AS $$
   );
 $$;
 
+CREATE OR REPLACE FUNCTION public.can_add_message_participant(target_thread_id text)
+RETURNS boolean
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.message_threads mt
+    WHERE mt.id = target_thread_id
+      AND mt.created_by = auth.uid()
+  );
+$$;
+
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
@@ -125,11 +139,7 @@ ON public.message_participants
 FOR INSERT
 WITH CHECK (
   auth.uid() IS NOT NULL
-  AND EXISTS (
-    SELECT 1 FROM public.message_threads mt
-    WHERE mt.id = message_participants.thread_id
-      AND mt.created_by = auth.uid()
-  )
+  AND public.can_add_message_participant(message_participants.thread_id)
 );
 
 DROP POLICY IF EXISTS "message_participants_update_self" ON public.message_participants;

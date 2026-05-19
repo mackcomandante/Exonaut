@@ -32,7 +32,24 @@ function formatAttachmentSize(size) {
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 }
 
-function MessageAttachments({ attachments = [], editable = false, onRemove }) {
+function fileIconForAttachment(file) {
+  const name = String(file?.name || '').toLowerCase();
+  const type = String(file?.type || '').toLowerCase();
+  if (type.includes('pdf') || name.endsWith('.pdf')) return 'fa-file-pdf';
+  if (type.includes('word') || name.endsWith('.doc') || name.endsWith('.docx')) return 'fa-file-word';
+  if (type.includes('spreadsheet') || type.includes('excel') || name.endsWith('.xls') || name.endsWith('.xlsx')) return 'fa-file-excel';
+  if (type.includes('presentation') || type.includes('powerpoint') || name.endsWith('.ppt') || name.endsWith('.pptx')) return 'fa-file-powerpoint';
+  if (type.includes('zip') || name.endsWith('.zip') || name.endsWith('.rar')) return 'fa-file-zipper';
+  return 'fa-file-lines';
+}
+
+function canEmbedAttachment(file) {
+  const name = String(file?.name || '').toLowerCase();
+  const type = String(file?.type || '').toLowerCase();
+  return type.includes('pdf') || name.endsWith('.pdf');
+}
+
+function MessageAttachments({ attachments = [], editable = false, onRemove, onPreview }) {
   if (!attachments.length) return null;
   return (
     <div className="message-attachments">
@@ -41,17 +58,30 @@ function MessageAttachments({ attachments = [], editable = false, onRemove }) {
         return (
           <div key={file.id || file.name || index} className={'message-attachment' + (isImage ? ' image' : '')}>
             {isImage ? (
-              <a href={file.dataUrl} target="_blank" rel="noreferrer" title={file.name}>
+              <button
+                type="button"
+                className="message-image-preview-btn"
+                onClick={() => onPreview?.(file)}
+                title={file.name || 'Open image'}
+              >
                 <img src={file.dataUrl} alt={file.name || 'Attached image'} />
-              </a>
+              </button>
             ) : (
-              <a className="message-file-chip" href={file.dataUrl} download={file.name || 'attachment'}>
-                <i className="fa-solid fa-file-arrow-down" />
+              <button
+                type="button"
+                className="message-file-card"
+                onClick={() => onPreview?.(file)}
+                title={file.name || 'Open file'}
+              >
+                <i className={'fa-solid ' + fileIconForAttachment(file)} />
                 <span>
                   <strong>{file.name || 'Attachment'}</strong>
                   <em>{formatAttachmentSize(file.size)}</em>
                 </span>
-              </a>
+                <a className="message-file-download" href={file.dataUrl} download={file.name || 'attachment'} title="Download file" onClick={e => e.stopPropagation()}>
+                  <i className="fa-solid fa-download" />
+                </a>
+              </button>
             )}
             {editable && (
               <button type="button" className="message-attachment-remove" onClick={() => onRemove?.(index)} title="Remove attachment">
@@ -86,6 +116,7 @@ function MessagesPage() {
   const [draft, setDraft] = React.useState('');
   const [threadSearch, setThreadSearch] = React.useState('');
   const [attachments, setAttachments] = React.useState([]);
+  const [previewImage, setPreviewImage] = React.useState(null);
   const fileInputRef = React.useRef(null);
   const activeThread = threads.find(t => t.id === activeId) || threads[0] || null;
   const messages = activeThread ? messagesForThread(activeThread.id) : [];
@@ -235,7 +266,7 @@ function MessagesPage() {
                       <div className="message-bubble">
                         {!mine && <div className="message-sender">{sender?.fullName || 'Exonaut'}</div>}
                         {m.body && <div>{m.body}</div>}
-                        <MessageAttachments attachments={m.attachments || []} />
+                        <MessageAttachments attachments={m.attachments || []} onPreview={setPreviewImage} />
                         <time>{timeAgo(m.createdAt)}</time>
                       </div>
                     </div>
@@ -257,6 +288,7 @@ function MessagesPage() {
                   <MessageAttachments
                     attachments={attachments}
                     editable
+                    onPreview={setPreviewImage}
                     onRemove={(index) => setAttachments(files => files.filter((_, i) => i !== index))}
                   />
                   <textarea
@@ -295,6 +327,31 @@ function MessagesPage() {
             setComposeOpen(false);
           }}
         />
+      )}
+
+      {previewImage && (
+        <div className="message-preview-backdrop" onClick={() => setPreviewImage(null)}>
+          <div className={'message-preview-dialog' + (String(previewImage.type || '').startsWith('image/') ? '' : ' file')} onClick={e => e.stopPropagation()}>
+            <button className="message-preview-close" onClick={() => setPreviewImage(null)} title="Close preview">
+              <i className="fa-solid fa-xmark" />
+            </button>
+            {String(previewImage.type || '').startsWith('image/') ? (
+              <img src={previewImage.dataUrl} alt={previewImage.name || 'Image preview'} />
+            ) : canEmbedAttachment(previewImage) ? (
+              <iframe className="message-preview-frame" src={previewImage.dataUrl} title={previewImage.name || 'File preview'} />
+            ) : (
+              <div className="message-preview-file-panel">
+                <i className={'fa-solid ' + fileIconForAttachment(previewImage)} />
+                <strong>{previewImage.name || 'Attachment'}</strong>
+                <span>{formatAttachmentSize(previewImage.size)}</span>
+                <a className="btn btn-primary" href={previewImage.dataUrl} download={previewImage.name || 'attachment'}>
+                  <i className="fa-solid fa-download" /> Download
+                </a>
+              </div>
+            )}
+            <div className="message-preview-caption">{previewImage.name || 'Image'}</div>
+          </div>
+        </div>
       )}
     </div>
   );
