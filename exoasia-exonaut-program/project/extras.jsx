@@ -297,7 +297,7 @@ function TweaksPanel({ open, onClose, tweaks, setTweak, onCelebrate }) {
 // ---- Tweaks Toggle FAB ----
 function TweaksFab({ onClick }) {
   return (
-    <button onClick={onClick}
+    <button className="floating-action floating-tweaks" onClick={onClick}
       style={{
         position: 'fixed', bottom: 20, right: 20, zIndex: 140,
         background: 'var(--bg-deep)', border: '1px solid var(--lime-border)',

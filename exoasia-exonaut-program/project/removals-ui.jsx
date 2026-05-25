@@ -376,7 +376,7 @@ function CommanderRemovalsPage() {
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 6, marginBottom: 20, borderBottom: '1px solid var(--off-white-07)' }}>
+      <div className="admin-action-tabs" style={{ display: 'flex', gap: 6, marginBottom: 20, borderBottom: '1px solid var(--off-white-07)' }}>
         {tabs.map(t => (
           <button key={t.id} onClick={() => setTab(t.id)} style={{
             padding: '10px 14px', background: 'transparent',
@@ -490,7 +490,7 @@ function AdminRemovalsPage() {
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 6, marginBottom: 20, borderBottom: '1px solid var(--off-white-07)' }}>
+      <div className="admin-action-tabs" style={{ display: 'flex', gap: 6, marginBottom: 20, borderBottom: '1px solid var(--off-white-07)' }}>
         {tabs.map(t => (
           <button key={t.id} onClick={() => setTab(t.id)} style={{
             padding: '10px 14px', background: 'transparent',

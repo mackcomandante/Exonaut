@@ -49,7 +49,7 @@ function ThemeToggle({ compact = false }) {
   );
 }
 
-function Sidebar({ current, onNavigate, onSignOut }) {
+function Sidebar({ current, onNavigate, onSignOut, mobileOpen = false, onMobileClose }) {
   const { profile } = useCurrentUserProfile();
   const { unreadCount } = useNotifications(profile);
   const { unreadCount: messageUnread } = useMessages(profile);
@@ -107,12 +107,15 @@ function Sidebar({ current, onNavigate, onSignOut }) {
   ];
 
   return (
-    <aside className="sidebar">
+    <aside id="application-navigation" className={'sidebar' + (mobileOpen ? ' mobile-open' : '')} aria-label="Application navigation">
+      <button type="button" className="sidebar-mobile-close" onClick={onMobileClose} aria-label="Close navigation menu">
+        <i className="fa-solid fa-xmark" />
+      </button>
       <div className="sidebar-brand">
         <div className="sidebar-logo">EXOASIA</div>
         <div className="sidebar-tag">EXONAUT PORTAL · v2.0</div>
       </div>
-      <div className="sidebar-user" onClick={() => onNavigate('profile')} style={{ cursor: 'pointer' }}>
+      <button type="button" className="sidebar-user" onClick={() => onNavigate('profile')} style={{ cursor: 'pointer' }}>
         <AvatarWithRing name={displayName} avatarUrl={profile.avatarUrl} size={36} tier={tier} />
         <div className="sidebar-user-info">
           <div className="sidebar-user-name">{displayName}</div>
@@ -120,37 +123,37 @@ function Sidebar({ current, onNavigate, onSignOut }) {
             {TIERS[tier].short} · #{liveRank}
           </div>
         </div>
-      </div>
+      </button>
 
       <nav className="sidebar-nav">
         <div className="sidebar-nav-section">Me</div>
         {me.map(l => (
-          <div key={l.id}
+          <button type="button" key={l.id}
                className={'sidebar-link' + (current === l.id ? ' active' : '')}
                onClick={() => onNavigate(l.id)}>
             <i className={'fa-solid ' + l.icon} />
             <span>{l.label}</span>
             {l.count ? <span className="badge-count">{l.count}</span> : null}
-          </div>
+          </button>
         ))}
         <div className="sidebar-nav-section">Program</div>
         {links.map(l => (
-          <div key={l.id}
+          <button type="button" key={l.id}
                className={'sidebar-link' + (current === l.id ? ' active' : '')}
                onClick={() => onNavigate(l.id)}>
             <i className={'fa-solid ' + l.icon} />
             <span>{l.label}</span>
             {l.count ? <span className="badge-count">{l.count}</span> : null}
-          </div>
+          </button>
         ))}
         <div className="sidebar-nav-section">Culture</div>
         {ops.map(l => (
-          <div key={l.id}
+          <button type="button" key={l.id}
                className={'sidebar-link' + (current === l.id ? ' active' : '')}
                onClick={() => onNavigate(l.id)}>
             <i className={'fa-solid ' + l.icon} />
             <span>{l.label}</span>
-          </div>
+          </button>
         ))}
         {crown && (
           <>
@@ -158,33 +161,33 @@ function Sidebar({ current, onNavigate, onSignOut }) {
               Track Ops · {(TRACKS.find(t => t.code === crown.trackCode)?.short || crown.trackCode)}
             </div>
             {trackOps.map(l => (
-              <div key={l.id}
+              <button type="button" key={l.id}
                    className={'sidebar-link' + (current === l.id ? ' active' : '')}
                    onClick={() => onNavigate(l.id)}>
                 <i className={'fa-solid ' + l.icon} />
                 <span>{l.label}</span>
-              </div>
+              </button>
             ))}
           </>
         )}
         {(hasAssignedProject || isFirstOfficer || hasProjectTasks) && (
           <>
             <div className="sidebar-nav-section" style={{ color: 'var(--lime)' }}>Projects</div>
-            <div className={'sidebar-link' + (current === 'projects' ? ' active' : '')} onClick={() => onNavigate('projects')}>
+            <button type="button" className={'sidebar-link' + (current === 'projects' ? ' active' : '')} onClick={() => onNavigate('projects')}>
               <i className="fa-solid fa-diagram-project" />
               <span>Projects</span>
-            </div>
+            </button>
             {isFirstOfficer && (
-              <div className={'sidebar-link' + (current === 'first-projects' ? ' active' : '')} onClick={() => onNavigate('first-projects')}>
+              <button type="button" className={'sidebar-link' + (current === 'first-projects' ? ' active' : '')} onClick={() => onNavigate('first-projects')}>
                 <i className="fa-solid fa-user-tie" />
                 <span>Project Lead Board</span>
-              </div>
+              </button>
             )}
             {(isFirstOfficer || hasProjectTasks) && (
-              <div className={'sidebar-link' + (current === 'project-tasks' ? ' active' : '')} onClick={() => onNavigate('project-tasks')}>
+              <button type="button" className={'sidebar-link' + (current === 'project-tasks' ? ' active' : '')} onClick={() => onNavigate('project-tasks')}>
                 <i className="fa-solid fa-list-check" />
                 <span>Project Tasks</span>
-              </div>
+              </button>
             )}
           </>
         )}
@@ -203,7 +206,7 @@ function Sidebar({ current, onNavigate, onSignOut }) {
   );
 }
 
-function Topbar({ crumbs, onNavigate }) {
+function Topbar({ crumbs, onNavigate, onMenuOpen, menuOpen = false }) {
   const { profile } = useCurrentUserProfile();
   const { unreadCount } = useNotifications(profile);
   const cohort = window.getActiveCohort?.(profile) || COHORT;
@@ -222,6 +225,9 @@ function Topbar({ crumbs, onNavigate }) {
   }, []);
   return (
     <div className="topbar">
+      <button type="button" className="topbar-menu-btn" onClick={onMenuOpen} aria-label="Open navigation menu" aria-controls="application-navigation" aria-expanded={menuOpen}>
+        <i className="fa-solid fa-bars" />
+      </button>
       <div className="topbar-breadcrumb">
         <i className="fa-solid fa-angles-right" style={{ color: 'var(--ink)', opacity: 0.6 }} />
         {crumbs.map((c, i) => (

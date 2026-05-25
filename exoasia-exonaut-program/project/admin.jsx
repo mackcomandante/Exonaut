@@ -287,7 +287,7 @@ function AdminCohortFilter() {
 }
 
 // -------- Platform Admin sidebar --------
-function PlatformAdminSidebar({ current, onNavigate, onSignOut }) {
+function PlatformAdminSidebar({ current, onNavigate, onSignOut, mobileOpen = false, onMobileClose }) {
   const { profile } = useCurrentUserProfile();
   const { unreadCount } = useNotifications(profile);
   const { unreadCount: messageUnread } = useMessages(profile);
@@ -311,27 +311,30 @@ function PlatformAdminSidebar({ current, onNavigate, onSignOut }) {
     { id: 'kudos',       label: 'Kudos',              icon: 'fa-hand-sparkles' },
   ];
   return (
-    <aside className="sidebar">
+    <aside id="application-navigation" className={'sidebar' + (mobileOpen ? ' mobile-open' : '')} aria-label="Application navigation">
+      <button type="button" className="sidebar-mobile-close" onClick={onMobileClose} aria-label="Close navigation menu">
+        <i className="fa-solid fa-xmark" />
+      </button>
       <div className="sidebar-brand">
         <div className="sidebar-logo">EXOASIA</div>
         <div className="sidebar-tag" style={{ color: 'var(--sky)' }}>PLATFORM · ADMIN</div>
       </div>
-      <div className="sidebar-user" style={{ cursor: 'pointer' }} onClick={() => onNavigate('pa-profile')} title="Open my profile">
+      <button type="button" className="sidebar-user" style={{ cursor: 'pointer' }} onClick={() => onNavigate('pa-profile')} title="Open my profile">
         <AvatarWithRing name={displayName} avatarUrl={profile.avatarUrl} size={36} tier="corps" />
         <div className="sidebar-user-info">
           <div className="sidebar-user-name">{displayName}</div>
           <div className="sidebar-user-tier" style={{ color: 'var(--sky)' }}>PLATFORM ADMIN</div>
         </div>
-      </div>
+      </button>
 
       <nav className="sidebar-nav" style={{ paddingTop: 0, paddingBottom: 0 }}>
         <div className="sidebar-nav-section" style={{ color: 'var(--sky)' }}>Me</div>
         {me.map(l => (
-          <div key={l.id} className={'sidebar-link' + (current === l.id ? ' active' : '')} onClick={() => onNavigate(l.id)}>
+          <button type="button" key={l.id} className={'sidebar-link' + (current === l.id ? ' active' : '')} onClick={() => onNavigate(l.id)}>
             <i className={'fa-solid ' + l.icon} />
             <span>{l.label}</span>
             {l.count ? <span className="badge-count">{l.count}</span> : null}
-          </div>
+          </button>
         ))}
       </nav>
 
@@ -340,10 +343,10 @@ function PlatformAdminSidebar({ current, onNavigate, onSignOut }) {
       <nav className="sidebar-nav">
         <div className="sidebar-nav-section" style={{ color: 'var(--sky)' }}>Platform</div>
         {links.map(l => (
-          <div key={l.id} className={'sidebar-link' + (current === l.id ? ' active' : '')} onClick={() => onNavigate(l.id)}>
+          <button type="button" key={l.id} className={'sidebar-link' + (current === l.id ? ' active' : '')} onClick={() => onNavigate(l.id)}>
             <i className={'fa-solid ' + l.icon} />
             <span>{l.label}</span>
-          </div>
+          </button>
         ))}
       </nav>
 
@@ -652,7 +655,7 @@ function AdminAssign() {
         </div>
       </div>
 
-      <div className="card-panel" style={{ padding: 16, marginBottom: 16, display: 'grid', gridTemplateColumns: '1fr 240px', gap: 12 }}>
+      <div className="card-panel admin-assignment-filters" style={{ padding: 16, marginBottom: 16, display: 'grid', gridTemplateColumns: '1fr 240px', gap: 12 }}>
         <div style={{ position: 'relative' }}>
           <i className="fa-solid fa-magnifying-glass" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--off-white-40)', fontSize: 11 }} />
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name…"
@@ -673,8 +676,8 @@ function AdminAssign() {
         </select>
       </div>
 
-      <div className="lb-table">
-        <div className="lb-header" style={{ gridTemplateColumns: '48px 1.4fr 80px 130px 150px 150px 180px' }}>
+      <div className="lb-table admin-assignment-table">
+        <div className="lb-header admin-assignment-header" style={{ gridTemplateColumns: '48px 1.4fr 80px 130px 150px 150px 180px' }}>
           <div></div>
           <div>USER</div>
           <div>POINTS</div>
@@ -696,42 +699,54 @@ function AdminAssign() {
             cursor: 'pointer', outline: 'none', width: '100%',
           };
           return (
-            <div key={u.id} className="lb-row" style={{ gridTemplateColumns: '48px 1.4fr 80px 130px 150px 150px 180px' }}>
+            <div key={u.id} className="lb-row admin-assignment-row" style={{ gridTemplateColumns: '48px 1.4fr 80px 130px 150px 150px 180px' }}>
               <AvatarWithRing name={u.name} avatarUrl={u.avatarUrl} size={34} tier={u.tier} />
-              <div className="lb-name">{u.name}</div>
-              <div className="lb-points">{u.points}</div>
-              <select value={u.role || 'exonaut'} onChange={async (e) => { if (u.supabaseProfile) await updateProfile(u.id, { role: e.target.value }); u.role = e.target.value; setTick(t => t + 1); }} style={selectStyle}>
-                <option value="exonaut">Exonaut</option>
-                <option value="commander">Commander</option>
-                <option value="admin">Admin</option>
-              </select>
-              <select value={curCohort} onChange={async (e) => {
-                if (!e.target.value) {
-                  unassignUserFromCohort(u.id);
-                } else {
-                  assignUserToCohort(u.id, e.target.value);
-                  if (u.supabaseProfile) await updateProfile(u.id, { cohortId: e.target.value });
-                }
-                setTick(t => t + 1);
-              }} style={selectStyle}>
-                <option value="">Unassigned</option>
-                {all.map(c => (<option key={c.id} value={c.id}>{c.name}</option>))}
-              </select>
-              <select value={curTrack} onChange={async (e) => { u.supabaseProfile ? await updateProfile(u.id, { trackCode: e.target.value }) : assignUserToTrack(u.id, e.target.value); setTick(t => t + 1); }} style={selectStyle}>
-                {tracks.map(t => (<option key={t.code} value={t.code}>{t.short} - {t.name}</option>))}
-              </select>
-              <select value={curLead?.id || ''} onChange={(e) => { assignUserToLead(u.id, e.target.value); setTick(t => t + 1); }} style={selectStyle}>
-                <option value="">— Unassigned —</option>
-                <optgroup label={'In ' + (TRACKS.find(t => t.code === curTrack)?.short || curTrack)}>
-                  {leadOptions.map(l => (<option key={l.id} value={l.id}>{l.name}</option>))}
-                </optgroup>
-                <optgroup label="Other tracks">
-                  {LEADS.filter(l => l.track !== curTrack).map(l => {
-                    const tr = TRACKS.find(t => t.code === l.track);
-                    return (<option key={l.id} value={l.id}>{l.name} ({tr?.short})</option>);
-                  })}
-                </optgroup>
-              </select>
+              <div className="lb-name admin-assignment-name">{u.name}</div>
+              <div className="lb-points admin-assignment-points">{u.points}</div>
+              <label className="admin-assignment-field">
+                <span className="admin-assignment-field-label">Role</span>
+                <select className="admin-assignment-select" aria-label={`Set role for ${u.name}`} value={u.role || 'exonaut'} onChange={async (e) => { if (u.supabaseProfile) await updateProfile(u.id, { role: e.target.value }); u.role = e.target.value; setTick(t => t + 1); }} style={selectStyle}>
+                  <option value="exonaut">Exonaut</option>
+                  <option value="commander">Commander</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </label>
+              <label className="admin-assignment-field">
+                <span className="admin-assignment-field-label">Cohort</span>
+                <select className="admin-assignment-select" aria-label={`Set cohort for ${u.name}`} value={curCohort} onChange={async (e) => {
+                  if (!e.target.value) {
+                    unassignUserFromCohort(u.id);
+                  } else {
+                    assignUserToCohort(u.id, e.target.value);
+                    if (u.supabaseProfile) await updateProfile(u.id, { cohortId: e.target.value });
+                  }
+                  setTick(t => t + 1);
+                }} style={selectStyle}>
+                  <option value="">Unassigned</option>
+                  {all.map(c => (<option key={c.id} value={c.id}>{c.name}</option>))}
+                </select>
+              </label>
+              <label className="admin-assignment-field">
+                <span className="admin-assignment-field-label">Track</span>
+                <select className="admin-assignment-select" aria-label={`Set track for ${u.name}`} value={curTrack} onChange={async (e) => { u.supabaseProfile ? await updateProfile(u.id, { trackCode: e.target.value }) : assignUserToTrack(u.id, e.target.value); setTick(t => t + 1); }} style={selectStyle}>
+                  {tracks.map(t => (<option key={t.code} value={t.code}>{t.short} - {t.name}</option>))}
+                </select>
+              </label>
+              <label className="admin-assignment-field">
+                <span className="admin-assignment-field-label">Manager</span>
+                <select className="admin-assignment-select" aria-label={`Set manager for ${u.name}`} value={curLead?.id || ''} onChange={(e) => { assignUserToLead(u.id, e.target.value); setTick(t => t + 1); }} style={selectStyle}>
+                  <option value="">— Unassigned —</option>
+                  <optgroup label={'In ' + (TRACKS.find(t => t.code === curTrack)?.short || curTrack)}>
+                    {leadOptions.map(l => (<option key={l.id} value={l.id}>{l.name}</option>))}
+                  </optgroup>
+                  <optgroup label="Other tracks">
+                    {LEADS.filter(l => l.track !== curTrack).map(l => {
+                      const tr = TRACKS.find(t => t.code === l.track);
+                      return (<option key={l.id} value={l.id}>{l.name} ({tr?.short})</option>);
+                    })}
+                  </optgroup>
+                </select>
+              </label>
             </div>
           );
         })}

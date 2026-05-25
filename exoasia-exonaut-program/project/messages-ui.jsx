@@ -117,6 +117,7 @@ function MessagesPage() {
   const [threadSearch, setThreadSearch] = React.useState('');
   const [attachments, setAttachments] = React.useState([]);
   const [previewImage, setPreviewImage] = React.useState(null);
+  const [mobileConversationOpen, setMobileConversationOpen] = React.useState(false);
   const fileInputRef = React.useRef(null);
   const activeThread = threads.find(t => t.id === activeId) || threads[0] || null;
   const messages = activeThread ? messagesForThread(activeThread.id) : [];
@@ -179,7 +180,7 @@ function MessagesPage() {
         </div>
       )}
 
-      <div className="messages-layout">
+      <div className={'messages-layout' + (mobileConversationOpen ? ' conversation-open' : '')}>
         <div className="messages-thread-list card-panel">
           <div className="messages-thread-actions">
             <button className="btn btn-primary" onClick={() => setComposeOpen(true)}>
@@ -215,7 +216,7 @@ function MessagesPage() {
               <button
                 key={thread.id}
                 className={'messages-thread' + (activeThread?.id === thread.id ? ' active' : '')}
-                onClick={() => setActiveId(thread.id)}
+                onClick={() => { setActiveId(thread.id); setMobileConversationOpen(true); }}
               >
                 <div className="messages-thread-avatar">
                   <AvatarWithRing
@@ -242,6 +243,9 @@ function MessagesPage() {
           {activeThread ? (
             <>
               <div className="messages-conversation-head">
+                <button type="button" className="messages-mobile-back" onClick={() => setMobileConversationOpen(false)} aria-label="Back to conversations">
+                  <i className="fa-solid fa-arrow-left" /> Conversations
+                </button>
                 <div>
                   <div className="t-heading" style={{ marginBottom: 2 }}>{activeThread.title}</div>
                   <div className="t-micro">{activeThread.participantNames.join(' / ')}</div>
@@ -324,6 +328,7 @@ function MessagesPage() {
           onCreate={async (payload) => {
             const thread = await createThread(payload);
             setActiveId(thread.id);
+            setMobileConversationOpen(true);
             setComposeOpen(false);
           }}
         />

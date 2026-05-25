@@ -42,9 +42,9 @@ function EowWeekStepper({ weekNumber, totalWeeks, onChange, window: win }) {
   );
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+    <div className="commander-eow-stepper" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
       {btn(canPrev, () => onChange(weekNumber - 1), 'fa-chevron-left')}
-      <div style={{
+      <div className="commander-eow-current-week" style={{
         padding: '8px 16px', background: 'var(--off-white-07)',
         border: '1px solid ' + (isCurrent ? 'var(--lime)' : 'var(--off-white-15)'),
         borderRadius: 2, minWidth: 220, textAlign: 'center',
@@ -58,7 +58,7 @@ function EowWeekStepper({ weekNumber, totalWeeks, onChange, window: win }) {
       </div>
       {btn(canNext, () => onChange(weekNumber + 1), 'fa-chevron-right')}
       {!isCurrent && (
-        <button onClick={() => onChange(EOW.currentWeek())} style={{
+        <button className="commander-eow-jump" onClick={() => onChange(EOW.currentWeek())} style={{
           padding: '8px 12px', background: 'transparent',
           border: '1px solid var(--lime)', borderRadius: 2, color: 'var(--lime)',
           cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.08em', fontWeight: 700,

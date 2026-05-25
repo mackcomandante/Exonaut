@@ -562,7 +562,7 @@ function CommanderHome({ onNavigate }) {
             {activeCohort?.code || COHORT.code} · Week {COHORT.week}/{window.getCohortWeekTotal?.(activeCohort) || COHORT.weekTotal} · {totalExonauts} Exonauts across {trackCount} tracks
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 10 }}>
+        <div className="commander-page-actions" style={{ display: 'flex', gap: 10 }}>
           <button className="btn btn-ghost" onClick={() => onNavigate('cmdr-health')}><i className="fa-solid fa-heart-pulse" /> HEALTH</button>
           <button className="btn btn-primary" onClick={() => onNavigate('cmdr-esc')}>
             <i className="fa-solid fa-triangle-exclamation" /> ESCALATIONS · {escalations.length}
@@ -584,7 +584,7 @@ function CommanderHome({ onNavigate }) {
         <h2 style={{ fontSize: 16 }}>Track Performance Matrix</h2>
         <span className="section-meta">{`ALL ${trackCount} TRACKS - LIVE`}</span>
       </div>
-      <div className="lb-table">
+      <div className="lb-table commander-matrix-table">
         <div className="lb-header" style={{ gridTemplateColumns: '1fr 1fr 70px 80px 80px 90px 100px' }}>
           <div>TRACK</div><div>TRACK LEAD</div><div>EXONAUTS</div><div>AVG PTS</div><div>SUBMIT%</div><div>APPROVED</div><div>QUEUE</div>
         </div>
@@ -593,7 +593,7 @@ function CommanderHome({ onNavigate }) {
           const overload = row.pending >= 5;
           const underperf = row.submitRate < 80 && row.roster.length > 0;
           return (
-            <div key={track.code} className="lb-row" style={{ gridTemplateColumns: '1fr 1fr 70px 80px 80px 90px 100px', cursor: 'pointer' }}
+            <div key={track.code} className="lb-row commander-matrix-row" style={{ gridTemplateColumns: '1fr 1fr 70px 80px 80px 90px 100px', cursor: 'pointer' }}
                  onClick={() => onNavigate('cmdr-leads')}>
               <div>
                 <div className="t-heading" style={{ fontSize: 12, letterSpacing: 0, textTransform: 'none' }}>{track.name}</div>
@@ -772,7 +772,7 @@ function CommanderLeads() {
           <KPI label="APPROVED WK" value={selected.completed} accent="lime" sub={`${selected.bad} REV/REJ`} />
           <KPI label="LAST ACTIVITY" value={selected.lastActivity} accent="platinum" sub={selected.crown?.dueAt ? `CROWN DUE ${new Date(selected.crown.dueAt).toLocaleDateString()}` : 'NO CROWN DUE'} />
         </div>
-        <div className="lb-table">
+        <div className="lb-table commander-track-detail-table">
           <div className="lb-header" style={{ gridTemplateColumns: '1.3fr 80px 80px 80px 80px 80px 80px 105px 120px' }}>
             <div>EXONAUT</div><div>WK DONE</div><div>TOTAL</div><div>PENDING</div><div>REV/REJ</div><div>POINTS</div><div>BADGES</div><div>LAST SUB</div><div>STATUS</div>
           </div>
@@ -786,7 +786,7 @@ function CommanderLeads() {
             const lastSubMs = Math.max(0, ...userSubs.map(s => new Date(s.submittedAtIso || s.submittedAt).getTime()).filter(Boolean));
             const status = bad ? 'At Risk' : pending ? 'Needs Attention' : done ? 'On Track' : 'Needs Attention';
             return (
-              <div key={u.id} className="lb-row" style={{ gridTemplateColumns: '1.3fr 80px 80px 80px 80px 80px 80px 105px 120px' }}>
+              <div key={u.id} className="lb-row commander-track-detail-row" style={{ gridTemplateColumns: '1.3fr 80px 80px 80px 80px 80px 80px 105px 120px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><AvatarWithRing name={u.name} avatarUrl={u.avatarUrl} size={28} tier={u.tier} /><span>{u.name}</span></div>
                 <div>{weekDone}/{selected.weekMissions.length}</div><div>{done}</div><div>{pending}</div><div>{bad}</div><div className="lb-points">{points}</div><div>{u.badges || 0}</div><div>{lastSubMs ? new Date(lastSubMs).toLocaleDateString() : '-'}</div>
                 <span className={'status-pill ' + statusClass(status)}>{status}</span>
@@ -807,12 +807,12 @@ function CommanderLeads() {
           <div className="t-body" style={{ marginTop: 6 }}>Week {currentWeek}/{window.getCohortWeekTotal?.(activeCohort) || COHORT.weekTotal} - {cohortUsers.length} Exonauts - {activeCohort?.name || COHORT.code}</div>
         </div>
       </div>
-      <div className="lb-table">
+      <div className="lb-table commander-track-table">
         <div className="lb-header" style={{ gridTemplateColumns: '1.25fr 1.1fr 65px 85px 85px 85px 85px 85px 105px 110px' }}>
           <div>TRACK</div><div>LEAD</div><div>ROSTER</div><div>WK PROG</div><div>SUBMIT</div><div>PENDING</div><div>REV/REJ</div><div>AVG PTS</div><div>LAST ACTIVE</div><div>STATUS</div>
         </div>
         {trackRows.map(row => (
-          <div key={row.track.code} className="lb-row" style={{ gridTemplateColumns: '1.25fr 1.1fr 65px 85px 85px 85px 85px 85px 105px 110px', cursor: 'pointer' }} onClick={() => setSelectedTrack(row.track.code)}>
+          <div key={row.track.code} className="lb-row commander-track-row" style={{ gridTemplateColumns: '1.25fr 1.1fr 65px 85px 85px 85px 85px 85px 105px 110px', cursor: 'pointer' }} onClick={() => setSelectedTrack(row.track.code)}>
             <div><div className="t-heading" style={{ fontSize: 12, textTransform: 'none', letterSpacing: 0 }}>{row.track.name}</div><div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)' }}>{row.track.short}</div></div>
             <div>{row.leadName}</div><div>{row.roster.length}</div><div>{row.progress}%</div><div>{row.weekSubs.length}</div><div>{row.pending}</div><div>{row.bad}</div><div className="lb-points">{row.avgPoints}</div><div>{row.lastActivity}</div>
             <span className={'status-pill ' + statusClass(row.status)}>{row.status}</span>
@@ -868,14 +868,14 @@ function CommanderProjectProgress() {
           <div className="t-label-muted">SECOND OFFICERS / TRACK LEADS</div>
           <div className="t-heading" style={{ fontSize: 14, textTransform: 'none', letterSpacing: 0, marginTop: 8 }}>{secondOfficers(selected)}</div>
         </div>
-        <div className="lb-table">
+        <div className="lb-table commander-project-task-table">
           <div className="lb-header" style={{ gridTemplateColumns: '1.5fr 100px 1fr 100px 90px 90px' }}>
             <div>TASK</div><div>TRACK</div><div>SECOND OFFICER</div><div>TEAM</div><div>POINTS</div><div>STATUS</div>
           </div>
           {projectTasks.map(task => {
             const team = assignees.filter(a => a.taskId === task.id);
             return (
-              <div key={task.id} className="lb-row" style={{ gridTemplateColumns: '1.5fr 100px 1fr 100px 90px 90px' }}>
+              <div key={task.id} className="lb-row commander-project-task-row" style={{ gridTemplateColumns: '1.5fr 100px 1fr 100px 90px 90px' }}>
                 <div>{task.title}</div><div>{TRACKS.find(t => t.code === task.trackCode)?.short || task.trackCode}</div><div>{nameOf(task.secondOfficerId)}</div><div>{team.length}</div><div>{task.points}</div>
                 <span className={'status-pill ' + (task.status === 'approved' ? 'status-approved' : task.status === 'submitted' ? 'status-submitted' : 'status-not-started')}>{task.status}</span>
               </div>
@@ -889,7 +889,7 @@ function CommanderProjectProgress() {
   return (
     <div className="enter">
       <div className="section-head"><div><div className="t-label" style={{ marginBottom: 8, color: 'var(--amber)' }}>COMMANDER - PROJECT OVERSIGHT</div><h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>Project Progress</h1></div></div>
-      <div className="lb-table">
+      <div className="lb-table commander-project-table">
         <div className="lb-header" style={{ gridTemplateColumns: '1.35fr .9fr 1fr 1fr 85px 85px 85px 95px' }}>
           <div>PROJECT</div><div>TRACKS</div><div>FIRST OFFICER</div><div>SECOND OFFICERS</div><div>TASKS</div><div>PENDING</div><div>TEAM</div><div>STATUS</div>
         </div>
@@ -898,7 +898,7 @@ function CommanderProjectProgress() {
           const approved = projectTasks.filter(t => t.status === 'approved').length;
           const pending = projectTasks.filter(t => t.status === 'submitted').length;
           return (
-            <div key={project.id} className="lb-row" style={{ gridTemplateColumns: '1.35fr .9fr 1fr 1fr 85px 85px 85px 95px', cursor: 'pointer' }} onClick={() => setSelectedProject(project.id)}>
+            <div key={project.id} className="lb-row commander-project-row" style={{ gridTemplateColumns: '1.35fr .9fr 1fr 1fr 85px 85px 85px 95px', cursor: 'pointer' }} onClick={() => setSelectedProject(project.id)}>
               <div><div className="t-heading" style={{ fontSize: 12, textTransform: 'none', letterSpacing: 0 }}>{project.title}</div><div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)' }}>DUE {project.dueDate || '-'}</div></div>
               <div>{project.trackCodes.map(c => TRACKS.find(t => t.code === c)?.short || c).join(' / ')}</div><div>{nameOf(project.firstOfficerId)}</div><div>{secondOfficers(project)}</div><div>{approved}/{projectTasks.length}</div><div>{pending}</div><div className="lb-points">{participantCount(project)}</div>
               <span className={'status-pill ' + (project.status === 'completed' ? 'status-approved' : 'status-submitted')}>{project.status}</span>
@@ -1067,7 +1067,7 @@ function CommanderExonauts() {
           </div>
         </div>
       ) : (
-        <div className="lb-table">
+        <div className="lb-table commander-exonaut-table">
           <div className="lb-header" style={{ gridTemplateColumns: '40px 48px 1fr 110px 140px 90px 80px 80px 80px' }}>
             <div>#</div><div></div><div>EXONAUT</div><div>TRACK</div><div>MANAGER</div><div>POINTS</div><div>BADGES</div><div>TIER</div><div>COHORT</div>
           </div>
@@ -1078,7 +1078,7 @@ function CommanderExonauts() {
             const cohortObj = window.__cohortStore.getAll().find(c => c.id === uCohort);
             const risk = u.points < 200;
             return (
-              <div key={u.id} className="lb-row" style={{ gridTemplateColumns: '40px 48px 1fr 110px 140px 90px 80px 80px 80px' }}>
+              <div key={u.id} className="lb-row commander-exonaut-row" style={{ gridTemplateColumns: '40px 48px 1fr 110px 140px 90px 80px 80px 80px' }}>
                 <div className="t-mono" style={{ fontSize: 11, color: 'var(--off-white-40)' }}>{String(i + 1).padStart(2, '0')}</div>
                 <AvatarWithRing name={u.name} avatarUrl={u.avatarUrl} size={34} tier={u.tier} />
                 <div className="lb-name">
@@ -1127,7 +1127,7 @@ function CommanderEscalations() {
           const track = TRACKS.find(t => t.code === lead?.track) || TRACKS[0];
           const sev = { high: 'var(--red)', med: 'var(--amber)', low: 'var(--platinum)' }[esc.severity];
           return (
-            <div key={esc.id} className="card-panel" style={{ borderLeft: `3px solid ${sev}` }}>
+            <div key={esc.id} className="card-panel commander-escalation-card" style={{ borderLeft: `3px solid ${sev}` }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
                 <span className="t-mono" style={{ fontSize: 10, color: sev, letterSpacing: '0.15em', fontWeight: 700 }}>
                   {esc.severity.toUpperCase()} SEVERITY · {esc.type.toUpperCase()} · {track.short}
@@ -1137,7 +1137,7 @@ function CommanderEscalations() {
               <div style={{ fontFamily: 'var(--font-serif)', fontSize: 17, lineHeight: 1.5, color: 'var(--off-white)', marginBottom: 16 }}>
                 {esc.body}
               </div>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center', paddingTop: 14, borderTop: '1px solid var(--off-white-07)' }}>
+              <div className="commander-escalation-actions" style={{ display: 'flex', gap: 8, alignItems: 'center', paddingTop: 14, borderTop: '1px solid var(--off-white-07)' }}>
                 <AvatarWithRing name={lead.name} size={28} tier="corps" />
                 <div className="t-body" style={{ fontSize: 12, color: 'var(--off-white-68)', flex: 1 }}>
                   Reporting: <span style={{ color: 'var(--off-white)' }}>{lead.name}</span>

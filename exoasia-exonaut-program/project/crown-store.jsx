@@ -461,7 +461,7 @@ function CommanderCrownTransfers() {
             {nameOf(req.fromUserId)} → {nameOf(req.toUserId)}
           </div>
           {req.note && <div className="t-body" style={{ marginTop: 10, color: 'var(--off-white-68)' }}>{req.note}</div>}
-          <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+          <div className="commander-crown-actions" style={{ display: 'flex', gap: 8, marginTop: 16 }}>
             <button className="btn btn-primary btn-sm" onClick={() => setReviewing({ req, action: 'approve' })}><i className="fa-solid fa-check" /> APPROVE</button>
             <button className="btn btn-ghost btn-sm" onClick={() => setReviewing({ req, action: 'deny' })}><i className="fa-solid fa-xmark" /> DENY</button>
           </div>
@@ -507,7 +507,7 @@ function CrownReviewModal({ reviewing, onClose }) {
         <textarea value={note} onChange={e => setNote(e.target.value)} rows={4} autoFocus placeholder="Optional note"
           style={{ width: '100%', marginTop: 18, padding: 10, background: 'var(--deep-black)', color: 'var(--off-white)', border: '1px solid var(--off-white-15)', borderRadius: 2 }} />
         {error && <div className="t-body" style={{ marginTop: 10, color: 'var(--red)' }}>{error}</div>}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
+        <div className="commander-crown-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
           <button className="btn btn-ghost btn-sm" onClick={onClose}>Cancel</button>
           <button className="btn btn-primary btn-sm" disabled={saving} onClick={submit}>{saving ? 'Saving...' : (isApprove ? 'Approve' : 'Deny')}</button>
         </div>
