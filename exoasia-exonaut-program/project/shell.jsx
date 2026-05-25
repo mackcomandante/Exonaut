@@ -81,7 +81,6 @@ function Sidebar({ current, onNavigate, onSignOut }) {
   const me = [
     { id: 'profile',     label: 'My Profile',  icon: 'fa-id-badge' },
     { id: 'messages',    label: 'Messages',    icon: 'fa-envelope', count: messageUnread },
-    { id: 'community',   label: 'Community',   icon: 'fa-users' },
     { id: 'exonaut-guide', label: 'Exonaut Guide', icon: 'fa-book-open' },
   ];
   const links = [
@@ -91,6 +90,7 @@ function Sidebar({ current, onNavigate, onSignOut }) {
     { id: 'credentials', label: 'Certificates', icon: 'fa-certificate' },
   ];
   const ops = [
+    { id: 'community',   label: 'Community',    icon: 'fa-users' },
     { id: 'kudos',       label: 'Kudos',        icon: 'fa-hand-sparkles' },
     { id: 'rituals',     label: 'Rituals',      icon: 'fa-calendar-check' },
     { id: 'announce',    label: 'Announcements',icon: 'fa-bullhorn' },

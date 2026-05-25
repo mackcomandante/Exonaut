@@ -1,311 +1,502 @@
-// ============================================================================
-// Message Board store — Reddit-style threads inside Community.
-// Supports channels (all, general, tracks, alumni), upvote/downvote, comments
-// (incl. nested replies), sorting by hot/new/top.
-// Persisted to localStorage; seeded with a realistic set of Exoasia threads on
-// first load so the board doesn't look empty.
-// ============================================================================
-
+// Community message board data store. Supabase is primary; localStorage is a
+// compact offline fallback so the static prototype still remains usable.
 (function () {
-  const STORE_KEY = 'exo:board:v2';
+  if (window.__boardStore) return;
 
-  // ---- Seed content -------------------------------------------------------
-  function seedThreads() {
-    return [];
-    // Pull a handful of users for authorship if USERS is available.
-    const U = (typeof USERS !== 'undefined') ? USERS : [];
-    const U_IDS = U.map(u => u.id);
-    const pick = (i) => U_IDS[i % U_IDS.length] || 'u01';
-
-    const H = 3600 * 1000, D = 86400 * 1000;
-
-    const T = [
-      {
-        id: 'th-welcome',
-        channel: 'general',
-        pinned: true,
-        title: 'Welcome to the Exonaut message board',
-        body: 'This is where the cohort talks — open questions, gear recs, shipping wins, missed-ritual apologies, and the occasional gif. Be direct. Lift before you climb. No karma farming; we already track points.\n\nUse channels to target your post (track channels are for track-specific chatter, #general for everything else, #alumni for cross-batch).',
-        authorId: 'cmdr-seed', authorRole: 'commander', authorName: 'Mission Commander',
-        ts: Date.now() - 10 * D,
-        votes: { u01: 1, u02: 1, u03: 1, u04: 1, u05: 1, u06: 1, u07: 1 },
-        comments: [
-          { id: 'c-welc-1', authorId: pick(1), ts: Date.now() - 9 * D, body: 'First 👋', votes: { u01: 1, u05: 1 }, replies: [] },
-          { id: 'c-welc-2', authorId: pick(3), ts: Date.now() - 8 * D, body: 'Can we pin a channel index post? Hard to keep track of where things go.', votes: { u02: 1 }, replies: [
-            { id: 'c-welc-2a', authorId: 'cmdr-seed', authorName: 'Mission Commander', ts: Date.now() - 7.5 * D, body: "Good call — I'll pin one this week.", votes: {}, replies: [] },
-          ] },
-        ],
-      },
-      {
-        id: 'th-ais-prompt',
-        channel: 'ais',
-        title: 'Prompt chain I stole from the AI Strategy brief — saved me 2 hours on Monday',
-        body: 'For the competitive landscape mission, chaining:\n1) "List 6 competitors of X with one-sentence positioning each"\n2) "Score each on [criteria] from 1–5 with justification"\n3) "Rewrite as a slide title + 2 supporting bullets, Exoasia tone"\n\nEach step gets its own chat window so context stays clean. Works better than asking all at once.',
-        authorId: 'u05', authorRole: 'exonaut',
-        ts: Date.now() - 3 * D - 4 * H,
-        votes: { u01: 1, u02: 1, u03: 1, u07: 1, u14: 1, u06: 1 },
-        comments: [
-          { id: 'c-ais-1', authorId: 'u06', ts: Date.now() - 2.5 * D, body: 'Stealing this. Have you tried a 4th step that asks it to critique its own bullets? Rescued two decks last week.', votes: { u05: 1, u03: 1 }, replies: [
-            { id: 'c-ais-1a', authorId: 'u05', ts: Date.now() - 2 * D, body: "I have — it's like a 15-sec peer review.", votes: { u06: 1 }, replies: [] },
-          ] },
-          { id: 'c-ais-2', authorId: 'u03', ts: Date.now() - 2 * D, body: 'Does this fit the word limit for Mission P1? I keep blowing past.', votes: {}, replies: [] },
-        ],
-      },
-      {
-        id: 'th-rituals',
-        channel: 'general',
-        title: 'Anyone else feel Monday Ignition has gotten sharper over the last 3 weeks?',
-        body: "Genuinely the best hour of my Monday. Whoever's been prepping the prompts — thank you. Culture move.",
-        authorId: 'u07', authorRole: 'exonaut',
-        ts: Date.now() - 1 * D - 6 * H,
-        votes: { u01: 1, u02: 1, u03: 1, u04: 1, u05: 1, u06: 1, u08: 1, u09: 1, u14: 1, u11: 1 },
-        comments: [
-          { id: 'c-rit-1', authorId: 'u11', ts: Date.now() - 1 * D, body: 'Agreed. The "what did you ship that you forgot to be proud of" prompt last week wrecked me in the best way.', votes: { u07: 1, u05: 1 }, replies: [] },
-          { id: 'c-rit-2', authorId: 'u02', ts: Date.now() - 22 * H, body: 'It really helps when people come with receipts instead of vibes.', votes: { u07: 1 }, replies: [] },
-        ],
-      },
-      {
-        id: 'th-client',
-        channel: 'ais',
-        title: 'Kestrel client call tomorrow — anyone free to pressure-test my deck at 20:00 SGT?',
-        body: 'Going in with the competitive map + 3-option recommendation. Want a skeptical eye, especially on slide 6 (market sizing). 15 mins on Meet. Will trade: kudos and a coffee at next Friday Win Wall.',
-        authorId: 'u14', authorRole: 'exonaut', authorName: null,
-        ts: Date.now() - 5 * H,
-        votes: { u05: 1, u06: 1, u07: 1 },
-        comments: [
-          { id: 'c-cli-1', authorId: 'u06', ts: Date.now() - 4 * H, body: "I'm in. Drop the link.", votes: { u14: 1 }, replies: [] },
-          { id: 'c-cli-2', authorId: 'u05', ts: Date.now() - 3 * H, body: 'Same — can join 20:15 onwards if you need a second pair of eyes.', votes: {}, replies: [] },
-        ],
-      },
-      {
-        id: 'th-alumni',
-        channel: 'alumni',
-        title: '[2025-26 cohort] Hiring: Senior AI Consultant at Exoasia, referrals get priority',
-        body: 'We just opened a role on my team. Looking for someone who can own a client workstream end-to-end. If anyone in the current batch is thinking about full-time post-program, ping me — happy to chat even if you\'re not sure yet.',
-        authorId: 'a01', authorName: 'Zara Okonkwo', authorRole: 'alumni',
-        ts: Date.now() - 2 * D,
-        votes: { u01: 1, u02: 1, u05: 1, u06: 1, u07: 1, u11: 1, u14: 1 },
-        comments: [
-          { id: 'c-alu-1', authorId: 'u14', ts: Date.now() - 1.5 * D, body: "Messaged. Thanks for opening this up.", votes: {}, replies: [] },
-        ],
-      },
-      {
-        id: 'th-vb',
-        channel: 'vb',
-        title: 'Venture Builder track — who is using cap tables in the diligence mission?',
-        body: 'Mission 2 specifically asks for a "simple cap table pre/post". Is that just pre-seed dilution math or full waterfall? The brief is a little vague and I don\'t want to over-build.',
-        authorId: 'u02', authorRole: 'exonaut',
-        ts: Date.now() - 18 * H,
-        votes: { u04: 1, u09: 1 },
-        comments: [],
-      },
-      {
-        id: 'th-pol',
-        channel: 'pol',
-        title: 'Policy research — stop pasting 40 tabs of MAS pages into one doc',
-        body: "Friendly reminder the grading rubric rewards a sharp 2-page memo over a 20-page dump. Spend the last 25% of your time cutting, not researching.",
-        authorId: 'u03', authorRole: 'exonaut',
-        ts: Date.now() - 9 * H,
-        votes: { u11: 1, u14: 1 },
-        comments: [
-          { id: 'c-pol-1', authorId: 'u11', ts: Date.now() - 8 * H, body: 'This is the reminder I needed. Two-page rule > all.', votes: {}, replies: [] },
-        ],
-      },
-    ];
-    return T;
-  }
-
-  function load() {
-    try {
-      const raw = localStorage.getItem(STORE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed?.threads)) return parsed;
-      }
-    } catch (e) {}
-    return { threads: seedThreads() };
-  }
-  function persist(s) { try { localStorage.setItem(STORE_KEY, JSON.stringify(s)); } catch(e) {} }
-
+  const STORE_KEY = 'exo:community-board:v3';
   const listeners = new Set();
-  const state = load();
-  function notify() { persist(state); listeners.forEach(fn => fn()); }
+  const state = { posts: [], loaded: false, loading: false, error: '' };
 
-  // --------------------------------------------------------------------
-  // Helpers
-  // --------------------------------------------------------------------
-  function voteScore(votes) {
-    if (!votes) return 0;
-    let s = 0;
-    for (const k in votes) s += votes[k] | 0;
-    return s;
+  function genId(prefix) {
+    return prefix + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
   }
-  function countComments(thread) {
-    let n = 0;
-    const walk = (arr) => { arr.forEach(c => { n++; if (c.replies) walk(c.replies); }); };
-    walk(thread.comments || []);
-    return n;
-  }
-  function hotScore(thread) {
-    const s = voteScore(thread.votes);
-    const age = Math.max(1, (Date.now() - thread.ts) / 3600000);   // hours
-    return (s + 1) / Math.pow(age + 2, 1.4);                       // Reddit-ish decay
-  }
-  function timeAgo(ts) {
-    const d = Date.now() - ts;
-    const m = Math.floor(d / 60000);
-    if (m < 1)  return 'just now';
-    if (m < 60) return m + 'm';
-    const h = Math.floor(d / 3600000);
-    if (h < 24) return h + 'h';
-    const days = Math.floor(d / 86400000);
-    if (days < 7) return days + 'd';
-    const w = Math.floor(days / 7);
-    if (w < 5) return w + 'w';
-    return Math.floor(days / 30) + 'mo';
-  }
-  function genId(prefix) { return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 5); }
 
-  function findComment(thread, commentId) {
-    const walk = (arr, parent) => {
-      for (const c of arr) {
-        if (c.id === commentId) return { comment: c, parent };
-        if (c.replies?.length) {
-          const r = walk(c.replies, c);
-          if (r) return r;
-        }
-      }
-      return null;
+  function nowIso() {
+    return new Date().toISOString();
+  }
+
+  function currentUserId(profile) {
+    return profile?.id || localStorage.getItem('exo:userId') || ME_ID || 'anonymous';
+  }
+
+  function isUuid(value) {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''));
+  }
+
+  async function authUserId(profile) {
+    const id = currentUserId(profile);
+    if (!window.__db || isUuid(id)) return id;
+    const result = await window.__db.auth.getSession();
+    return result?.data?.session?.user?.id || id;
+  }
+
+  function missingSchema(error) {
+    const message = String(error?.message || error || '').toLowerCase();
+    return error?.code === '42P01' || error?.code === 'PGRST204' ||
+      message.includes('does not exist') || message.includes('schema cache');
+  }
+
+  function readLocal() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(STORE_KEY) || '{}');
+      return Array.isArray(parsed.posts) ? parsed.posts.map(normalizePost) : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function persistLocal() {
+    if (window.__db) return;
+    try { localStorage.setItem(STORE_KEY, JSON.stringify({ posts: state.posts })); } catch (e) {}
+  }
+
+  function notify() {
+    persistLocal();
+    listeners.forEach(fn => fn());
+  }
+
+  function profileFor(id) {
+    return (window.__profileDirectory || []).find(p => p.id === id) || null;
+  }
+
+  function normalizeMedia(media) {
+    return {
+      id: media.id || genId('media-'),
+      type: media.type === 'video' ? 'video' : 'image',
+      url: media.url || '',
+      storagePath: media.storagePath || '',
+      name: media.name || 'Attachment',
+      mimeType: media.mimeType || '',
     };
-    return walk(thread.comments || [], null);
   }
 
-  // --------------------------------------------------------------------
-  // Public store
-  // --------------------------------------------------------------------
+  function normalizeComment(comment) {
+    return {
+      id: comment.id || genId('comment-'),
+      postId: comment.postId || '',
+      parentCommentId: comment.parentCommentId || null,
+      authorId: comment.authorId || '',
+      authorName: comment.authorName || profileFor(comment.authorId)?.fullName || 'Exonaut',
+      authorRole: comment.authorRole || profileFor(comment.authorId)?.role || 'exonaut',
+      body: String(comment.body || '').trim(),
+      mentionIds: Array.isArray(comment.mentionIds) ? comment.mentionIds : [],
+      createdAt: comment.createdAt || nowIso(),
+      updatedAt: comment.updatedAt || comment.createdAt || nowIso(),
+      replies: Array.isArray(comment.replies) ? comment.replies.map(normalizeComment) : [],
+    };
+  }
+
+  function normalizePost(post) {
+    return {
+      id: post.id || genId('post-'),
+      channel: post.channel || 'general',
+      title: String(post.title || '').trim(),
+      body: String(post.body || '').trim(),
+      authorId: post.authorId || '',
+      authorName: post.authorName || profileFor(post.authorId)?.fullName || 'Exonaut',
+      authorRole: post.authorRole || profileFor(post.authorId)?.role || 'exonaut',
+      mentionIds: Array.isArray(post.mentionIds) ? post.mentionIds : [],
+      createdAt: post.createdAt || nowIso(),
+      updatedAt: post.updatedAt || post.createdAt || nowIso(),
+      media: Array.isArray(post.media) ? post.media.map(normalizeMedia) : [],
+      likes: Array.isArray(post.likes) ? post.likes : [],
+      comments: Array.isArray(post.comments) ? post.comments.map(normalizeComment) : [],
+    };
+  }
+
+  function threadComments(rows, postId) {
+    const byId = {};
+    const roots = [];
+    rows.filter(row => row.post_id === postId).forEach(row => {
+      byId[row.id] = normalizeComment({
+        id: row.id,
+        postId: row.post_id,
+        parentCommentId: row.parent_comment_id,
+        authorId: row.author_id,
+        authorName: row.author_name,
+        authorRole: row.author_role,
+        body: row.body,
+        mentionIds: row.mention_ids || [],
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      });
+    });
+    Object.values(byId).forEach(comment => {
+      if (comment.parentCommentId && byId[comment.parentCommentId]) byId[comment.parentCommentId].replies.push(comment);
+      else roots.push(comment);
+    });
+    return roots.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+  }
+
+  function fromRows(posts, media, likes, comments) {
+    return (posts || []).map(row => normalizePost({
+      id: row.id,
+      channel: row.channel,
+      title: row.title,
+      body: row.body,
+      authorId: row.author_id,
+      authorName: row.author_name,
+      authorRole: row.author_role,
+      mentionIds: row.mention_ids || [],
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      media: (media || []).filter(item => item.post_id === row.id).map(item => ({
+        id: item.id,
+        type: item.media_type,
+        url: item.public_url,
+        storagePath: item.storage_path,
+        name: item.file_name,
+        mimeType: item.mime_type,
+      })),
+      likes: (likes || []).filter(like => like.post_id === row.id).map(like => like.user_id),
+      comments: threadComments(comments || [], row.id),
+    }));
+  }
+
+  function countComments(post) {
+    let count = 0;
+    const walk = comments => (comments || []).forEach(comment => {
+      count += 1;
+      walk(comment.replies);
+    });
+    walk(post.comments);
+    return count;
+  }
+
+  function discussionMetrics(post) {
+    const metrics = {
+      comments: 0,
+      replies: 0,
+      latestActivityAt: new Date(post.createdAt || Date.now()).getTime(),
+    };
+    const walk = (comments, depth) => (comments || []).forEach(comment => {
+      if (depth === 0) metrics.comments += 1;
+      else metrics.replies += 1;
+      metrics.latestActivityAt = Math.max(
+        metrics.latestActivityAt,
+        new Date(comment.createdAt || post.createdAt || Date.now()).getTime()
+      );
+      walk(comment.replies, depth + 1);
+    });
+    walk(post.comments, 0);
+    return metrics;
+  }
+
+  function engagementScore(post) {
+    const metrics = discussionMetrics(post);
+    return (post.likes || []).length * 2 + metrics.comments * 3 + metrics.replies * 2;
+  }
+
+  function timeAgo(value) {
+    const delta = Math.max(0, Date.now() - new Date(value || Date.now()).getTime());
+    const mins = Math.floor(delta / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return mins + 'm ago';
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return hours + 'h ago';
+    const days = Math.floor(hours / 24);
+    if (days < 7) return days + 'd ago';
+    return Math.floor(days / 7) + 'w ago';
+  }
+
+  function hotScore(post) {
+    const metrics = discussionMetrics(post);
+    const ageHours = Math.max(0, (Date.now() - metrics.latestActivityAt) / 3600000);
+    const freshnessBoost = ageHours < 6 ? 15 : ageHours < 24 ? 10 : ageHours < 72 ? 5 : 0;
+    return engagementScore(post) + freshnessBoost;
+  }
+
+  function newestFirst(a, b) {
+    return new Date(b.createdAt) - new Date(a.createdAt);
+  }
+
+  function latestActivityFirst(a, b) {
+    return discussionMetrics(b).latestActivityAt - discussionMetrics(a).latestActivityAt || newestFirst(a, b);
+  }
+
+  async function refresh(profile) {
+    if (!window.__db) {
+      state.posts = readLocal();
+      state.loaded = true;
+      state.loading = false;
+      notify();
+      return state.posts;
+    }
+    state.loading = true;
+    state.error = '';
+    notify();
+    const [postsResult, mediaResult, likesResult, commentsResult] = await Promise.all([
+      window.__db.from('community_posts').select('*').order('created_at', { ascending: false }),
+      window.__db.from('community_post_media').select('*'),
+      window.__db.from('community_post_likes').select('post_id, user_id'),
+      window.__db.from('community_comments').select('*').order('created_at', { ascending: true }),
+    ]);
+    const error = postsResult.error || mediaResult.error || likesResult.error || commentsResult.error;
+    if (error) {
+      state.loaded = true;
+      state.loading = false;
+      state.error = missingSchema(error)
+        ? 'Community storage is not installed yet. Run migrations/create_community_board_tables.sql in Supabase.'
+        : (error.message || 'Could not load community posts.');
+      notify();
+      return state.posts;
+    }
+    state.posts = fromRows(postsResult.data, mediaResult.data, likesResult.data, commentsResult.data);
+    state.loaded = true;
+    state.loading = false;
+    notify();
+    return state.posts;
+  }
+
+  function subscribeRemote(profile) {
+    if (!window.__db) return () => {};
+    const channel = window.__db
+      .channel('community-board-' + Math.random().toString(36).slice(2))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'community_posts' }, () => refresh(profile))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'community_post_media' }, () => refresh(profile))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'community_post_likes' }, () => refresh(profile))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'community_comments' }, () => refresh(profile))
+      .subscribe();
+    return () => window.__db.removeChannel(channel);
+  }
+
+  function fileAsDataUrl(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function uploadFiles(files, postId, profile) {
+    const attachments = Array.from(files || []);
+    if (attachments.length > 6) throw new Error('Attach up to 6 images or videos per post.');
+    const userId = await authUserId(profile);
+    return Promise.all(attachments.map(async file => {
+      const isImage = String(file.type || '').startsWith('image/');
+      const isVideo = String(file.type || '').startsWith('video/');
+      if (!isImage && !isVideo) throw new Error('Only images and videos can be attached.');
+      const maxSize = isVideo ? 100 * 1024 * 1024 : 10 * 1024 * 1024;
+      if (file.size > maxSize) throw new Error(isVideo ? 'Videos must be 100MB or smaller.' : 'Images must be 10MB or smaller.');
+      if (!window.__db) {
+        return normalizeMedia({
+          type: isVideo ? 'video' : 'image',
+          url: await fileAsDataUrl(file),
+          name: file.name,
+          mimeType: file.type,
+        });
+      }
+      if (!isUuid(userId)) throw new Error('You must be signed in to upload media.');
+      const ext = String(file.name || 'upload').split('.').pop().toLowerCase().replace(/[^a-z0-9]/g, '') || (isVideo ? 'mp4' : 'jpg');
+      const path = `${userId}/${postId}/${genId('asset-')}.${ext}`;
+      const upload = await window.__db.storage.from('community-media').upload(path, file, {
+        contentType: file.type,
+        upsert: false,
+      });
+      if (upload.error) throw upload.error;
+      const publicUrl = window.__db.storage.from('community-media').getPublicUrl(path).data?.publicUrl || '';
+      return normalizeMedia({
+        id: genId('media-'),
+        type: isVideo ? 'video' : 'image',
+        url: publicUrl,
+        storagePath: path,
+        name: file.name,
+        mimeType: file.type,
+      });
+    }));
+  }
+
   const store = {
     list({ channel = 'all', sort = 'hot', search = '' } = {}) {
-      let list = state.threads.filter(t => {
-        if (channel !== 'all' && t.channel !== channel) return false;
-        if (search) {
-          const q = search.toLowerCase();
-          if (!(t.title.toLowerCase().includes(q) || (t.body || '').toLowerCase().includes(q))) return false;
-        }
-        return true;
+      const q = String(search || '').trim().toLowerCase();
+      const filtered = state.posts.filter(post => {
+        if (channel !== 'all' && post.channel !== channel) return false;
+        if (!q) return true;
+        return [post.title, post.body, post.authorName, post.channel]
+          .some(value => String(value || '').toLowerCase().includes(q));
       });
-
-      if (sort === 'new') list.sort((a, b) => b.ts - a.ts);
-      else if (sort === 'top') list.sort((a, b) => voteScore(b.votes) - voteScore(a.votes));
-      else /* hot */           list.sort((a, b) => hotScore(b) - hotScore(a));
-
-      // Pinned always on top.
-      list.sort((a, b) => ((b.pinned ? 1 : 0) - (a.pinned ? 1 : 0)));
-      return list;
+      if (sort === 'new') return filtered.sort(newestFirst);
+      if (sort === 'top') return filtered.sort((a, b) => engagementScore(b) - engagementScore(a) || newestFirst(a, b));
+      return filtered.sort((a, b) => hotScore(b) - hotScore(a) || latestActivityFirst(a, b));
     },
-    get(threadId) { return state.threads.find(t => t.id === threadId); },
-
-    createThread({ title, body, channel, authorId, authorName, authorRole }) {
-      const t = {
-        id: genId('th-'),
-        channel: channel || 'general',
-        title: String(title || '').trim() || 'Untitled',
-        body: String(body || '').trim(),
-        authorId, authorName: authorName || null, authorRole: authorRole || 'exonaut',
-        ts: Date.now(),
-        votes: { [authorId]: 1 },
-        comments: [],
-        pinned: false,
+    countComments,
+    timeAgo,
+    refresh,
+    async createPost({ channel, title, body, mentionIds, files, profile }) {
+      const authorId = await authUserId(profile);
+      if (window.__db && !isUuid(authorId)) throw new Error('You must be signed in to create a post.');
+      if (!String(title || '').trim() && !String(body || '').trim() && !(files || []).length) {
+        throw new Error('Add text, an image, or a video before posting.');
+      }
+      const post = normalizePost({
+        id: genId('post-'),
+        channel,
+        title,
+        body,
+        authorId,
+        authorName: profile?.fullName || ME.name,
+        authorRole: profile?.role || 'exonaut',
+        mentionIds,
+        createdAt: nowIso(),
+      });
+      post.media = await uploadFiles(files, post.id, profile);
+      state.posts.unshift(post);
+      notify();
+      if (!window.__db) return post;
+      const postRow = {
+        id: post.id,
+        channel: post.channel,
+        title: post.title,
+        body: post.body,
+        author_id: authorId,
+        author_name: post.authorName,
+        author_role: post.authorRole,
+        mention_ids: post.mentionIds,
       };
-      state.threads.unshift(t);
-      notify();
-      return t;
+      const insertPost = await window.__db.from('community_posts').insert(postRow);
+      if (insertPost.error) {
+        state.posts = state.posts.filter(item => item.id !== post.id);
+        notify();
+        throw insertPost.error;
+      }
+      if (post.media.length) {
+        const insertMedia = await window.__db.from('community_post_media').insert(post.media.map(item => ({
+          id: item.id,
+          post_id: post.id,
+          media_type: item.type,
+          public_url: item.url,
+          storage_path: item.storagePath,
+          file_name: item.name,
+          mime_type: item.mimeType,
+        })));
+        if (insertMedia.error) throw insertMedia.error;
+      }
+      await refresh(profile);
+      return post;
     },
-    deleteThread(threadId) {
-      const i = state.threads.findIndex(t => t.id === threadId);
-      if (i === -1) return false;
-      state.threads.splice(i, 1);
+    async deletePost(postId, profile) {
+      const previous = state.posts;
+      state.posts = state.posts.filter(post => post.id !== postId);
       notify();
-      return true;
+      if (!window.__db) return;
+      const result = await window.__db.from('community_posts').delete().eq('id', postId);
+      if (result.error) {
+        state.posts = previous;
+        notify();
+        throw result.error;
+      }
+      await refresh(profile);
     },
-    voteThread(threadId, userId, direction) {
-      const t = state.threads.find(x => x.id === threadId);
-      if (!t) return;
-      if (!t.votes) t.votes = {};
-      const cur = t.votes[userId] || 0;
-      const next = cur === direction ? 0 : direction;      // toggle-off if pressing the same arrow
-      if (next === 0) delete t.votes[userId];
-      else            t.votes[userId] = next;
+    async toggleLike(postId, profile) {
+      const userId = await authUserId(profile);
+      if (window.__db && !isUuid(userId)) throw new Error('You must be signed in to like a post.');
+      const post = state.posts.find(item => item.id === postId);
+      if (!post) return;
+      const liked = post.likes.includes(userId);
+      post.likes = liked ? post.likes.filter(id => id !== userId) : [...post.likes, userId];
       notify();
+      if (!window.__db) return;
+      const result = liked
+        ? await window.__db.from('community_post_likes').delete().eq('post_id', postId).eq('user_id', userId)
+        : await window.__db.from('community_post_likes').insert({ post_id: postId, user_id: userId });
+      if (result.error) {
+        post.likes = liked ? [...post.likes, userId] : post.likes.filter(id => id !== userId);
+        notify();
+        throw result.error;
+      }
     },
-
-    addComment(threadId, { parentId = null, body, authorId, authorName, authorRole }) {
-      const t = state.threads.find(x => x.id === threadId);
-      if (!t) return null;
-      const comment = {
-        id: genId('c-'),
-        authorId, authorName: authorName || null, authorRole: authorRole || 'exonaut',
-        ts: Date.now(),
-        body: String(body || '').trim(),
-        votes: { [authorId]: 1 },
-        replies: [],
-      };
-      if (parentId) {
-        const found = findComment(t, parentId);
-        if (!found) return null;
-        (found.comment.replies = found.comment.replies || []).push(comment);
+    async addComment({ postId, parentCommentId, body, mentionIds, profile }) {
+      const authorId = await authUserId(profile);
+      const text = String(body || '').trim();
+      if (!text) throw new Error('Comment cannot be empty.');
+      if (window.__db && !isUuid(authorId)) throw new Error('You must be signed in to comment.');
+      const comment = normalizeComment({
+        id: genId('comment-'),
+        postId,
+        parentCommentId,
+        body: text,
+        authorId,
+        authorName: profile?.fullName || ME.name,
+        authorRole: profile?.role || 'exonaut',
+        mentionIds,
+      });
+      const post = state.posts.find(item => item.id === postId);
+      if (!post) throw new Error('That post no longer exists.');
+      if (parentCommentId) {
+        const addReply = comments => {
+          for (const candidate of comments) {
+            if (candidate.id === parentCommentId) {
+              candidate.replies.push(comment);
+              return true;
+            }
+            if (addReply(candidate.replies)) return true;
+          }
+          return false;
+        };
+        if (!addReply(post.comments)) throw new Error('That comment no longer exists.');
       } else {
-        t.comments = t.comments || [];
-        t.comments.push(comment);
+        post.comments.push(comment);
       }
       notify();
+      if (!window.__db) return comment;
+      const result = await window.__db.from('community_comments').insert({
+        id: comment.id,
+        post_id: postId,
+        parent_comment_id: parentCommentId || null,
+        author_id: authorId,
+        author_name: comment.authorName,
+        author_role: comment.authorRole,
+        body: text,
+        mention_ids: comment.mentionIds,
+      });
+      if (result.error) {
+        await refresh(profile);
+        throw result.error;
+      }
       return comment;
     },
-    voteComment(threadId, commentId, userId, direction) {
-      const t = state.threads.find(x => x.id === threadId);
-      if (!t) return;
-      const found = findComment(t, commentId);
-      if (!found) return;
-      const c = found.comment;
-      if (!c.votes) c.votes = {};
-      const cur = c.votes[userId] || 0;
-      const next = cur === direction ? 0 : direction;
-      if (next === 0) delete c.votes[userId];
-      else            c.votes[userId] = next;
-      notify();
-    },
-
-    // Constants
-    voteScore, countComments, timeAgo,
     subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
   };
 
-  // Channel metadata
   window.BOARD_CHANNELS = [
-    { id: 'all',     label: 'All',        icon: 'fa-layer-group',    color: 'var(--off-white)' },
-    { id: 'general', label: 'General',    icon: 'fa-comments',       color: 'var(--off-white)' },
-    { id: 'ais',     label: 'AI Strategy',icon: 'fa-brain',          color: 'var(--lime)' },
-    { id: 'aid',     label: 'AI Data',    icon: 'fa-database',       color: 'var(--sky)' },
-    { id: 'vb',      label: 'Venture',    icon: 'fa-rocket',         color: 'var(--amber)' },
-    { id: 'pol',     label: 'Policy',     icon: 'fa-scale-balanced', color: 'var(--lavender)' },
-    { id: 'cc',      label: 'Content',    icon: 'fa-pen-nib',        color: 'var(--platinum)' },
-    { id: 'xm',      label: 'Experience', icon: 'fa-palette',        color: 'var(--peach)' },
-    { id: 'lp',      label: 'Leadership', icon: 'fa-compass',        color: 'var(--ink)' },
-    { id: 'alumni',  label: 'Alumni',     icon: 'fa-user-astronaut', color: 'var(--lavender)' },
+    { id: 'all', label: 'All', icon: 'fa-layer-group', color: 'var(--off-white)' },
+    { id: 'general', label: 'General', icon: 'fa-comments', color: 'var(--lavender)' },
+    { id: 'ais', label: 'AI Strategy', icon: 'fa-brain', color: 'var(--lime)' },
+    { id: 'aid', label: 'AI Data', icon: 'fa-database', color: 'var(--sky)' },
+    { id: 'vb', label: 'Venture', icon: 'fa-rocket', color: 'var(--amber)' },
+    { id: 'pol', label: 'Policy', icon: 'fa-scale-balanced', color: 'var(--lavender)' },
+    { id: 'cc', label: 'Content', icon: 'fa-pen-nib', color: 'var(--platinum)' },
+    { id: 'xm', label: 'Experience', icon: 'fa-palette', color: 'var(--peach)' },
+    { id: 'lp', label: 'Leadership', icon: 'fa-compass', color: 'var(--ink)' },
+    { id: 'alumni', label: 'Alumni', icon: 'fa-user-astronaut', color: 'var(--lavender)' },
   ];
 
+  state.posts = window.__db ? [] : readLocal();
+  state.loaded = !window.__db;
   window.__boardStore = store;
-  window.useBoard = function useBoard() {
-    const [, setTick] = React.useState(0);
-    React.useEffect(() => store.subscribe(() => setTick(t => t + 1)), []);
+
+  window.useBoard = function useBoard(profile) {
+    const [, rerender] = React.useState(0);
+    React.useEffect(() => {
+      const unsub = store.subscribe(() => rerender(value => value + 1));
+      store.refresh(profile);
+      const unsubRemote = subscribeRemote(profile);
+      return () => { unsub(); unsubRemote(); };
+    }, [profile?.id]);
     return {
+      posts: state.posts,
+      loaded: state.loaded,
+      loading: state.loading,
+      error: state.error,
       list: store.list,
-      get: store.get,
-      createThread: store.createThread,
-      deleteThread: store.deleteThread,
-      voteThread: store.voteThread,
-      addComment: store.addComment,
-      voteComment: store.voteComment,
-      voteScore, countComments, timeAgo,
+      countComments,
+      timeAgo,
+      createPost: data => store.createPost({ ...data, profile }),
+      deletePost: postId => store.deletePost(postId, profile),
+      toggleLike: postId => store.toggleLike(postId, profile),
+      addComment: data => store.addComment({ ...data, profile }),
+      refresh: () => store.refresh(profile),
     };
   };
 })();

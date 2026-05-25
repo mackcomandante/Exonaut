@@ -559,6 +559,31 @@ function WeeklyMissionsList({ onOpenMission }) {
 // ========== KUDOS FEED ==========
 const KUDOS_FEED = [];
 
+function roleBadgeStyle(role) {
+  const styles = {
+    lead: { bg: 'rgba(192,192,192,0.15)', fg: 'var(--platinum)', label: 'LEAD' },
+    commander: { bg: 'rgba(244,197,66,0.15)', fg: 'var(--amber)', label: 'COMMANDER' },
+    admin: { bg: 'rgba(125,211,252,0.15)', fg: 'var(--sky)', label: 'ADMIN' },
+    alumni: { bg: 'rgba(176,149,197,0.15)', fg: 'var(--lavender)', label: 'ALUMNI' },
+  };
+  return styles[role] || null;
+}
+
+function resolveAuthor(authorId, authorName) {
+  const profile = (window.__profileDirectory || []).find(item => item.id === authorId);
+  if (profile) {
+    return {
+      name: authorName || profile.fullName || profile.email || 'Exonaut',
+      tier: profile.role === 'exonaut' ? 'gold' : 'corps',
+      avatarUrl: profile.avatarUrl || '',
+    };
+  }
+  if (authorName) return { name: authorName, tier: 'gold', avatarUrl: '' };
+  const user = (typeof USERS !== 'undefined' ? USERS : []).find(item => item.id === authorId);
+  if (user) return { name: user.name, tier: user.tier || 'gold', avatarUrl: '' };
+  return { name: 'Exonaut', tier: 'bronze', avatarUrl: '' };
+}
+
 function KudosFeed({ onGive }) {
   const [filter, setFilter] = React.useState('all');
   const kudos = useKudos();
@@ -1406,6 +1431,10 @@ function CommunityPage() {
   const projectState = useProjects();
   const [tab, setTab] = React.useState(() => localStorage.getItem('exo:community:tab') || 'directory');
   React.useEffect(() => { localStorage.setItem('exo:community:tab', tab); }, [tab]);
+  const [boardChannel, setBoardChannel] = React.useState('all');
+  const [boardSort, setBoardSort] = React.useState('hot');
+  const [boardSearch, setBoardSearch] = React.useState('');
+  const [boardComposerOpen, setBoardComposerOpen] = React.useState(false);
   const [filter, setFilter] = React.useState('all');     // all | active | alumni
   const [trackFilter, setTrackFilter] = React.useState('all');
   const [batchFilter, setBatchFilter] = React.useState('all');   // alumni cohort year
@@ -1439,10 +1468,9 @@ function CommunityPage() {
   };
 
   return (
-    <div className="enter">
-      <div className="section-head">
+    <div className={'enter community-page ' + (tab === 'board' ? 'board-view' : '')}>
+      <div className="section-head community-header">
         <div>
-          <div className="t-label" style={{ marginBottom: 8, color: 'var(--lavender)' }}>CULTURE · COMMUNITY</div>
           <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>Community</h1>
           <div className="t-body" style={{ marginTop: 6, color: 'var(--off-white-68)' }}>
             {tab === 'directory'
@@ -1455,23 +1483,50 @@ function CommunityPage() {
         </div>
       </div>
 
-      {/* Top-level tab switcher */}
-      <div style={{ display: 'flex', gap: 2, padding: 2, background: 'var(--off-white-07)', borderRadius: 2, marginBottom: 20, width: 'fit-content' }}>
-        {[
-          { id: 'directory', label: 'Directory', icon: 'fa-id-card' },
-          { id: 'board',     label: 'Message Board', icon: 'fa-comments' },
-        ].map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)} style={{
-            padding: '8px 16px', background: tab === t.id ? 'var(--ink)' : 'transparent',
-            color: tab === t.id ? 'var(--deep-black)' : 'var(--off-white-68)',
-            border: 'none', borderRadius: 2, fontFamily: 'var(--font-mono)', fontSize: 10,
-            fontWeight: 700, letterSpacing: '0.1em', cursor: 'pointer', textTransform: 'uppercase',
-            display: 'flex', alignItems: 'center', gap: 6,
-          }}><i className={'fa-solid ' + t.icon} />{t.label}</button>
-        ))}
+      {/* Top-level tab switcher and board actions share a single desktop row. */}
+      <div className={'community-toolbar ' + (tab === 'board' ? 'with-board-controls' : '')}>
+        <div className="community-tabs" style={{ display: 'flex', gap: 2, padding: 2, background: 'var(--off-white-07)', borderRadius: 2, width: 'fit-content' }}>
+          {[
+            { id: 'directory', label: 'Directory', icon: 'fa-id-card' },
+            { id: 'board',     label: 'Message Board', icon: 'fa-comments' },
+          ].map(t => (
+            <button key={t.id} onClick={() => setTab(t.id)} style={{
+              padding: '8px 16px', background: tab === t.id ? 'var(--ink)' : 'transparent',
+              color: tab === t.id ? 'var(--deep-black)' : 'var(--off-white-68)',
+              border: 'none', borderRadius: 2, fontFamily: 'var(--font-mono)', fontSize: 10,
+              fontWeight: 700, letterSpacing: '0.1em', cursor: 'pointer', textTransform: 'uppercase',
+              display: 'flex', alignItems: 'center', gap: 6,
+            }}><i className={'fa-solid ' + t.icon} />{t.label}</button>
+          ))}
+        </div>
+        {tab === 'board' && (
+          <div className="board-controls">
+            <div className="board-sort" aria-label="Sort posts">
+              {['hot', 'new', 'top'].map(mode => (
+                <button className={boardSort === mode ? 'active' : ''} key={mode} onClick={() => setBoardSort(mode)}>{mode}</button>
+              ))}
+            </div>
+            <label className="board-search">
+              <i className="fa-solid fa-magnifying-glass" />
+              <input aria-label="Search posts" value={boardSearch} onChange={event => setBoardSearch(event.target.value)} placeholder="Search threads..." />
+            </label>
+            <button className="btn btn-primary board-new-post" onClick={() => setBoardComposerOpen(true)}>
+              <i className="fa-solid fa-pen-to-square" /> New Post
+            </button>
+          </div>
+        )}
       </div>
 
-      {tab === 'board' ? <CommunityBoard /> : (
+      {tab === 'board' ? (
+        <CommunityBoard
+          channel={boardChannel}
+          onChannelChange={setBoardChannel}
+          sort={boardSort}
+          search={boardSearch}
+          composerOpen={boardComposerOpen}
+          onComposeClose={() => setBoardComposerOpen(false)}
+        />
+      ) : (
         <React.Fragment>
       {loading && (
         <div className="card-panel" style={{ padding: 18, marginBottom: 16 }}>

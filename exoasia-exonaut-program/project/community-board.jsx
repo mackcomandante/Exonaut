@@ -1,613 +1,370 @@
-// ============================================================================
-// Community Message Board — Reddit-style UI.
-// Lives inside CommunityPage as a new "Board" tab.
-// Usable by Exonauts, Leads, Commanders, and Admins via the shared auth shim.
-// ============================================================================
-
-// Returns who is currently posting — reads roleView from localStorage (set by app.jsx)
-// and maps to a name/avatar/id. Exonaut is ME; other roles post as themselves.
+// Reddit-style Community board UI.
 function useBoardIdentity() {
   const { profile } = useCurrentUserProfile();
-  const role = profile.role || 'exonaut';
   return {
+    ...profile,
     id: profile.id || ME_ID,
-    name: profile.fullName || ME.name || 'You',
-    role,
-    avatarUrl: profile.avatarUrl || '',
-    badge: role === 'exonaut' ? null : role.toUpperCase(),
+    fullName: profile.fullName || ME.name || 'You',
+    role: profile.role || 'exonaut',
   };
 }
 
-function roleBadgeStyle(role) {
-  const map = {
-    lead:      { bg: 'rgba(192,192,192,0.15)', fg: 'var(--platinum)', label: 'LEAD' },
-    commander: { bg: 'rgba(244,197,66,0.15)',  fg: 'var(--amber)',    label: 'COMMANDER' },
-    admin:     { bg: 'rgba(125,211,252,0.15)', fg: 'var(--sky)',      label: 'ADMIN' },
-    alumni:    { bg: 'rgba(176,149,197,0.15)', fg: 'var(--lavender)', label: 'ALUMNI' },
-  };
-  return map[role] || null;
+function profileHandle(profile) {
+  const source = String(profile?.fullName || profile?.email || 'member').toLowerCase();
+  return source.replace(/[^a-z0-9]+/g, '.').replace(/^\.+|\.+$/g, '') || 'member';
 }
 
-function resolveAuthor(authorId, authorName) {
-  const p = (window.__profileDirectory || []).find(x => x.id === authorId);
-  if (p) return { name: authorName || p.fullName || p.email || 'Exonaut', tier: p.role === 'exonaut' ? 'gold' : 'corps', avatarUrl: p.avatarUrl || '' };
-  // If a name is stored on the thread/comment, trust it (covers alumni + custom cases).
-  if (authorName) return { name: authorName, tier: 'gold', avatarUrl: '' };
-  const U = (typeof USERS !== 'undefined') ? USERS : [];
-  const u = U.find(x => x.id === authorId);
-  if (u) return { name: u.name, tier: u.tier || 'gold', avatarUrl: '' };
-  // Special system authors
-  if (authorId === 'cmdr-mack') return { name: 'Mission Commander', tier: 'corps' };
-  if (authorId === 'admin-ops') return { name: 'Platform Admin', tier: 'corps' };
-  if ((typeof LEADS !== 'undefined')) {
-    const L = LEADS.find(l => l.id === authorId);
-    if (L) return { name: L.name, tier: 'corps' };
+function boardMembers(profiles, me) {
+  const items = [...(profiles || [])];
+  if (me && !items.some(profile => profile.id === me.id)) items.unshift(me);
+  return items.map(profile => ({ ...profile, handle: profileHandle(profile) }));
+}
+
+function extractMentionIds(text, members) {
+  const handles = new Set((String(text || '').match(/@[a-z0-9._-]+/gi) || []).map(token => token.slice(1).toLowerCase()));
+  return members.filter(member => handles.has(member.handle.toLowerCase())).map(member => member.id);
+}
+
+function authorFor(post) {
+  const profile = (window.__profileDirectory || []).find(item => item.id === post.authorId);
+  return {
+    name: post.authorName || profile?.fullName || 'Exonaut',
+    avatarUrl: profile?.avatarUrl || '',
+    role: post.authorRole || profile?.role || 'exonaut',
+    tier: (post.authorRole || profile?.role) === 'exonaut' ? 'gold' : 'corps',
+    handle: profileHandle(profile || { fullName: post.authorName }),
+  };
+}
+
+function RoleChip({ role }) {
+  if (!role || role === 'exonaut') return null;
+  return <span className="board-role-chip">{role.toUpperCase()}</span>;
+}
+
+function RichText({ text, members }) {
+  if (!text) return null;
+  const parts = String(text).split(/(@[a-z0-9._-]+)/gi);
+  return (
+    <React.Fragment>
+      {parts.map((part, index) => {
+        if (!part.startsWith('@')) return <React.Fragment key={index}>{part}</React.Fragment>;
+        const exists = members.some(member => '@' + member.handle.toLowerCase() === part.toLowerCase());
+        return exists
+          ? <span className="board-mention" key={index}>{part}</span>
+          : <React.Fragment key={index}>{part}</React.Fragment>;
+      })}
+    </React.Fragment>
+  );
+}
+
+function MentionTextarea({ value, onChange, members, rows = 4, placeholder, className = 'board-textarea' }) {
+  const [query, setQuery] = React.useState(null);
+  const inputRef = React.useRef(null);
+  const matches = query === null ? [] : members
+    .filter(member => member.handle.toLowerCase().includes(query.toLowerCase()) || String(member.fullName || '').toLowerCase().includes(query.toLowerCase()))
+    .slice(0, 6);
+
+  function change(event) {
+    const next = event.target.value;
+    const beforeCursor = next.slice(0, event.target.selectionStart);
+    const match = beforeCursor.match(/(?:^|\s)@([a-z0-9._-]*)$/i);
+    onChange(next);
+    setQuery(match ? match[1] : null);
   }
-  return { name: 'Anonymous', tier: 'bronze', avatarUrl: '' };
-}
 
-// ============================================================================
-// BoardList — left column with channels, sort, search, thread list.
-// ============================================================================
-function CommunityBoard() {
-  const me = useBoardIdentity();
-  const board = useBoard();
-
-  const [channel, setChannel] = React.useState('all');
-  const [sort, setSort] = React.useState('hot');
-  const [search, setSearch] = React.useState('');
-  const [composeOpen, setComposeOpen] = React.useState(false);
-  const [openThreadId, setOpenThreadId] = React.useState(null);
-
-  const threads = board.list({ channel, sort, search });
-
-  if (openThreadId) {
-    return (
-      <ThreadView
-        threadId={openThreadId}
-        me={me}
-        onBack={() => setOpenThreadId(null)}
-      />
-    );
+  function selectMember(member) {
+    const textarea = inputRef.current;
+    const cursor = textarea?.selectionStart ?? value.length;
+    const before = value.slice(0, cursor);
+    const after = value.slice(cursor);
+    const atIndex = before.lastIndexOf('@');
+    const inserted = before.slice(0, atIndex) + '@' + member.handle + ' ' + after;
+    onChange(inserted);
+    setQuery(null);
+    setTimeout(() => textarea?.focus(), 0);
   }
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: 18 }}>
-
-      {/* Channels sidebar */}
-      <div>
-        <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.12em', marginBottom: 10, paddingLeft: 4 }}>
-          CHANNELS
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {BOARD_CHANNELS.map(ch => (
-            <button key={ch.id} onClick={() => setChannel(ch.id)} style={{
-              display: 'flex', alignItems: 'center', gap: 10,
-              padding: '8px 10px', textAlign: 'left',
-              background: channel === ch.id ? 'var(--off-white-07)' : 'transparent',
-              border: '1px solid ' + (channel === ch.id ? 'var(--off-white-15)' : 'transparent'),
-              borderRadius: 2, cursor: 'pointer',
-              color: channel === ch.id ? 'var(--off-white)' : 'var(--off-white-68)',
-              fontFamily: 'var(--font-display)', fontWeight: channel === ch.id ? 700 : 500, fontSize: 12,
-              transition: 'all 0.12s',
-            }}>
-              <i className={'fa-solid ' + ch.icon} style={{ fontSize: 11, color: channel === ch.id ? ch.color : 'var(--off-white-40)', width: 14 }} />
-              <span>{ch.label}</span>
+    <div className="board-mention-editor">
+      <textarea ref={inputRef} className={className} value={value} onChange={change} rows={rows} placeholder={placeholder} />
+      {matches.length > 0 && (
+        <div className="board-mention-list" role="listbox" aria-label="Mention a member">
+          {matches.map(member => (
+            <button type="button" key={member.id} className="board-mention-option" onClick={() => selectMember(member)}>
+              <AvatarWithRing name={member.fullName || member.email} avatarUrl={member.avatarUrl} size={25} tier="gold" />
+              <span>{member.fullName || member.email}</span>
+              <small>@{member.handle}</small>
             </button>
           ))}
         </div>
-
-        <div style={{ marginTop: 20, padding: 12, background: 'var(--off-white-07)', borderRadius: 2, border: '1px solid var(--off-white-15)' }}>
-          <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.1em', marginBottom: 6 }}>
-            POSTING AS
-          </div>
-          <div className="t-heading" style={{ fontSize: 12, textTransform: 'none', letterSpacing: 0, color: 'var(--off-white)' }}>
-            {me.name}
-          </div>
-          {me.badge && (
-            <div style={{ marginTop: 4, display: 'inline-block', padding: '2px 6px', background: roleBadgeStyle(me.role)?.bg, color: roleBadgeStyle(me.role)?.fg, fontFamily: 'var(--font-mono)', fontSize: 8, letterSpacing: '0.1em', fontWeight: 700, borderRadius: 2 }}>
-              {me.badge}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Thread list */}
-      <div>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
-          {/* Sort toggle */}
-          <div style={{ display: 'flex', gap: 2, padding: 2, background: 'var(--off-white-07)', borderRadius: 2 }}>
-            {['hot', 'new', 'top'].map(s => (
-              <button key={s} onClick={() => setSort(s)} style={{
-                padding: '6px 12px',
-                background: sort === s ? 'var(--ink)' : 'transparent',
-                color: sort === s ? 'var(--deep-black)' : 'var(--off-white-68)',
-                border: 'none', borderRadius: 2,
-                fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700, letterSpacing: '0.1em',
-                cursor: 'pointer', textTransform: 'uppercase',
-              }}>{s}</button>
-            ))}
-          </div>
-
-          <div style={{ flex: 1, minWidth: 200, position: 'relative' }}>
-            <i className="fa-solid fa-magnifying-glass" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--off-white-40)', fontSize: 11 }} />
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search threads…" style={{
-              width: '100%', padding: '7px 12px 7px 30px',
-              background: 'var(--deep-black)', color: 'var(--off-white)',
-              border: '1px solid var(--off-white-15)', borderRadius: 2,
-              fontFamily: 'var(--font-display)', fontSize: 12, outline: 'none',
-            }} />
-          </div>
-
-          <button className="btn btn-primary" onClick={() => setComposeOpen(true)}>
-            <i className="fa-solid fa-pen-to-square" /> NEW POST
-          </button>
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {threads.length === 0 && (
-            <div className="card-panel" style={{ padding: 40, textAlign: 'center' }}>
-              <i className="fa-solid fa-comments" style={{ fontSize: 28, color: 'var(--off-white-40)', marginBottom: 10 }} />
-              <div className="t-body" style={{ color: 'var(--off-white-68)' }}>No posts here yet. Be first.</div>
-            </div>
-          )}
-          {threads.map(t => (
-            <ThreadRow key={t.id} thread={t} me={me} onOpen={() => setOpenThreadId(t.id)} />
-          ))}
-        </div>
-      </div>
-
-      {composeOpen && (
-        <ThreadCompose
-          open
-          onClose={() => setComposeOpen(false)}
-          defaultChannel={channel === 'all' ? 'general' : channel}
-          me={me}
-        />
       )}
     </div>
   );
 }
 
-// ============================================================================
-// Thread list row
-// ============================================================================
-function ThreadRow({ thread, me, onOpen }) {
-  const board = useBoard();
-  const author = resolveAuthor(thread.authorId, thread.authorName);
-  const score = board.voteScore(thread.votes);
-  const myVote = thread.votes?.[me.id] || 0;
-  const commentCount = board.countComments(thread);
-  const channel = BOARD_CHANNELS.find(c => c.id === thread.channel);
-  const roleStyle = roleBadgeStyle(thread.authorRole);
-
-  const vote = (e, dir) => {
-    e.stopPropagation();
-    board.voteThread(thread.id, me.id, dir);
-  };
-
+function MediaGrid({ media }) {
+  if (!media?.length) return null;
   return (
-    <div onClick={onOpen} className="card-panel" style={{
-      display: 'grid', gridTemplateColumns: '44px 1fr', gap: 12, padding: 14,
-      cursor: 'pointer', transition: 'all 0.12s',
-      borderColor: thread.pinned ? 'var(--lime)' : 'var(--off-white-15)',
-      background: thread.pinned ? 'rgba(201,229,74,0.03)' : 'transparent',
-    }}
-    onMouseEnter={(e) => { if (!thread.pinned) e.currentTarget.style.borderColor = 'var(--off-white-40)'; }}
-    onMouseLeave={(e) => { if (!thread.pinned) e.currentTarget.style.borderColor = 'var(--off-white-15)'; }}>
-
-      {/* Vote column */}
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-        <button onClick={(e) => vote(e, 1)} title="Upvote" style={voteBtnStyle(myVote === 1, 'up')}>
-          <i className="fa-solid fa-caret-up" />
-        </button>
-        <div className="t-mono" style={{
-          fontSize: 12, fontWeight: 700,
-          color: myVote === 1 ? 'var(--lime)' : myVote === -1 ? 'var(--red)' : 'var(--off-white)',
-        }}>{score}</div>
-        <button onClick={(e) => vote(e, -1)} title="Downvote" style={voteBtnStyle(myVote === -1, 'down')}>
-          <i className="fa-solid fa-caret-down" />
-        </button>
-      </div>
-
-      {/* Body */}
-      <div style={{ minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
-          {thread.pinned && (
-            <span style={{ padding: '1px 6px', background: 'var(--lime)', color: 'var(--on-lime)', fontFamily: 'var(--font-mono)', fontSize: 8, letterSpacing: '0.12em', fontWeight: 700, borderRadius: 2 }}>
-              <i className="fa-solid fa-thumbtack" style={{ marginRight: 4 }} />PINNED
-            </span>
-          )}
-          {channel && (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontFamily: 'var(--font-mono)', fontSize: 9, color: channel.color, letterSpacing: '0.1em', fontWeight: 700 }}>
-              <i className={'fa-solid ' + channel.icon} style={{ fontSize: 9 }} />#{channel.id}
-            </span>
-          )}
-          <span className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)' }}>
-            · posted by <strong style={{ color: 'var(--off-white-68)' }}>{author.name}</strong>
-          </span>
-          {roleStyle && (
-            <span style={{ padding: '1px 5px', background: roleStyle.bg, color: roleStyle.fg, fontFamily: 'var(--font-mono)', fontSize: 8, letterSpacing: '0.1em', fontWeight: 700, borderRadius: 2 }}>
-              {roleStyle.label}
-            </span>
-          )}
-          <span className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)' }}>
-            · {board.timeAgo(thread.ts)} ago
-          </span>
-        </div>
-        <h3 className="t-heading" style={{ fontSize: 16, margin: '0 0 4px 0', textTransform: 'none', letterSpacing: 0, color: 'var(--off-white)' }}>
-          {thread.title}
-        </h3>
-        {thread.body && (
-          <div className="t-body" style={{ fontSize: 13, color: 'var(--off-white-68)', marginTop: 6,
-            overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
-            {thread.body}
-          </div>
-        )}
-        <div style={{ marginTop: 8, display: 'flex', gap: 14 }}>
-          <span className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)' }}>
-            <i className="fa-solid fa-comment" style={{ marginRight: 5 }} />{commentCount} {commentCount === 1 ? 'comment' : 'comments'}
-          </span>
-          <span className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)' }}>
-            <i className="fa-solid fa-arrow-trend-up" style={{ marginRight: 5 }} />{score} score
-          </span>
-        </div>
-      </div>
+    <div className={'board-media-grid count-' + Math.min(media.length, 3)}>
+      {media.map(item => item.type === 'video'
+        ? <video key={item.id} src={item.url} controls preload="metadata" aria-label={item.name} />
+        : <img key={item.id} src={item.url} alt={item.name || 'Post attachment'} loading="lazy" />)}
     </div>
   );
 }
 
-function voteBtnStyle(active, dir) {
-  return {
-    width: 28, height: 22,
-    background: active ? (dir === 'up' ? 'rgba(201,229,74,0.15)' : 'rgba(239,68,68,0.15)') : 'transparent',
-    border: '1px solid ' + (active ? (dir === 'up' ? 'var(--lime)' : 'var(--red)') : 'var(--off-white-15)'),
-    borderRadius: 2, cursor: 'pointer',
-    color: active ? (dir === 'up' ? 'var(--lime)' : 'var(--red)') : 'var(--off-white-68)',
-    fontSize: 14, display: 'grid', placeItems: 'center',
-  };
+function CommunityBoard({ channel, onChannelChange, sort, search, composerOpen, onComposeClose }) {
+  const me = useBoardIdentity();
+  const { profiles } = useUserProfiles();
+  const members = React.useMemo(() => boardMembers(profiles, me), [profiles, me.id, me.fullName]);
+  const board = useBoard(me);
+  const posts = board.list({ channel, sort, search });
+
+  return (
+    <div className="board-layout">
+      <aside className="board-sidebar">
+        <div className="board-eyebrow">CHANNELS</div>
+        <nav className="board-channel-list" aria-label="Message board channels">
+          {BOARD_CHANNELS.map(item => (
+            <button className={'board-channel ' + (channel === item.id ? 'active' : '')} key={item.id} onClick={() => onChannelChange(item.id)}>
+              <i className={'fa-solid ' + item.icon} style={{ color: channel === item.id ? item.color : undefined }} />
+              {item.label}
+            </button>
+          ))}
+        </nav>
+        <div className="board-current-user">
+          <div className="board-eyebrow">POSTING AS</div>
+          <div className="board-current-row">
+            <AvatarWithRing name={me.fullName} avatarUrl={me.avatarUrl} size={29} tier={me.role === 'exonaut' ? 'gold' : 'corps'} />
+            <div>
+              <strong>{me.fullName}</strong>
+              <span>@{profileHandle(me)}</span>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <section className="board-feed">
+        {board.error && <div className="board-alert"><i className="fa-solid fa-circle-exclamation" />{board.error}</div>}
+        {board.loading && !board.loaded && <div className="board-empty">Loading posts...</div>}
+        {!board.loading && posts.length === 0 && (
+          <div className="card-panel board-empty">
+            <i className="fa-regular fa-comments" />
+            <div>No posts here yet. Be first.</div>
+          </div>
+        )}
+        <div className="board-posts">
+          {posts.map(post => <PostCard key={post.id} post={post} board={board} me={me} members={members} />)}
+        </div>
+      </section>
+
+      {composerOpen && <PostComposer board={board} me={me} members={members} defaultChannel={channel === 'all' ? 'general' : channel} onClose={onComposeClose} />}
+    </div>
+  );
 }
 
-// ============================================================================
-// Thread view (single-thread page inside the Board)
-// ============================================================================
-function ThreadView({ threadId, me, onBack }) {
-  const board = useBoard();
-  const thread = board.get(threadId);
+function PostCard({ post, board, me, members }) {
+  const [commentsOpen, setCommentsOpen] = React.useState(false);
+  const [commentText, setCommentText] = React.useState('');
+  const [busy, setBusy] = React.useState(false);
+  const [error, setError] = React.useState('');
+  const author = authorFor(post);
+  const channel = BOARD_CHANNELS.find(item => item.id === post.channel);
+  const liked = post.likes.includes(me.id);
+  const canDelete = post.authorId === me.id;
 
-  const [replyOpen, setReplyOpen] = React.useState(false);
-  const [replyText, setReplyText] = React.useState('');
-
-  if (!thread) {
-    return (
-      <div className="card-panel" style={{ padding: 40, textAlign: 'center' }}>
-        <div className="t-body" style={{ color: 'var(--off-white-68)' }}>Thread not found.</div>
-        <button className="btn btn-ghost" style={{ marginTop: 12 }} onClick={onBack}>← Back to board</button>
-      </div>
-    );
+  async function like() {
+    setError('');
+    try { await board.toggleLike(post.id); } catch (err) { setError(err.message || 'Could not update like.'); }
   }
 
-  const author = resolveAuthor(thread.authorId, thread.authorName);
-  const roleStyle = roleBadgeStyle(thread.authorRole);
-  const score = board.voteScore(thread.votes);
-  const myVote = thread.votes?.[me.id] || 0;
-  const channel = BOARD_CHANNELS.find(c => c.id === thread.channel);
-  const canDelete = thread.authorId === me.id || me.role === 'admin' || me.role === 'commander';
+  async function comment() {
+    if (!commentText.trim()) return;
+    setBusy(true);
+    setError('');
+    try {
+      await board.addComment({ postId: post.id, body: commentText, mentionIds: extractMentionIds(commentText, members) });
+      setCommentText('');
+      setCommentsOpen(true);
+    } catch (err) {
+      setError(err.message || 'Could not post comment.');
+    } finally {
+      setBusy(false);
+    }
+  }
 
-  function submitReply() {
-    if (replyText.trim().length < 2) return;
-    board.addComment(thread.id, {
-      body: replyText.trim(),
-      authorId: me.id, authorName: me.name, authorRole: me.role,
-    });
-    setReplyText('');
-    setReplyOpen(false);
+  async function remove() {
+    if (!confirm('Delete this post and its comments?')) return;
+    setBusy(true);
+    try { await board.deletePost(post.id); } catch (err) { setError(err.message || 'Could not delete post.'); setBusy(false); }
   }
 
   return (
-    <div>
-      <button onClick={onBack} style={{
-        background: 'transparent', border: 'none', color: 'var(--off-white-68)',
-        cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.08em',
-        marginBottom: 16, padding: 0,
-      }}>
-        <i className="fa-solid fa-arrow-left" /> BACK TO BOARD
+    <article className="card-panel board-post">
+      <header className="board-post-head">
+        <AvatarWithRing name={author.name} avatarUrl={author.avatarUrl} size={37} tier={author.tier} />
+        <div className="board-post-author">
+          <strong>{author.name}</strong>
+          <span>@{author.handle}</span>
+          <RoleChip role={author.role} />
+          <time>{board.timeAgo(post.createdAt)}</time>
+        </div>
+        {channel && <span className="board-channel-chip"><i className={'fa-solid ' + channel.icon} />{channel.label}</span>}
+        {canDelete && <button className="board-icon-btn" disabled={busy} aria-label="Delete post" onClick={remove}><i className="fa-solid fa-trash" /></button>}
+      </header>
+      {post.title && <h3 className="board-post-title">{post.title}</h3>}
+      {post.body && <p className="board-post-body"><RichText text={post.body} members={members} /></p>}
+      <MediaGrid media={post.media} />
+      <footer className="board-post-actions">
+        <button className={liked ? 'liked' : ''} onClick={like} aria-pressed={liked}>
+          <i className={liked ? 'fa-solid fa-heart' : 'fa-regular fa-heart'} /> {post.likes.length}
+        </button>
+        <button onClick={() => setCommentsOpen(open => !open)}>
+          <i className="fa-regular fa-comment" /> {board.countComments(post)}
+        </button>
+      </footer>
+      {error && <div className="board-inline-error">{error}</div>}
+      {commentsOpen && (
+        <div className="board-comments">
+          <div className="board-comment-compose">
+            <MentionTextarea value={commentText} onChange={setCommentText} members={members} rows={2} placeholder="Write a comment. Use @ to mention someone." />
+            <button className="btn btn-primary btn-sm" disabled={!commentText.trim() || busy} onClick={comment}>Comment</button>
+          </div>
+          {post.comments.length === 0 && <div className="board-no-comments">No comments yet.</div>}
+          {post.comments.map(item => <CommentCard key={item.id} comment={item} postId={post.id} board={board} me={me} members={members} depth={0} />)}
+        </div>
+      )}
+    </article>
+  );
+}
+
+function CommentCard({ comment, postId, board, me, members, depth }) {
+  const [replying, setReplying] = React.useState(false);
+  const [reply, setReply] = React.useState('');
+  const [error, setError] = React.useState('');
+  const author = authorFor(comment);
+
+  async function submitReply() {
+    if (!reply.trim()) return;
+    setError('');
+    try {
+      await board.addComment({ postId, parentCommentId: comment.id, body: reply, mentionIds: extractMentionIds(reply, members) });
+      setReply('');
+      setReplying(false);
+    } catch (err) {
+      setError(err.message || 'Could not post reply.');
+    }
+  }
+
+  return (
+    <div className="board-comment" style={{ marginLeft: Math.min(depth, 4) * 18 }}>
+      <div className="board-comment-head">
+        <AvatarWithRing name={author.name} avatarUrl={author.avatarUrl} size={25} tier={author.tier} />
+        <strong>{author.name}</strong>
+        <RoleChip role={author.role} />
+        <time>{board.timeAgo(comment.createdAt)}</time>
+      </div>
+      <p><RichText text={comment.body} members={members} /></p>
+      <button className="board-reply-button" onClick={() => setReplying(value => !value)}>
+        <i className="fa-solid fa-reply" /> Reply
       </button>
-
-      <div className="card-panel" style={{ padding: 22 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
-          {channel && (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontFamily: 'var(--font-mono)', fontSize: 10, color: channel.color, letterSpacing: '0.1em', fontWeight: 700 }}>
-              <i className={'fa-solid ' + channel.icon} style={{ fontSize: 10 }} />#{channel.id}
-            </span>
-          )}
-          <span className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)' }}>
-            · posted by <strong style={{ color: 'var(--off-white-68)' }}>{author.name}</strong>
-          </span>
-          {roleStyle && (
-            <span style={{ padding: '1px 5px', background: roleStyle.bg, color: roleStyle.fg, fontFamily: 'var(--font-mono)', fontSize: 8, letterSpacing: '0.1em', fontWeight: 700, borderRadius: 2 }}>
-              {roleStyle.label}
-            </span>
-          )}
-          <span className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)' }}>· {board.timeAgo(thread.ts)} ago</span>
-          {canDelete && (
-            <button onClick={() => { if (confirm('Delete this thread and all comments?')) { board.deleteThread(thread.id); onBack(); } }} style={{
-              marginLeft: 'auto', background: 'transparent', border: '1px solid var(--off-white-15)',
-              borderRadius: 2, padding: '3px 8px', color: 'var(--off-white-68)',
-              cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '0.08em',
-            }}><i className="fa-solid fa-trash" style={{ marginRight: 4 }} />DELETE</button>
-          )}
-        </div>
-
-        <h1 className="t-heading" style={{ fontSize: 22, margin: '0 0 14px 0', textTransform: 'none', letterSpacing: 0 }}>
-          {thread.title}
-        </h1>
-
-        {thread.body && (
-          <div className="t-body" style={{ whiteSpace: 'pre-wrap', fontSize: 14, lineHeight: 1.55 }}>{thread.body}</div>
-        )}
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 18, paddingTop: 14, borderTop: '1px solid var(--off-white-07)' }}>
-          <button onClick={() => board.voteThread(thread.id, me.id, 1)} style={voteBtnStyle(myVote === 1, 'up')}>
-            <i className="fa-solid fa-caret-up" />
-          </button>
-          <div className="t-mono" style={{
-            fontSize: 14, fontWeight: 700,
-            color: myVote === 1 ? 'var(--lime)' : myVote === -1 ? 'var(--red)' : 'var(--off-white)',
-          }}>{score}</div>
-          <button onClick={() => board.voteThread(thread.id, me.id, -1)} style={voteBtnStyle(myVote === -1, 'down')}>
-            <i className="fa-solid fa-caret-down" />
-          </button>
-          <button onClick={() => setReplyOpen(o => !o)} style={{
-            marginLeft: 10, background: 'transparent', border: '1px solid var(--off-white-15)',
-            borderRadius: 2, padding: '6px 14px', color: 'var(--off-white)',
-            cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.08em', fontWeight: 700,
-          }}>
-            <i className="fa-solid fa-comment" style={{ marginRight: 6 }} />REPLY
-          </button>
-        </div>
-
-        {replyOpen && (
-          <div style={{ marginTop: 14 }}>
-            <textarea value={replyText} onChange={(e) => setReplyText(e.target.value)} rows={3} placeholder={`Reply as ${me.name}…`} style={{
-              width: '100%', padding: '10px 12px',
-              background: 'var(--deep-black)', color: 'var(--off-white)',
-              border: '1px solid var(--off-white-15)', borderRadius: 2,
-              fontFamily: 'var(--font-display)', fontSize: 13, outline: 'none', resize: 'vertical',
-            }} />
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, marginTop: 6 }}>
-              <button onClick={() => { setReplyOpen(false); setReplyText(''); }} style={{
-                padding: '6px 12px', background: 'transparent', border: '1px solid var(--off-white-15)',
-                borderRadius: 2, color: 'var(--off-white-68)', cursor: 'pointer',
-                fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.08em', fontWeight: 700, textTransform: 'uppercase',
-              }}>Cancel</button>
-              <button onClick={submitReply} disabled={replyText.trim().length < 2} style={{
-                padding: '6px 12px', background: replyText.trim().length >= 2 ? 'var(--lime)' : 'var(--off-white-15)',
-                color: replyText.trim().length >= 2 ? 'var(--on-lime)' : 'var(--off-white-40)',
-                border: 'none', borderRadius: 2, cursor: replyText.trim().length >= 2 ? 'pointer' : 'not-allowed',
-                fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.08em', fontWeight: 700, textTransform: 'uppercase',
-              }}>Post Reply</button>
-            </div>
+      {replying && (
+        <div className="board-reply-editor">
+          <div className="board-replying">Replying to @{author.handle}</div>
+          <MentionTextarea value={reply} onChange={setReply} members={members} rows={2} placeholder={'Reply to @' + author.handle} />
+          <div>
+            <button className="btn btn-ghost btn-sm" onClick={() => { setReplying(false); setReply(''); }}>Cancel</button>
+            <button className="btn btn-primary btn-sm" disabled={!reply.trim()} onClick={submitReply}>Reply</button>
           </div>
-        )}
-      </div>
-
-      {/* Comments */}
-      <div style={{ marginTop: 20 }}>
-        <div className="t-mono" style={{ fontSize: 11, color: 'var(--off-white-40)', letterSpacing: '0.12em', marginBottom: 12 }}>
-          {board.countComments(thread)} COMMENT{board.countComments(thread) === 1 ? '' : 'S'}
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {(thread.comments || []).map(c => (
-            <CommentNode key={c.id} threadId={thread.id} comment={c} me={me} depth={0} />
-          ))}
-        </div>
-      </div>
+      )}
+      {error && <div className="board-inline-error">{error}</div>}
+      {comment.replies.map(child => <CommentCard key={child.id} comment={child} postId={postId} board={board} me={me} members={members} depth={depth + 1} />)}
     </div>
   );
 }
 
-// ============================================================================
-// CommentNode — recursive for nested replies (capped at 4 levels visually).
-// ============================================================================
-function CommentNode({ threadId, comment, me, depth }) {
-  const board = useBoard();
-  const [replyOpen, setReplyOpen] = React.useState(false);
-  const [replyText, setReplyText] = React.useState('');
-
-  const author = resolveAuthor(comment.authorId, comment.authorName);
-  const roleStyle = roleBadgeStyle(comment.authorRole);
-  const score = board.voteScore(comment.votes);
-  const myVote = comment.votes?.[me.id] || 0;
-  const canReply = depth < 4;
-
-  function submit() {
-    if (replyText.trim().length < 2) return;
-    board.addComment(threadId, {
-      parentId: comment.id,
-      body: replyText.trim(),
-      authorId: me.id, authorName: me.name, authorRole: me.role,
-    });
-    setReplyText('');
-    setReplyOpen(false);
-  }
-
-  return (
-    <div style={{
-      padding: '10px 12px', background: 'var(--off-white-07)',
-      borderLeft: '2px solid ' + (depth === 0 ? 'var(--off-white-15)' : 'var(--ink)'),
-      borderRadius: 2, marginLeft: depth * 14,
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
-        <AvatarWithRing name={author.name} avatarUrl={author.avatarUrl} size={22} tier={author.tier} />
-        <span className="t-heading" style={{ fontSize: 12, textTransform: 'none', letterSpacing: 0, color: 'var(--off-white)' }}>
-          {author.name}
-        </span>
-        {roleStyle && (
-          <span style={{ padding: '1px 5px', background: roleStyle.bg, color: roleStyle.fg, fontFamily: 'var(--font-mono)', fontSize: 8, letterSpacing: '0.1em', fontWeight: 700, borderRadius: 2 }}>
-            {roleStyle.label}
-          </span>
-        )}
-        <span className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)' }}>· {board.timeAgo(comment.ts)} ago</span>
-      </div>
-
-      <div className="t-body" style={{ fontSize: 13, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{comment.body}</div>
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
-        <button onClick={() => board.voteComment(threadId, comment.id, me.id, 1)} style={{
-          ...voteBtnStyle(myVote === 1, 'up'), width: 22, height: 18, fontSize: 11,
-        }}><i className="fa-solid fa-caret-up" /></button>
-        <span className="t-mono" style={{
-          fontSize: 11, fontWeight: 700,
-          color: myVote === 1 ? 'var(--lime)' : myVote === -1 ? 'var(--red)' : 'var(--off-white)',
-        }}>{score}</span>
-        <button onClick={() => board.voteComment(threadId, comment.id, me.id, -1)} style={{
-          ...voteBtnStyle(myVote === -1, 'down'), width: 22, height: 18, fontSize: 11,
-        }}><i className="fa-solid fa-caret-down" /></button>
-        {canReply && (
-          <button onClick={() => setReplyOpen(o => !o)} style={{
-            marginLeft: 8, background: 'transparent', border: 'none',
-            color: 'var(--off-white-68)', cursor: 'pointer',
-            fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.08em', fontWeight: 700,
-          }}><i className="fa-solid fa-reply" style={{ marginRight: 5 }} />REPLY</button>
-        )}
-      </div>
-
-      {replyOpen && (
-        <div style={{ marginTop: 8 }}>
-          <textarea value={replyText} onChange={(e) => setReplyText(e.target.value)} rows={2} placeholder={`Reply as ${me.name}…`} style={{
-            width: '100%', padding: '8px 10px',
-            background: 'var(--deep-black)', color: 'var(--off-white)',
-            border: '1px solid var(--off-white-15)', borderRadius: 2,
-            fontFamily: 'var(--font-display)', fontSize: 12, outline: 'none', resize: 'vertical',
-          }} />
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, marginTop: 5 }}>
-            <button onClick={() => { setReplyOpen(false); setReplyText(''); }} style={{
-              padding: '5px 10px', background: 'transparent', border: '1px solid var(--off-white-15)',
-              borderRadius: 2, color: 'var(--off-white-68)', cursor: 'pointer',
-              fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '0.08em', fontWeight: 700, textTransform: 'uppercase',
-            }}>Cancel</button>
-            <button onClick={submit} disabled={replyText.trim().length < 2} style={{
-              padding: '5px 10px', background: replyText.trim().length >= 2 ? 'var(--lime)' : 'var(--off-white-15)',
-              color: replyText.trim().length >= 2 ? 'var(--on-lime)' : 'var(--off-white-40)',
-              border: 'none', borderRadius: 2, cursor: replyText.trim().length >= 2 ? 'pointer' : 'not-allowed',
-              fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '0.08em', fontWeight: 700, textTransform: 'uppercase',
-            }}>Reply</button>
-          </div>
-        </div>
-      )}
-
-      {comment.replies && comment.replies.length > 0 && (
-        <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {comment.replies.map(r => (
-            <CommentNode key={r.id} threadId={threadId} comment={r} me={me} depth={depth + 1} />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ============================================================================
-// Thread compose modal
-// ============================================================================
-function ThreadCompose({ open, onClose, defaultChannel, me }) {
-  const board = useBoard();
-  const [channel, setChannel] = React.useState(defaultChannel || 'general');
+function PostComposer({ board, me, members, defaultChannel, onClose }) {
+  const [channel, setChannel] = React.useState(defaultChannel);
   const [title, setTitle] = React.useState('');
   const [body, setBody] = React.useState('');
+  const [files, setFiles] = React.useState([]);
+  const [submitting, setSubmitting] = React.useState(false);
+  const [error, setError] = React.useState('');
+  const uploadRef = React.useRef(null);
+  const previews = React.useMemo(() => files.map(file => ({ file, url: URL.createObjectURL(file), type: file.type.startsWith('video/') ? 'video' : 'image' })), [files]);
+  React.useEffect(() => () => previews.forEach(item => URL.revokeObjectURL(item.url)), [previews]);
+  const valid = Boolean(title.trim() || body.trim() || files.length);
 
-  if (!open) return null;
-  const canPost = title.trim().length >= 2;
+  function selectFiles(event) {
+    const selected = Array.from(event.target.files || []);
+    const next = [...files, ...selected].slice(0, 6);
+    setFiles(next);
+    setError(selected.some(file => !file.type.startsWith('image/') && !file.type.startsWith('video/')) ? 'Only images and videos can be attached.' : '');
+    event.target.value = '';
+  }
 
-  function submit() {
-    if (!canPost) return;
-    board.createThread({
-      channel, title: title.trim(), body: body.trim(),
-      authorId: me.id, authorName: me.role === 'exonaut' ? null : me.name, authorRole: me.role,
-    });
-    onClose?.();
+  async function submit() {
+    if (!valid) { setError('Add text, an image, or a video before posting.'); return; }
+    setSubmitting(true);
+    setError('');
+    try {
+      await board.createPost({ channel, title, body, files, mentionIds: extractMentionIds(body, members) });
+      onClose();
+    } catch (err) {
+      setError(err.message || 'Could not publish post.');
+      setSubmitting(false);
+    }
   }
 
   return (
-    <div onClick={onClose} style={{
-      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)',
-      zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
-    }}>
-      <div onClick={(e) => e.stopPropagation()} className="card-panel" style={{
-        width: 'min(600px, 100%)', padding: 0, maxHeight: '92vh', display: 'flex', flexDirection: 'column',
-      }}>
-        <div style={{ padding: '16px 22px', borderBottom: '1px solid var(--off-white-07)', position: 'relative' }}>
-          <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.12em', marginBottom: 4 }}>
-            NEW POST · POSTING AS {me.name.toUpperCase()}
-          </div>
-          <h2 className="t-title" style={{ fontSize: 22, margin: 0 }}>Start a thread</h2>
-          <div onClick={onClose} style={{
-            position: 'absolute', top: 14, right: 14, width: 26, height: 26,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer', color: 'var(--off-white-40)',
-          }}><i className="fa-solid fa-xmark" /></div>
+    <div className="modal-scrim board-composer-scrim" onClick={onClose}>
+      <div className="modal-body board-composer" onClick={event => event.stopPropagation()} role="dialog" aria-modal="true" aria-label="New post">
+        <button className="modal-close" aria-label="Close composer" onClick={onClose}><i className="fa-solid fa-xmark" /></button>
+        <div className="board-eyebrow">NEW POST / POSTING AS {me.fullName.toUpperCase()}</div>
+        <h2>Share with the cohort</h2>
+        <label className="board-field">
+          <span>Channel</span>
+          <select className="input" value={channel} onChange={event => setChannel(event.target.value)}>
+            {BOARD_CHANNELS.filter(item => item.id !== 'all').map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
+          </select>
+        </label>
+        <label className="board-field">
+          <span>Title <small>optional</small></span>
+          <input className="input" value={title} onChange={event => setTitle(event.target.value)} placeholder="What is this about?" />
+        </label>
+        <div className="board-field">
+          <span>Caption <small>type @ to mention someone</small></span>
+          <MentionTextarea value={body} onChange={setBody} members={members} rows={5} placeholder="Share a thought, update, request, or resource." className="textarea board-textarea" />
         </div>
-
-        <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14, overflowY: 'auto' }}>
-          <div>
-            <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.1em', marginBottom: 6 }}>CHANNEL</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {BOARD_CHANNELS.filter(c => c.id !== 'all').map(c => (
-                <button key={c.id} onClick={() => setChannel(c.id)} style={{
-                  padding: '6px 10px',
-                  background: channel === c.id ? c.color + '20' : 'var(--off-white-07)',
-                  border: '1px solid ' + (channel === c.id ? c.color : 'var(--off-white-15)'),
-                  borderRadius: 2, color: channel === c.id ? c.color : 'var(--off-white-68)',
-                  cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.08em', fontWeight: 700,
-                  display: 'flex', alignItems: 'center', gap: 5,
-                }}><i className={'fa-solid ' + c.icon} />#{c.id}</button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.1em', marginBottom: 5 }}>TITLE</div>
-            <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Get to the point in one line"
-              style={{
-                width: '100%', padding: '10px 12px',
-                background: 'var(--deep-black)', color: 'var(--off-white)',
-                border: '1px solid var(--off-white-15)', borderRadius: 2,
-                fontFamily: 'var(--font-display)', fontSize: 15, outline: 'none',
-              }} />
-          </div>
-
-          <div>
-            <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.1em', marginBottom: 5 }}>BODY <span style={{ opacity: 0.5 }}>· OPTIONAL</span></div>
-            <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={6} placeholder="Context, details, what you need from the cohort."
-              style={{
-                width: '100%', padding: '10px 12px', resize: 'vertical',
-                background: 'var(--deep-black)', color: 'var(--off-white)',
-                border: '1px solid var(--off-white-15)', borderRadius: 2,
-                fontFamily: 'var(--font-display)', fontSize: 13, outline: 'none', lineHeight: 1.5,
-              }} />
-          </div>
+        <div className="board-field">
+          <span>Media <small>images or videos, up to 6</small></span>
+          <button className="board-upload" type="button" onClick={() => uploadRef.current?.click()}>
+            <i className="fa-solid fa-photo-film" /> Add images or videos
+          </button>
+          <input ref={uploadRef} hidden type="file" accept="image/*,video/*" multiple onChange={selectFiles} />
         </div>
-
-        <div style={{ padding: '12px 20px', borderTop: '1px solid var(--off-white-07)', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-          <button onClick={onClose} style={{
-            padding: '9px 16px', background: 'transparent', border: '1px solid var(--off-white-15)',
-            borderRadius: 2, color: 'var(--off-white-68)', cursor: 'pointer',
-            fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.08em', fontWeight: 700, textTransform: 'uppercase',
-          }}>Cancel</button>
-          <button onClick={submit} disabled={!canPost} style={{
-            padding: '9px 16px', background: canPost ? 'var(--lime)' : 'var(--off-white-15)',
-            color: canPost ? 'var(--on-lime)' : 'var(--off-white-40)',
-            border: 'none', borderRadius: 2, cursor: canPost ? 'pointer' : 'not-allowed',
-            fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.08em', fontWeight: 700, textTransform: 'uppercase',
-          }}><i className="fa-solid fa-paper-plane" style={{ marginRight: 6 }} />Post Thread</button>
+        {previews.length > 0 && (
+          <div className="board-preview-grid">
+            {previews.map((item, index) => (
+              <div className="board-preview" key={item.url}>
+                {item.type === 'video' ? <video src={item.url} controls /> : <img src={item.url} alt={item.file.name} />}
+                <button aria-label="Remove attachment" onClick={() => setFiles(files.filter((file, fileIndex) => fileIndex !== index))}><i className="fa-solid fa-xmark" /></button>
+              </div>
+            ))}
+          </div>
+        )}
+        {error && <div className="board-inline-error">{error}</div>}
+        <div className="board-composer-actions">
+          <button className="btn btn-ghost" onClick={onClose} disabled={submitting}>Cancel</button>
+          <button className="btn btn-primary" onClick={submit} disabled={!valid || submitting}>
+            {submitting ? <i className="fa-solid fa-spinner fa-spin" /> : <i className="fa-solid fa-paper-plane" />}
+            {submitting ? 'Publishing' : 'Post'}
+          </button>
         </div>
       </div>
     </div>
   );
 }
 
-Object.assign(window, {
-  CommunityBoard, ThreadView, ThreadRow, ThreadCompose, CommentNode,
-  useBoardIdentity, resolveAuthor, roleBadgeStyle,
-});
+Object.assign(window, { CommunityBoard, useBoardIdentity });
