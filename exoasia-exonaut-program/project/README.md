@@ -79,7 +79,7 @@ page.
 1. Role switcher → **Lead**
 2. Sidebar → **Review Queue** (the count updates live)
 3. Click **GRADE** on the submission
-4. Pick a grade (Needs Revision / Good / Excellent), write feedback (≥ 10 chars)
+4. Pick a grade (Needs Revision / Good / Excellent); feedback is optional
 5. **SUBMIT GRADE**
 
 ### Flow C — Exonaut sees feedback

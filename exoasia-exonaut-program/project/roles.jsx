@@ -375,7 +375,6 @@ function LeadGrade({ onBack, subId }) {
           </div>
           <div className="t-label" style={{ marginBottom: 10 }}>SUBMISSION PREVIEW</div>
           <div style={{ background: 'var(--bg-darkest)', padding: 20, fontFamily: 'var(--font-serif)', fontSize: 15, lineHeight: 1.65, color: 'var(--off-white)', maxHeight: 320, overflow: 'auto', borderRadius: 4 }}>
-            <strong style={{ color: 'var(--lime)' }}>{sub.missionTitle} · Submission</strong><br/><br/>
             {sub.note && (
               <div style={{ padding: 12, background: 'rgba(139,232,255,0.06)', borderLeft: '2px solid var(--platinum)', marginBottom: 14, fontSize: 13 }}>
                 <div className="t-label" style={{ marginBottom: 4 }}>NOTE TO REVIEWER</div>
@@ -387,12 +386,11 @@ function LeadGrade({ onBack, subId }) {
                 <i className="fa-solid fa-paperclip" /> {sub.fileName}
               </div>
             )}
-            Kestrel enters a Southeast Asian medical-AI market dominated by three entrenched players (HealthLens, MediCore, and Sanjeevani) — each with regional regulatory headstarts but increasing model-debt.<br/><br/>
-            <em>Three direct competitors (positioning, pricing, moat):</em><br/>
-            1. <strong>HealthLens</strong> — hospital-network partnerships, premium pricing, moat = accreditation.<br/>
-            2. <strong>MediCore</strong> — physician-facing tooling, mid-market pricing, moat = workflow lock-in.<br/>
-            3. <strong>Sanjeevani</strong> — direct-to-clinic, aggressive pricing, moat = distribution.<br/><br/>
-            <em style={{ color: 'var(--lavender)' }}>[continued — {sub.wordCount} words]</em>
+            <div className="t-body" style={{ fontFamily: 'var(--font-body)', fontSize: 13, color: 'var(--off-white-68)' }}>
+              {sub.fileName
+                ? 'Open the submitted file below to review the Exonaut\'s deliverable.'
+                : 'No submitted file is available for preview.'}
+            </div>
           </div>
           <button className="btn btn-ghost btn-sm" style={{ marginTop: 10 }}
             onClick={async () => {
@@ -412,7 +410,7 @@ function LeadGrade({ onBack, subId }) {
           <div className="t-label" style={{ marginBottom: 12 }}>GRADE</div>
           <div style={{ display: 'grid', gap: 8, marginBottom: 20 }}>
             {[
-              { v: 'rejected',       label: 'Rejected',       sub: '0 pts - comment required', color: 'var(--red)' },
+              { v: 'rejected',       label: 'Rejected',       sub: '0 pts · feedback optional', color: 'var(--red)' },
               { v: 'needs-revision', label: 'Needs Revision', sub: '0 pts · one resubmit allowed', color: 'var(--amber)' },
               { v: 'good',           label: 'Good',           sub: 'task points awarded', color: 'var(--lime)' },
               { v: 'excellent',      label: 'Excellent',      sub: 'task points awarded · badge recheck', color: 'var(--gold)' },
@@ -432,9 +430,9 @@ function LeadGrade({ onBack, subId }) {
           <textarea className="textarea" rows={5} value={feedback} onChange={e => setFeedback(e.target.value)}
                     placeholder="Specific, actionable, kind. They'll remember this." />
 
-          <button className="btn btn-primary" disabled={!grade || feedback.length < 10}
+          <button className="btn btn-primary" disabled={!grade}
                   onClick={handleSubmit}
-                  style={{ width: '100%', justifyContent: 'center', marginTop: 14, opacity: (!grade || feedback.length < 10) ? 0.4 : 1 }}>
+                  style={{ width: '100%', justifyContent: 'center', marginTop: 14, opacity: grade ? 1 : 0.4 }}>
             <i className="fa-solid fa-gavel" /> SUBMIT GRADE
           </button>
         </div>
