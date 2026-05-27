@@ -95,7 +95,7 @@ function MessageAttachments({ attachments = [], editable = false, onRemove, onPr
   );
 }
 
-function MessagesPage() {
+function MessagesPage({ intent, onIntentHandled }) {
   const { profile } = useCurrentUserProfile();
   const usersState = useUserProfiles();
   const profiles = usersState.profiles && usersState.profiles.length
@@ -118,6 +118,7 @@ function MessagesPage() {
   const [attachments, setAttachments] = React.useState([]);
   const [previewImage, setPreviewImage] = React.useState(null);
   const [mobileConversationOpen, setMobileConversationOpen] = React.useState(false);
+  const [composeDefaults, setComposeDefaults] = React.useState(null);
   const fileInputRef = React.useRef(null);
   const activeThread = threads.find(t => t.id === activeId) || threads[0] || null;
   const messages = activeThread ? messagesForThread(activeThread.id) : [];
@@ -140,6 +141,29 @@ function MessagesPage() {
   React.useEffect(() => {
     if (activeThread) markThreadRead(activeThread.id);
   }, [activeThread?.id]);
+
+  React.useEffect(() => {
+    if (!intent?.recipientId) return;
+    const existingThread = threads.find(thread =>
+      (thread.otherParticipantIds || []).includes(intent.recipientId)
+    );
+    if (existingThread) {
+      setActiveId(existingThread.id);
+      setMobileConversationOpen(true);
+      setComposeOpen(false);
+      setComposeDefaults(null);
+      onIntentHandled?.();
+      return;
+    }
+    if (!loaded) return;
+    setComposeDefaults({
+      recipientId: intent.recipientId,
+      recipientName: intent.recipientName || '',
+      title: intent.title || '',
+    });
+    setComposeOpen(true);
+    onIntentHandled?.();
+  }, [intent?.requestedAt, intent?.recipientId, loaded, threads]);
 
   const send = async () => {
     const text = draft.trim();
@@ -323,7 +347,11 @@ function MessagesPage() {
 
       {composeOpen && (
         <MessageComposeModal
+          key={(composeDefaults?.recipientId || 'new') + ':' + (composeDefaults?.title || '')}
           profiles={directory}
+          initialRecipientId={composeDefaults?.recipientId || ''}
+          initialRecipientName={composeDefaults?.recipientName || ''}
+          initialTitle={composeDefaults?.title || ''}
           onClose={() => setComposeOpen(false)}
           onCreate={async (payload) => {
             const thread = await createThread(payload);
@@ -362,10 +390,10 @@ function MessagesPage() {
   );
 }
 
-function MessageComposeModal({ profiles, onClose, onCreate }) {
-  const [query, setQuery] = React.useState('');
-  const [recipientId, setRecipientId] = React.useState('');
-  const [title, setTitle] = React.useState('');
+function MessageComposeModal({ profiles, onClose, onCreate, initialRecipientId = '', initialRecipientName = '', initialTitle = '' }) {
+  const [query, setQuery] = React.useState(initialRecipientName);
+  const [recipientId, setRecipientId] = React.useState(initialRecipientId);
+  const [title, setTitle] = React.useState(initialTitle);
   const [body, setBody] = React.useState('');
   const [attachments, setAttachments] = React.useState([]);
   const [saving, setSaving] = React.useState(false);

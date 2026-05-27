@@ -300,11 +300,11 @@ function TweaksFab({ onClick }) {
     <button className="floating-action floating-tweaks" onClick={onClick}
       style={{
         position: 'fixed', bottom: 20, right: 20, zIndex: 140,
-        background: 'var(--bg-deep)', border: '1px solid var(--lime-border)',
+        background: 'var(--bg-deep)', border: '1px solid var(--accent-border)',
         borderRadius: '50%', width: 48, height: 48,
         display: 'grid', placeItems: 'center',
         color: 'var(--ink)', fontSize: 16,
-        boxShadow: 'var(--lime-glow)',
+        boxShadow: 'var(--accent-glow)',
         cursor: 'pointer',
       }} title="Tweaks">
       <i className="fa-solid fa-sliders" />

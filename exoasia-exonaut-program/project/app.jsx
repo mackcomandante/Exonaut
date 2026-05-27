@@ -17,6 +17,7 @@ function App() {
   const [kudosOpen, setKudosOpen] = React.useState(false);
   const [mobileNavOpen, setMobileNavOpen] = React.useState(false);
   const [toasts, setToasts] = React.useState([]);
+  const [messageIntent, setMessageIntent] = React.useState(null);
   const [tweaks, setTweaks] = React.useState(() => {
     try { return JSON.parse(localStorage.getItem('exo:tweaks')) || {}; } catch { return {}; }
   });
@@ -30,12 +31,11 @@ function App() {
     density: 'default', accent: 'lime', dashVariant: 'default',
     ritualStyle: 'cards', badgeShape: 'geom', ...tweaks,
   };
+  const setTweak = (key, value) => setTweaks(current => ({ ...current, [key]: value }));
 
   React.useEffect(() => {
     document.body.dataset.density = mergedTweaks.density;
     document.body.dataset.accent = mergedTweaks.accent;
-    const accentMap = { lime: '#C9F24A', platinum: '#7FE3FF', lavender: '#C6B8FF' };
-    document.documentElement.style.setProperty('--lime', accentMap[mergedTweaks.accent]);
   }, [mergedTweaks.density, mergedTweaks.accent]);
 
   React.useEffect(() => { localStorage.setItem('exo:route', route); }, [route]);
@@ -93,6 +93,11 @@ function App() {
     setMissionId(id);
     setRoute('mission');
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const messageLead = (intent) => {
+    setMessageIntent({ ...intent, requestedAt: Date.now() });
+    navigate('messages');
   };
 
   const pushToast = (t) => {
@@ -180,7 +185,7 @@ function App() {
   };
 
   if (authStage === 'login') {
-    return <LoginScreen onAuthComplete={handleAuthenticated} />;
+    return <LoginScreen onAuthComplete={handleAuthenticated} tweaks={mergedTweaks} setTweak={setTweak} />;
   }
   if (authStage === 'onboarding') {
     return <Onboarding onComplete={() => { setRoleView('exonaut'); setAuthStage('app'); setRoute('dashboard'); }} />;
@@ -255,7 +260,7 @@ function App() {
     if (route === 'dashboard')        page = <Dashboard onNavigate={navigate} onOpenMission={openMission} />;
     else if (route === 'leaderboard') page = <Leaderboard onBack={() => navigate('dashboard')} />;
     else if (route === 'profile')     page = <Profile onOpenMission={openMission} onTriggerBadge={(b) => onCelebrate('badge', { badge: b })} />;
-    else if (route === 'mission')     page = <MissionDetail missionId={missionId} onBack={() => navigate('missions')} onSubmitted={() => pushToast({ title: 'SUBMISSION RECEIVED', sub: 'Track Lead has 48h to review', icon: 'fa-paper-plane' })} />;
+    else if (route === 'mission')     page = <MissionDetail missionId={missionId} onBack={() => navigate('missions')} onMessageLead={messageLead} onSubmitted={() => pushToast({ title: 'SUBMISSION RECEIVED', sub: 'Track Lead has 48h to review', icon: 'fa-paper-plane' })} />;
     else if (route === 'missions') {
       const MissionsComponent = window.MissionsList;
       page = MissionsComponent
@@ -266,7 +271,7 @@ function App() {
     else if (route === 'projects') page = <ProjectsPage />;
     else if (route === 'first-projects') page = <FirstOfficerProjectsPage />;
     else if (route === 'project-tasks') page = <ProjectTasksPage />;
-    else if (route === 'messages')    page = <MessagesPage />;
+    else if (route === 'messages')    page = <MessagesPage intent={messageIntent} onIntentHandled={() => setMessageIntent(null)} />;
     else if (route === 'community')   page = <CommunityPage />;
     else if (route === 'exonaut-guide') page = <ExonautGuidePage />;
     else if (route === 'kudos')       page = <KudosFeed onGive={() => setKudosOpen(true)} />;
@@ -363,17 +368,17 @@ function App() {
       <ExtrasTweaksFab onClick={() => setTweaksOpen(v => !v)} />
       <ExtrasTweaksPanel open={tweaksOpen} onClose={() => setTweaksOpen(false)}
                    tweaks={mergedTweaks}
-                   setTweak={(k, v) => setTweaks(t => ({ ...t, [k]: v }))}
+                   setTweak={setTweak}
                    onCelebrate={onCelebrate} />
 
       {roleView !== 'login' && (
         <button className="floating-action floating-kudos" onClick={() => setKudosOpen(true)}
           style={{
             position: 'fixed', bottom: 20, right: 80, zIndex: 140,
-            background: 'var(--lime)', color: 'var(--on-lime)',
+            background: 'var(--accent)', color: 'var(--on-accent)',
             border: 'none', borderRadius: '50%', width: 48, height: 48,
             display: 'grid', placeItems: 'center', fontSize: 16, fontWeight: 700,
-            boxShadow: 'var(--lime-glow)', cursor: 'pointer',
+            boxShadow: 'var(--accent-glow)', cursor: 'pointer',
           }} title="Give Kudos">
           <i className="fa-solid fa-hand-sparkles" />
         </button>

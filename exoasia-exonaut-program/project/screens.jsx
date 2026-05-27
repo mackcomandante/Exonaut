@@ -20,12 +20,12 @@ function MissionBriefsView() {
     return (
       <div className={'card-panel' + (isCurrent ? ' week-current' : '')} style={{
         padding: 0, marginBottom: 10, overflow: 'hidden',
-        borderColor: isCurrent ? 'var(--lime)' : universal ? 'rgba(176,149,197,0.28)' : undefined,
+        borderColor: isCurrent ? 'var(--accent)' : universal ? 'rgba(176,149,197,0.28)' : undefined,
       }}>
         <div onClick={() => toggle(id)} style={{
           display: 'grid', gridTemplateColumns: '90px 1fr auto auto', gap: 16, alignItems: 'center',
           padding: '16px 22px', cursor: 'pointer',
-          background: isCurrent ? 'rgba(201,229,0,0.04)' : universal ? 'rgba(176,149,197,0.04)' : 'transparent',
+          background: isCurrent ? 'var(--accent-wash)' : universal ? 'rgba(176,149,197,0.04)' : 'transparent',
         }}>
           <div className="t-mono" style={{ fontSize: 11, color: universal ? 'var(--lavender)' : isCurrent ? 'var(--ink)' : 'var(--off-white-68)', letterSpacing: '0.12em', fontWeight: 700 }}>
             WEEK {String(week).padStart(2,'0')}
@@ -63,7 +63,7 @@ function MissionBriefsView() {
               {rituals.map((r, i) => {
                 const isCore = CORE_RITUALS.some(c => r.toLowerCase().includes(c.toLowerCase()));
                 return (
-                  <span key={i} className="t-mono" style={{ fontSize: 10, padding: '5px 10px', border: '1px solid ' + (isCore ? 'rgba(201,229,0,0.35)' : 'var(--off-white-15)'), borderRadius: 2, color: isCore ? 'var(--ink)' : 'var(--off-white-68)', background: isCore ? 'rgba(201,229,0,0.06)' : 'transparent', letterSpacing: '0.04em', fontWeight: isCore ? 700 : 400 }}>
+                  <span key={i} className="t-mono" style={{ fontSize: 10, padding: '5px 10px', border: '1px solid ' + (isCore ? 'var(--accent-border)' : 'var(--off-white-15)'), borderRadius: 2, color: isCore ? 'var(--ink)' : 'var(--off-white-68)', background: isCore ? 'var(--accent-wash)' : 'transparent', letterSpacing: '0.04em', fontWeight: isCore ? 700 : 400 }}>
                     {r.toUpperCase()}
                   </span>
                 );
@@ -101,7 +101,7 @@ function MissionBriefsView() {
       </div>
 
       {/* Discovery Tier Callout */}
-      <div className="card-panel" style={{ padding: 18, marginBottom: 18, borderColor: 'rgba(201,229,0,0.28)', background: 'rgba(201,229,0,0.03)' }}>
+      <div className="card-panel" style={{ padding: 18, marginBottom: 18, borderColor: 'var(--accent-border-soft)', background: 'var(--accent-wash)' }}>
         <div className="t-label" style={{ marginBottom: 4, color: 'var(--ink)' }}>WEEK 2 · DISCOVERY OUTCOME TIERS</div>
         <div className="t-body" style={{ fontSize: 13, color: 'var(--off-white-68)', marginBottom: 14 }}>
           You send 10 concept papers. Your score is driven by how many discovery meetings you convert.
@@ -145,7 +145,7 @@ function PointsRubricView() {
   const groups = [...new Set(POINTS_RUBRIC.map(r => r.group))];
   return (
     <div>
-      <div className="card-panel" style={{ padding: 22, marginBottom: 18, background: 'rgba(201,229,0,0.03)', borderColor: 'rgba(201,229,0,0.2)' }}>
+      <div className="card-panel" style={{ padding: 22, marginBottom: 18, background: 'var(--accent-wash)', borderColor: 'var(--accent-border-soft)' }}>
         <div className="t-label" style={{ marginBottom: 8, color: 'var(--ink)' }}>TIER MILESTONES</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
           {[
@@ -293,7 +293,7 @@ function LegacyMissionsList({ onOpenMission }) {
                     {canSubmit && (
                       <button className="btn btn-ghost btn-sm"
                         onClick={(e) => { e.stopPropagation(); setExpandedId(isExpanded ? null : m.id); }}
-                        style={{ borderColor: isExpanded ? 'var(--lime)' : undefined, color: isExpanded ? 'var(--ink)' : undefined }}>
+                        style={{ borderColor: isExpanded ? 'var(--accent)' : undefined, color: isExpanded ? 'var(--ink)' : undefined }}>
                         <i className={'fa-solid ' + (isExpanded ? 'fa-chevron-up' : 'fa-cloud-arrow-up')} /> {isExpanded ? 'HIDE' : 'SUBMIT'}
                       </button>
                     )}
@@ -814,7 +814,7 @@ function RitualProofModal({ ritual, onClose, onSubmit }) {
       <div className="ritual-proof-modal card-panel" onClick={e => e.stopPropagation()}>
         <div className="task-modal-head">
           <div>
-            <div className="t-label" style={{ color: 'var(--lime)', marginBottom: 6 }}>RITUAL PROOF</div>
+            <div className="t-label" style={{ color: 'var(--accent)', marginBottom: 6 }}>RITUAL PROOF</div>
             <h2 className="t-title">{ritual.name}</h2>
           </div>
           <button className="btn btn-ghost btn-sm" onClick={onClose}><i className="fa-solid fa-xmark" /></button>
@@ -925,7 +925,7 @@ function NotificationsPage() {
           <div key={n.id} onClick={() => markRead(n.id)} style={{
             display: 'grid', gridTemplateColumns: '40px 1fr auto auto', gap: 16,
             padding: '18px 24px', borderBottom: i < notifications.length - 1 ? '1px solid var(--off-white-07)' : 'none',
-            background: !n.read ? 'rgba(201,229,0,0.03)' : 'transparent',
+            background: !n.read ? 'var(--accent-wash)' : 'transparent',
             alignItems: 'center', cursor: 'pointer', transition: 'background 150ms',
           }}>
             <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--bg-dark)', border: '1px solid var(--off-white-07)', display: 'grid', placeItems: 'center', color: 'var(--ink)' }}>
@@ -933,7 +933,7 @@ function NotificationsPage() {
             </div>
             <div>
               <div className="t-heading" style={{ fontSize: 13, textTransform: 'none', letterSpacing: 0 }}>
-                {n.title} {!n.read && <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: 'var(--lime)', marginLeft: 6, verticalAlign: 'middle' }} />}
+                {n.title} {!n.read && <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: 'var(--accent)', marginLeft: 6, verticalAlign: 'middle' }} />}
               </div>
               <div className="t-body" style={{ fontSize: 13, marginTop: 2 }}>{n.sub}</div>
             </div>
@@ -1171,7 +1171,7 @@ function SettingsPage() {
             <label key={x.k} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid var(--off-white-07)' }}>
               <span style={{ fontFamily: 'var(--font-display)', fontSize: 13, color: 'var(--off-white)' }}>{x.label}</span>
               <div onClick={() => setPrefs(p => ({ ...p, [x.k]: !p[x.k] }))}
-                   style={{ width: 40, height: 22, borderRadius: 11, background: prefs[x.k] ? 'var(--lime)' : 'var(--off-white-15)', cursor: 'pointer', position: 'relative', transition: 'background 200ms' }}>
+                   style={{ width: 40, height: 22, borderRadius: 11, background: prefs[x.k] ? 'var(--accent)' : 'var(--off-white-15)', cursor: 'pointer', position: 'relative', transition: 'background 200ms' }}>
                 <div style={{ position: 'absolute', top: 2, left: prefs[x.k] ? 20 : 2, width: 18, height: 18, borderRadius: '50%', background: 'var(--bg-deep)', transition: 'left 200ms' }} />
               </div>
             </label>
@@ -1179,7 +1179,7 @@ function SettingsPage() {
           <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0' }}>
             <span style={{ fontFamily: 'var(--font-display)', fontSize: 13, color: 'var(--off-white)' }}>Dark mode</span>
             <div onClick={toggleTheme}
-                 style={{ width: 40, height: 22, borderRadius: 11, background: isDark ? 'var(--lime)' : 'var(--off-white-15)', cursor: 'pointer', position: 'relative', transition: 'background 200ms' }}>
+                 style={{ width: 40, height: 22, borderRadius: 11, background: isDark ? 'var(--accent)' : 'var(--off-white-15)', cursor: 'pointer', position: 'relative', transition: 'background 200ms' }}>
               <div style={{ position: 'absolute', top: 2, left: isDark ? 20 : 2, width: 18, height: 18, borderRadius: '50%', background: 'var(--bg-deep)', transition: 'left 200ms', display: 'grid', placeItems: 'center', fontSize: 8, color: 'var(--ink)' }}>
                 <i className={'fa-solid ' + (isDark ? 'fa-moon' : 'fa-sun')} />
               </div>
@@ -1196,8 +1196,8 @@ function SettingsPage() {
               { v: 'private', l: 'Private', d: 'Admins only' },
             ].map(x => (
               <div key={x.v} onClick={() => setPrefs(p => ({ ...p, privacy: x.v }))}
-                   style={{ padding: 14, border: '1px solid ' + (prefs.privacy === x.v ? 'var(--lime)' : 'var(--off-white-07)'), borderRadius: 4, cursor: 'pointer', background: prefs.privacy === x.v ? 'rgba(201,229,0,0.04)' : 'transparent' }}>
-                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13, color: prefs.privacy === x.v ? 'var(--lime)' : 'var(--off-white)' }}>{x.l}</div>
+                   style={{ padding: 14, border: '1px solid ' + (prefs.privacy === x.v ? 'var(--accent)' : 'var(--off-white-07)'), borderRadius: 4, cursor: 'pointer', background: prefs.privacy === x.v ? 'var(--accent-wash)' : 'transparent' }}>
+                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13, color: prefs.privacy === x.v ? 'var(--accent-deep)' : 'var(--off-white)' }}>{x.l}</div>
                 <div className="t-body" style={{ fontSize: 12, marginTop: 2 }}>{x.d}</div>
               </div>
             ))}
@@ -1612,7 +1612,7 @@ function CommunityCard({ m, onOpen }) {
       borderColor: 'var(--off-white-15)',
       background: 'transparent',
     }}
-    onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--lime)'; e.currentTarget.style.background = 'rgba(201,229,0,0.03)'; }}
+    onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.background = 'var(--accent-wash)'; }}
     onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--off-white-15)'; e.currentTarget.style.background = 'transparent'; }}>
 
       <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', marginBottom: 12 }}>
@@ -1710,7 +1710,7 @@ function CommunityProfileSheet({ m, onClose }) {
     }}>
       <div onClick={(e) => e.stopPropagation()} className="card-panel" style={{
         width: 'min(720px, 100%)', maxHeight: '85vh', overflowY: 'auto', padding: 0,
-        borderColor: 'var(--lime)',
+        borderColor: 'var(--accent)',
       }}>
         {/* Header */}
         <div style={{ padding: '28px 32px 20px', borderBottom: '1px solid var(--off-white-07)', position: 'relative' }}>
@@ -1883,9 +1883,9 @@ function CommunityProfileSheet({ m, onClose }) {
             {m.project && (
               <div style={{
                 padding: '14px 16px',
-                border: '1px solid rgba(201,229,0,0.25)',
+                border: '1px solid var(--accent-border-soft)',
                 borderRadius: 2,
-                background: 'rgba(201,229,0,0.03)',
+                background: 'var(--accent-wash)',
               }}>
                 <div className="t-mono" style={{ fontSize: 9, color: 'var(--ink)', letterSpacing: '0.08em', fontWeight: 700, marginBottom: 6 }}>
                   {isAlumni ? 'CAPSTONE PROJECT' : 'CURRENT PROJECT'}

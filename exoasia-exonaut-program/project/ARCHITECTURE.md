@@ -258,15 +258,16 @@ All styling lives in `styles.css`. Tokens in `:root`:
 ```
 --bg-deep, --bg-darkest, --card-base     Surfaces
 --off-white / 07 / 40 / 68                Text tiers
---lime, --platinum, --lavender            Accents (--lime is the primary)
+--lime, --platinum, --lavender            Semantic/status and palette colors
+--accent / --accent-wash / --accent-*     Selected interactive accent palette
 --amber, --red, --green, --gold           Status colors
 --font-display (Montserrat)
 --font-serif (EB Garamond)
 --font-mono (JetBrains Mono)
 ```
 
-`--lime` is overridden at runtime by the accent tweak via
-`document.documentElement.style.setProperty('--lime', hex)`.
+The accent tweak sets `body[data-accent]`; CSS maps that selection to the
+`--accent-*` tokens while fixed green success/status uses can remain `--lime`.
 
 Key reusable classes: `.card-panel`, `.card-flat`, `.card-hud`, `.btn`,
 `.btn-primary`, `.btn-ghost`, `.btn-danger`, `.btn-sm`, `.t-title`,

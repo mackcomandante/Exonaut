@@ -186,14 +186,17 @@ function PillarGrid() {
 
 function RitualTracker() {
   const { profile } = useCurrentUserProfile();
+  useCohort();
   const { records } = useRitualState(profile.id);
   const activeCohort = window.getActiveCohort?.(profile) || COHORT;
-  const weekLabel = window.getCohortWeekWindowLabel?.(activeCohort, COHORT.week) || '';
+  const timeline = window.getCohortTimeline?.(activeCohort);
+  const currentWeek = timeline?.valid ? timeline.currentWeek : COHORT.week;
+  const weekLabel = window.getCohortWeekWindowLabel?.(activeCohort, currentWeek) || '';
   return (
     <div style={{ marginBottom: 32 }}>
       <div className="section-head">
         <h2>Weekly Ritual Tracker</h2>
-        <span className="section-meta">WEEK {COHORT.week} · {weekLabel}</span>
+        <span className="section-meta">WEEK {currentWeek} · {weekLabel}</span>
       </div>
       <div className="ritual-row">
         {RITUALS.map(r => {
@@ -225,17 +228,21 @@ function MissionFeed({ onOpenMission }) {
   const subs = useSubs();
   useManualCredits();
   const { profile } = useCurrentUserProfile();
+  useCohort();
   const missions = useMissions();
   const myTrack = profile.trackCode || ME.track || 'AIS';
-  const myCohort = profile.cohortId || ME.cohort || 'c2627';
-  const [selectedWeek, setSelectedWeek] = React.useState(COHORT.week || 1);
+  const activeCohort = window.getActiveCohort?.(profile) || COHORT;
+  const myCohort = activeCohort?.id || profile.cohortId || ME.cohort || 'c2627';
+  const timeline = window.getCohortTimeline?.(activeCohort);
+  const currentWeek = timeline?.valid ? timeline.currentWeek : (COHORT.week || 1);
+  const [selectedWeek, setSelectedWeek] = React.useState(currentWeek);
   const scopedMissions = missions
     .filter(m => (m.cohortId || 'c2627') === myCohort && (!m.track || m.track === myTrack));
   const weekOptions = Array.from(new Set(scopedMissions.map(m => Number(m.week || 0)).filter(Boolean)))
     .sort((a, b) => a - b);
   const activeWeek = weekOptions.includes(selectedWeek)
     ? selectedWeek
-    : (weekOptions.includes(COHORT.week) ? COHORT.week : weekOptions[0]);
+    : (weekOptions.includes(currentWeek) ? currentWeek : weekOptions[0]);
   const upcoming = scopedMissions
     .filter(m => Number(m.week || 0) === activeWeek)
     .sort((a,b) => a.dueIn - b.dueIn);
@@ -243,7 +250,7 @@ function MissionFeed({ onOpenMission }) {
     <div>
       <div className="section-head">
         <h2>Track Feed</h2>
-        <span className="section-meta">WEEK {String(activeWeek || COHORT.week).padStart(2, '0')} - {upcoming.length} TRACK TASKS</span>
+        <span className="section-meta">WEEK {String(activeWeek || currentWeek).padStart(2, '0')} - {upcoming.length} TRACK TASKS</span>
       </div>
       {weekOptions.length > 0 && (
         <div className="lb-filters" style={{ marginBottom: 14 }}>
@@ -418,12 +425,13 @@ function LeaderboardSnapshot({ onView }) {
 
 function Dashboard({ onNavigate, onOpenMission }) {
   const { profile } = useCurrentUserProfile();
+  useCohort();
   const displayName = profile.fullName || ME.name;
   const activeCohort = window.getActiveCohort?.(profile) || COHORT;
-  const demoDate = new Date(window.getCohortDemoDay?.(activeCohort) || COHORT.demoDay || '');
-  const daysToDemo = isNaN(demoDate.getTime())
-    ? Math.max(0, ((window.getCohortWeekTotal?.(activeCohort) || COHORT.weekTotal) * 7) - 11)
-    : Math.max(0, Math.ceil((demoDate.getTime() - Date.now()) / 86400000));
+  const timeline = window.getCohortTimeline?.(activeCohort);
+  const currentDay = timeline?.valid ? timeline.currentDay : '--';
+  const totalDays = timeline?.valid ? timeline.totalDays : '--';
+  const countdownLabel = timeline?.countdownLabel || 'SCHEDULE PENDING';
 
   return (
     <div>
@@ -431,16 +439,16 @@ function Dashboard({ onNavigate, onOpenMission }) {
         <div>
           <div className="t-label" style={{ marginBottom: 8 }}>Welcome back, Exonaut</div>
           <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>{displayName}</h1>
-          <div className="t-body" style={{ marginTop: 8, color: 'var(--lavender)', fontStyle: 'italic' }}>
+          <div className="t-body" style={{ marginTop: 8, color: 'var(--accent)', fontStyle: 'italic' }}>
             "We don't wait for the map. We build it."
           </div>
         </div>
         <div style={{ textAlign: 'right' }}>
           <div className="t-label-muted">DAY</div>
           <div className="t-mono" style={{ fontSize: 40, color: 'var(--off-white)', fontWeight: 700, lineHeight: 1 }}>
-            11<span style={{ color: 'var(--off-white-40)', fontSize: 22 }}>/84</span>
+            {currentDay}<span style={{ color: 'var(--off-white-40)', fontSize: 22 }}>/{totalDays}</span>
           </div>
-          <div className="t-micro" style={{ marginTop: 6 }}>{daysToDemo} DAYS TO DEMO DAY</div>
+          <div className="t-micro" style={{ marginTop: 6 }}>{countdownLabel}</div>
         </div>
       </div>
 

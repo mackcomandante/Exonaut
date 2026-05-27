@@ -1,6 +1,6 @@
 // Mission detail screen with submit flow
 
-function MissionDetail({ missionId, onBack, onSubmitted }) {
+function MissionDetail({ missionId, onBack, onSubmitted, onMessageLead }) {
   const missions = useMissions();
   const mission = missions.find(m => m.id === missionId) || missions[0];
   const subs = useSubs(); // reactive
@@ -280,7 +280,16 @@ function MissionDetail({ missionId, onBack, onSubmitted }) {
               <div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)', letterSpacing: '0.05em' }}>{leadSub}</div>
             </div>
           </div>
-          <button className="btn btn-ghost btn-sm" disabled={!activeCrown} style={{ marginTop: 14, width: '100%', justifyContent: 'center', opacity: activeCrown ? 1 : 0.55 }}>
+          <button
+            className="btn btn-ghost btn-sm"
+            disabled={!activeCrown}
+            onClick={() => activeCrown && onMessageLead?.({
+              recipientId: activeCrown.userId,
+              recipientName: leadName,
+              title: mission.title + ' - Mission Support',
+            })}
+            style={{ marginTop: 14, width: '100%', justifyContent: 'center', opacity: activeCrown ? 1 : 0.55 }}
+          >
             <i className="fa-solid fa-message" /> MESSAGE LEAD
           </button>
         </div>
@@ -475,8 +484,8 @@ function AddProspectCard({ idx }) {
       style={{
         padding: 0,
         borderStyle: 'dashed',
-        borderColor: hovered ? 'var(--lime)' : 'var(--off-white-15)',
-        background: hovered ? 'rgba(201,229,0,0.04)' : 'transparent',
+        borderColor: hovered ? 'var(--accent)' : 'var(--off-white-15)',
+        background: hovered ? 'var(--accent-wash)' : 'transparent',
         cursor: 'pointer',
         transition: 'all 0.15s',
         minHeight: 74,
@@ -489,8 +498,8 @@ function AddProspectCard({ idx }) {
           color: hovered ? 'var(--ink)' : 'var(--off-white-40)',
           width: 30, height: 30, borderRadius: '50%',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          border: '1px dashed ' + (hovered ? 'var(--lime)' : 'var(--off-white-15)'),
-          background: hovered ? 'rgba(201,229,0,0.1)' : 'transparent',
+          border: '1px dashed ' + (hovered ? 'var(--accent)' : 'var(--off-white-15)'),
+          background: hovered ? 'var(--accent-wash)' : 'transparent',
         }}>
           <i className="fa-solid fa-plus" style={{ fontSize: 11 }} />
         </div>
@@ -722,8 +731,8 @@ function XOCopilot({ mission }) {
   return (
     <div className="card-panel" style={{
       marginTop: 16, padding: 0,
-      borderColor: 'rgba(201,229,0,0.28)',
-      background: 'linear-gradient(180deg, rgba(201,229,0,0.04) 0%, transparent 60%)',
+      borderColor: 'var(--accent-border-soft)',
+      background: 'linear-gradient(180deg, var(--accent-wash) 0%, transparent 60%)',
     }}>
       {/* header */}
       <div style={{ padding: '16px 18px 14px', borderBottom: '1px solid var(--off-white-07)' }}>
@@ -791,7 +800,7 @@ function XOCopilot({ mission }) {
                 textAlign: 'left',
                 transition: 'all 0.12s',
               }}
-              onMouseEnter={(e) => !busy && (e.currentTarget.style.borderColor = 'var(--lime)', e.currentTarget.style.color = 'var(--ink)')}
+              onMouseEnter={(e) => !busy && (e.currentTarget.style.borderColor = 'var(--accent)', e.currentTarget.style.color = 'var(--ink)')}
               onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'var(--off-white-15)', e.currentTarget.style.color = 'var(--off-white)')}
             >
               <i className={'fa-solid ' + a.icon} style={{ fontSize: 11 }} />
@@ -938,8 +947,8 @@ function XOExportBtn({ icon, label, onClick }) {
       style={{
         display: 'flex', alignItems: 'center', gap: 6,
         padding: '5px 9px',
-        background: hover ? 'rgba(201,229,0,0.08)' : 'transparent',
-        border: '1px solid ' + (hover ? 'var(--lime)' : 'var(--off-white-15)'),
+        background: hover ? 'var(--accent-wash)' : 'transparent',
+        border: '1px solid ' + (hover ? 'var(--accent)' : 'var(--off-white-15)'),
         borderRadius: 2,
         color: hover ? 'var(--ink)' : 'var(--off-white-68)',
         fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 700, letterSpacing: '0.06em',
@@ -967,7 +976,7 @@ function renderXOMarkdown(text) {
   html = html.replace(/^### (.+)$/gm, '<div style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.08em;color:var(--ink);font-weight:700;margin:10px 0 4px;text-transform:uppercase;">$1</div>');
   html = html.replace(/^## (.+)$/gm, '<div style="font-family:var(--font-display);font-weight:600;font-size:13px;margin:12px 0 6px;color:var(--off-white);">$1</div>');
   html = html.replace(/^# (.+)$/gm, '<div style="font-family:var(--font-display);font-weight:700;font-size:14px;margin:12px 0 6px;color:var(--off-white);">$1</div>');
-  html = html.replace(/^\s*[-*] (.+)$/gm, '<div style="padding-left:14px;position:relative;margin:3px 0;"><span style="position:absolute;left:2px;color:var(--lime);">•</span>$1</div>');
+  html = html.replace(/^\s*[-*] (.+)$/gm, '<div style="padding-left:14px;position:relative;margin:3px 0;"><span style="position:absolute;left:2px;color:var(--accent);">•</span>$1</div>');
   html = html.replace(/\*\*([^*]+)\*\*/g, '<strong style="color:var(--ink);font-weight:700;">$1</strong>');
   html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
   html = html.replace(/`([^`]+)`/g, '<code style="font-family:var(--font-mono);font-size:11px;background:var(--off-white-07);padding:1px 5px;border-radius:2px;">$1</code>');

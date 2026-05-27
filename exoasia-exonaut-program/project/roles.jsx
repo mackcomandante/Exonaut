@@ -270,8 +270,8 @@ function LeadQueue({ onNavigate }) {
           { id: 'graded', label: 'GRADED', count: myGraded.length },
         ].map(t => (
           <button key={t.id} onClick={() => setTab(t.id)} className="btn btn-ghost" style={{
-            borderRadius: 0, borderBottom: tab === t.id ? '2px solid var(--lime)' : '2px solid transparent',
-            color: tab === t.id ? 'var(--lime)' : 'var(--off-white-68)', marginBottom: -1,
+            borderRadius: 0, borderBottom: tab === t.id ? '2px solid var(--accent)' : '2px solid transparent',
+            color: tab === t.id ? 'var(--accent)' : 'var(--off-white-68)', marginBottom: -1,
           }}>
             {t.label} · {t.count}
           </button>
@@ -418,7 +418,7 @@ function LeadGrade({ onBack, subId }) {
               <div key={g.v} onClick={() => setGrade(g.v)}
                    style={{
                      padding: 14, border: '1px solid ' + (grade === g.v ? g.color : 'var(--off-white-07)'),
-                     background: grade === g.v ? 'rgba(201,229,0,0.04)' : 'transparent',
+                     background: grade === g.v ? `color-mix(in srgb, ${g.color} 9%, transparent)` : 'transparent',
                      cursor: 'pointer', borderRadius: 4,
                    }}>
                 <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13, color: grade === g.v ? g.color : 'var(--off-white)' }}>{g.label}</div>

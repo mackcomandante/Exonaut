@@ -219,7 +219,7 @@
       <div className="share-overlay" onClick={onClose}>
         <div className="share-modal" onClick={e => e.stopPropagation()}>
           <div className="share-head">
-            <span className="t-mono" style={{ fontSize: 10, letterSpacing: '0.14em', color: 'var(--lime)' }}>
+            <span className="t-mono" style={{ fontSize: 10, letterSpacing: '0.14em', color: 'var(--accent)' }}>
               <i className={'fa-solid ' + kicker.icon} style={{ marginRight: 6 }} />
               {kicker.label}
             </span>

@@ -24,7 +24,7 @@ function LoginScreen({ onSignIn }) {
         <div className="card-hud" style={{ background: 'var(--bg-darkest)', border: '1px solid var(--off-white-07)', borderRadius: 6, padding: 36 }}>
           <div className="t-label" style={{ marginBottom: 10 }}>SECURE ACCESS</div>
           <h1 className="t-title" style={{ fontSize: 36, margin: '0 0 10px 0' }}>Exonaut Portal</h1>
-          <div style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 16, color: 'var(--lavender)', marginBottom: 32 }}>
+          <div style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 16, color: 'var(--accent)', marginBottom: 32 }}>
             "We don't wait for the map. We build it."
           </div>
 
@@ -104,7 +104,7 @@ function Onboarding({ onComplete }) {
 
         <div style={{ display: 'flex', gap: 4, marginBottom: 48 }}>
           {[1,2,3,4].map(n => (
-            <div key={n} style={{ flex: 1, height: 3, background: n <= step ? 'var(--lime)' : 'var(--off-white-07)', transition: 'background 300ms' }} />
+            <div key={n} style={{ flex: 1, height: 3, background: n <= step ? 'var(--accent)' : 'var(--off-white-07)', transition: 'background 300ms' }} />
           ))}
         </div>
 
@@ -116,7 +116,7 @@ function Onboarding({ onComplete }) {
               Before your dashboard opens, read the Exonaut Pledge and sign it. This is the one part of the program that isn't gamified.
             </div>
 
-            <div className="card-panel" style={{ background: 'var(--bg-darkest)', padding: 36, borderLeft: '2px solid var(--lime)' }}>
+            <div className="card-panel" style={{ background: 'var(--bg-darkest)', padding: 36, borderLeft: '2px solid var(--accent)' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginBottom: 28 }}>
                 <div><div className="t-label-muted" style={{ marginBottom: 4 }}>COHORT</div><div className="t-heading" style={{ fontSize: 16 }}>Batch 2026–2027</div></div>
                 <div><div className="t-label-muted" style={{ marginBottom: 4 }}>TRACK</div><div className="t-heading" style={{ fontSize: 16 }}>AI Strategy & Advisory</div></div>
@@ -135,7 +135,7 @@ function Onboarding({ onComplete }) {
 
             <label style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 32, cursor: 'pointer' }}>
               <input type="checkbox" checked={pledgeAccepted} onChange={(e) => setPledgeAccepted(e.target.checked)}
-                     style={{ width: 18, height: 18, accentColor: 'var(--lime)' }} />
+                     style={{ width: 18, height: 18, accentColor: 'var(--accent)' }} />
               <span className="t-heading" style={{ fontSize: 13 }}>I accept the Exonaut Pledge</span>
               <span className="t-mono" style={{ fontSize: 10, color: 'var(--ink)', marginLeft: 8, letterSpacing: '0.1em' }}>+50 PTS</span>
             </label>
@@ -206,12 +206,12 @@ function Onboarding({ onComplete }) {
                 <div key={i} style={{
                   padding: '24px 28px',
                   borderBottom: i < 4 ? '1px solid var(--off-white-07)' : 'none',
-                  background: tourSlide === i ? 'rgba(201,229,0,0.04)' : 'transparent',
+                  background: tourSlide === i ? 'var(--accent-wash)' : 'transparent',
                   display: 'grid', gridTemplateColumns: '40px 1fr auto', gap: 20, alignItems: 'center',
                   cursor: 'pointer',
                 }} onClick={() => setTourSlide(i)}>
-                  <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--bg-dark)', border: '1px solid ' + (tourSlide === i ? 'var(--lime)' : 'var(--off-white-07)'), display: 'grid', placeItems: 'center' }}>
-                    <i className={'fa-solid ' + s.icon} style={{ color: tourSlide === i ? 'var(--lime)' : 'var(--off-white-40)' }} />
+                  <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--bg-dark)', border: '1px solid ' + (tourSlide === i ? 'var(--accent)' : 'var(--off-white-07)'), display: 'grid', placeItems: 'center' }}>
+                    <i className={'fa-solid ' + s.icon} style={{ color: tourSlide === i ? 'var(--accent)' : 'var(--off-white-40)' }} />
                   </div>
                   <div>
                     <div className="t-heading" style={{ fontSize: 14 }}>{s.t}</div>
@@ -240,14 +240,14 @@ function Onboarding({ onComplete }) {
               <div style={{ background: 'var(--bg-darkest)', padding: 24, borderRadius: 4, fontFamily: 'var(--font-serif)', fontSize: 16, lineHeight: 1.65, color: 'var(--off-white)' }}>
                 I'm joining <strong style={{ color: 'var(--ink)' }}>Exoasia Innovation Hub</strong> as an Exonaut in the <strong>AI Strategy & Advisory</strong> track, Batch 2026–2027.<br/><br/>
                 For the next 12 weeks, I'll be shipping real client work, competing with 29 of the sharpest people I've met, and learning from founders who'd rather build than talk about it.<br/><br/>
-                <em style={{ color: 'var(--lavender)' }}>We don't wait for the map. We build it.</em><br/><br/>
+                <em style={{ color: 'var(--accent)' }}>We don't wait for the map. We build it.</em><br/><br/>
                 <span style={{ color: 'var(--off-white-40)', fontFamily: 'var(--font-mono)', fontSize: 13 }}>#ExoasiaExonaut #Batch2026 #AIStrategy</span>
               </div>
             </div>
 
             <label style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 28, cursor: 'pointer' }}>
               <input type="checkbox" checked={liPosted} onChange={(e) => setLiPosted(e.target.checked)}
-                     style={{ width: 18, height: 18, accentColor: 'var(--lime)' }} />
+                     style={{ width: 18, height: 18, accentColor: 'var(--accent)' }} />
               <span className="t-heading" style={{ fontSize: 13 }}>I've posted my LinkedIn announcement</span>
               <span className="t-mono" style={{ fontSize: 10, color: 'var(--ink)', marginLeft: 8, letterSpacing: '0.1em' }}>+20 PTS</span>
             </label>
@@ -282,17 +282,29 @@ function AuthDotGrid({
   const canvasRef = React.useRef(null);
   const dotsRef = React.useRef([]);
   const pointerRef = React.useRef({ x: -1000, y: -1000, lastX: 0, lastY: 0, lastTime: 0 });
-  const [isDark, setIsDark] = React.useState(() => document.body.dataset.theme === 'dark');
+  const [appearance, setAppearance] = React.useState(() => ({
+    isDark: document.body.dataset.theme === 'dark',
+    accent: document.body.dataset.accent || 'lime',
+  }));
 
   React.useEffect(() => {
-    const observer = new MutationObserver(() => setIsDark(document.body.dataset.theme === 'dark'));
-    observer.observe(document.body, { attributes: true, attributeFilter: ['data-theme'] });
+    const observer = new MutationObserver(() => setAppearance({
+      isDark: document.body.dataset.theme === 'dark',
+      accent: document.body.dataset.accent || 'lime',
+    }));
+    observer.observe(document.body, { attributes: true, attributeFilter: ['data-theme', 'data-accent'] });
     return () => observer.disconnect();
   }, []);
 
-  const palette = isDark
-    ? { base: [42, 52, 50], active: [184, 230, 48] }
-    : { base: [217, 226, 197], active: [143, 191, 21] };
+  const activePalette = {
+    lime: appearance.isDark ? [184, 230, 48] : [143, 191, 21],
+    platinum: appearance.isDark ? [127, 227, 255] : [47, 200, 230],
+    lavender: appearance.isDark ? [198, 184, 255] : [139, 92, 246],
+  };
+  const palette = {
+    base: appearance.isDark ? [42, 52, 50] : [217, 226, 197],
+    active: activePalette[appearance.accent] || activePalette.lime,
+  };
 
   const buildGrid = React.useCallback(() => {
     const wrapper = wrapperRef.current;
@@ -449,7 +461,63 @@ function AuthDotGrid({
   );
 }
 
-function RoleAuthScreen({ onAuthComplete }) {
+function AuthTweaks({ tweaks, setTweak }) {
+  const [open, setOpen] = React.useState(false);
+  const choices = [
+    { label: 'Density', key: 'density', values: [
+      { value: 'compact', label: 'Compact' },
+      { value: 'default', label: 'Default' },
+      { value: 'comfy', label: 'Comfy' },
+    ] },
+    { label: 'Accent hue', key: 'accent', values: [
+      { value: 'lime', label: 'Lime' },
+      { value: 'platinum', label: 'Platinum' },
+      { value: 'lavender', label: 'Lavender' },
+    ] },
+  ];
+
+  return (
+    <>
+      <button
+        type="button"
+        className="auth-tweaks-toggle"
+        onClick={() => setOpen(true)}
+        aria-expanded={open}
+        aria-controls="auth-tweaks-panel"
+        title="Tweaks"
+      >
+        <i className="fa-solid fa-sliders" /> TWEAKS
+      </button>
+      {open && (
+        <div className="tweaks-panel auth-tweaks-panel open" id="auth-tweaks-panel">
+          <button type="button" className="modal-close" onClick={() => setOpen(false)} aria-label="Close tweaks">
+            <i className="fa-solid fa-xmark" />
+          </button>
+          <h4><i className="fa-solid fa-sliders" /> TWEAKS</h4>
+          {choices.map(group => (
+            <div className="tweak-group" key={group.key}>
+              <label>{group.label}</label>
+              <div className="tweak-options">
+                {group.values.map(option => (
+                  <button
+                    type="button"
+                    key={option.value}
+                    className={'tweak-option' + (tweaks[group.key] === option.value ? ' active' : '')}
+                    onClick={() => setTweak(group.key, option.value)}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+function RoleAuthScreen({ onAuthComplete, tweaks, setTweak }) {
   const selectedRole = 'exonaut';
   const [mode, setMode] = React.useState('signin');
   const [email, setEmail] = React.useState('maya.chen@exoasia.hub');
@@ -521,16 +589,17 @@ function RoleAuthScreen({ onAuthComplete }) {
   return (
     <div className="hud-bg auth-screen" style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 32, position: 'relative' }}>
       <AuthDotGrid />
-      <div style={{ position: 'relative', zIndex: 2, width: 'min(520px, 100%)' }} className="enter">
+      <AuthTweaks tweaks={tweaks || { density: 'default', accent: 'lime' }} setTweak={setTweak || (() => {})} />
+      <div style={{ position: 'relative', zIndex: 2, width: 'min(520px, 100%)' }} className="enter auth-login-content">
         <div style={{ textAlign: 'center', marginBottom: 30 }}>
           <div style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: 48, letterSpacing: '0.1em', color: 'var(--ink)', lineHeight: 1 }}>EXOASIA</div>
           <div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)', marginTop: 6, letterSpacing: '0.3em' }}>INNOVATION HUB</div>
         </div>
 
-        <div className="card-hud" style={{ background: 'var(--bg-darkest)', border: '1px solid var(--off-white-07)', borderRadius: 6, padding: 32 }}>
+        <div className="card-hud auth-login-card" style={{ background: 'var(--bg-darkest)', border: '1px solid var(--off-white-07)', borderRadius: 6 }}>
           <div className="t-label" style={{ marginBottom: 10 }}>SECURE ACCESS</div>
           <h1 className="t-title" style={{ fontSize: 34, margin: '0 0 10px 0' }}>Exonaut Portal</h1>
-          <div style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 16, color: 'var(--lavender)', marginBottom: 26 }}>
+          <div style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 16, color: 'var(--accent)', marginBottom: 26 }}>
             "We don't wait for the map. We build it."
           </div>
 

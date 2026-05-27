@@ -182,9 +182,9 @@ function AnnounceCompose({ open, onClose, initial, authorRole, authorName, restr
                 return (
                   <button key={k} onClick={() => setAudKind(k)} style={{
                     padding: '6px 12px',
-                    background: audKind === k ? 'var(--lime)' : 'var(--off-white-07)',
-                    border: '1px solid ' + (audKind === k ? 'var(--lime)' : 'var(--off-white-15)'),
-                    borderRadius: 2, color: audKind === k ? 'var(--on-lime)' : 'var(--off-white-68)',
+                    background: audKind === k ? 'var(--accent)' : 'var(--off-white-07)',
+                    border: '1px solid ' + (audKind === k ? 'var(--accent)' : 'var(--off-white-15)'),
+                    borderRadius: 2, color: audKind === k ? 'var(--on-accent)' : 'var(--off-white-68)',
                     cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '0.08em', fontWeight: 700,
                   }}>{label.toUpperCase()}</button>
                 );
@@ -223,7 +223,7 @@ function AnnounceCompose({ open, onClose, initial, authorRole, authorName, restr
           {/* Pin */}
           <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '10px 12px', background: 'var(--off-white-07)', borderRadius: 2 }}>
             <input type="checkbox" checked={pinned} onChange={(e) => setPinned(e.target.checked)}
-                   style={{ width: 14, height: 14, accentColor: 'var(--lime)' }} />
+                   style={{ width: 14, height: 14, accentColor: 'var(--accent)' }} />
             <span className="t-mono" style={{ fontSize: 10, letterSpacing: '0.08em', color: 'var(--off-white)' }}>
               PIN TO TOP OF FEED
             </span>
@@ -305,10 +305,10 @@ function AudienceUserPicker({ label, users, selected, onToggle }) {
           return (
             <label key={u.id} style={{
               display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', cursor: 'pointer',
-              background: on ? 'rgba(201,229,74,0.08)' : 'transparent', borderRadius: 2,
+              background: on ? 'var(--accent-wash)' : 'transparent', borderRadius: 2,
             }}>
               <input type="checkbox" checked={on} onChange={() => onToggle(u.id)}
-                     style={{ width: 12, height: 12, accentColor: 'var(--lime)' }} />
+                     style={{ width: 12, height: 12, accentColor: 'var(--accent)' }} />
               <span className="t-body" style={{ fontSize: 12, color: 'var(--off-white)', flex: 1 }}>{u.name}</span>
               <span className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.06em' }}>
                 {(typeof TRACKS !== 'undefined' ? TRACKS.find(t => t.code === u.track)?.short : u.track) || ''}
@@ -339,8 +339,8 @@ function AnnouncementCard({ a, onReact, onEdit, onDelete, onPin, isAuthor }) {
       {a.pinned && (
         <div style={{
           position: 'absolute', top: 10, right: 12,
-          padding: '2px 7px', background: 'var(--lime)', borderRadius: 2,
-          color: 'var(--on-lime)', fontFamily: 'var(--font-mono)', fontSize: 8, letterSpacing: '0.1em', fontWeight: 700,
+          padding: '2px 7px', background: 'var(--accent)', borderRadius: 2,
+          color: 'var(--on-accent)', fontFamily: 'var(--font-mono)', fontSize: 8, letterSpacing: '0.1em', fontWeight: 700,
         }}>
           <i className="fa-solid fa-thumbtack" style={{ marginRight: 4 }} />PINNED
         </div>
@@ -356,8 +356,8 @@ function AnnouncementCard({ a, onReact, onEdit, onDelete, onPin, isAuthor }) {
           </span>
           {isNew && (
             <span style={{
-              padding: '1px 6px', background: 'var(--lime)', borderRadius: 2,
-              color: 'var(--on-lime)', fontFamily: 'var(--font-mono)', fontSize: 8, letterSpacing: '0.1em', fontWeight: 700,
+              padding: '1px 6px', background: 'var(--accent)', borderRadius: 2,
+              color: 'var(--on-accent)', fontFamily: 'var(--font-mono)', fontSize: 8, letterSpacing: '0.1em', fontWeight: 700,
             }}>NEW</span>
           )}
         </div>
@@ -383,8 +383,8 @@ function AnnouncementCard({ a, onReact, onEdit, onDelete, onPin, isAuthor }) {
             return (
               <button key={emoji} onClick={() => onReact?.(a.id, emoji)} style={{
                 padding: '5px 10px',
-                background: count > 0 ? 'rgba(201,229,74,0.08)' : 'var(--off-white-07)',
-                border: '1px solid ' + (count > 0 ? 'var(--lime)' : 'var(--off-white-15)'),
+                background: count > 0 ? 'var(--accent-wash)' : 'var(--off-white-07)',
+                border: '1px solid ' + (count > 0 ? 'var(--accent)' : 'var(--off-white-15)'),
                 borderRadius: 2, color: 'var(--off-white)',
                 cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700,
                 display: 'flex', alignItems: 'center', gap: 5,

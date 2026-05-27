@@ -361,6 +361,30 @@ function PlatformAdminSidebar({ current, onNavigate, onSignOut, mobileOpen = fal
 }
 
 // -------- Cohort Management --------
+const ADMIN_DATE_MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+
+function cohortDateInputValue(value) {
+  const text = String(value || '').trim();
+  let match = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (match) return text;
+  match = text.match(/^([a-z]+)\s+(\d{1,2}),?\s+(\d{4})$/i);
+  if (!match) return '';
+  const month = ADMIN_DATE_MONTHS.indexOf(match[1].slice(0, 3).toUpperCase());
+  if (month < 0) return '';
+  return `${match[3]}-${String(month + 1).padStart(2, '0')}-${String(Number(match[2])).padStart(2, '0')}`;
+}
+
+function cohortDateDisplay(value) {
+  const iso = cohortDateInputValue(value);
+  if (!iso) return value || '—';
+  const [year, month, day] = iso.split('-');
+  return `${ADMIN_DATE_MONTHS[Number(month) - 1]} ${day} ${year}`;
+}
+
+function hasValidCohortDateRange(start, end) {
+  return Boolean(start && end && start <= end);
+}
+
 function AdminCohorts() {
   const { all, cohortId, setSelected, createCohort, updateCohort, deleteCohort, assignUserToCohort, unassignUserFromCohort, isUserUnassigned, getAssignments } = useCohort();
   const { profiles, updateProfile } = useUserProfiles();
@@ -463,11 +487,11 @@ function AdminCohorts() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
                 <div>
                   <div className="t-mono" style={{ fontSize: 8, color: 'var(--off-white-40)', letterSpacing: '0.08em' }}>START</div>
-                  <div className="t-body" style={{ fontSize: 11, color: 'var(--off-white)', marginTop: 2 }}>{c.start || '—'}</div>
+                  <div className="t-body" style={{ fontSize: 11, color: 'var(--off-white)', marginTop: 2 }}>{cohortDateDisplay(c.start)}</div>
                 </div>
                 <div>
                   <div className="t-mono" style={{ fontSize: 8, color: 'var(--off-white-40)', letterSpacing: '0.08em' }}>END</div>
-                  <div className="t-body" style={{ fontSize: 11, color: 'var(--off-white)', marginTop: 2 }}>{c.end || '—'}</div>
+                  <div className="t-body" style={{ fontSize: 11, color: 'var(--off-white)', marginTop: 2 }}>{cohortDateDisplay(c.end)}</div>
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: 'var(--off-white-07)', borderRadius: 2 }}>
@@ -971,7 +995,8 @@ function AdminCreateCohortModal({ onClose, onCreate }) {
   const [end, setEnd] = React.useState('');
 
   const cleanId = id.trim();
-  const canSave = name.trim().length >= 3 && (!cleanId || /^[a-zA-Z0-9_-]+$/.test(cleanId));
+  const datesValid = hasValidCohortDateRange(start, end);
+  const canSave = name.trim().length >= 3 && (!cleanId || /^[a-zA-Z0-9_-]+$/.test(cleanId)) && datesValid;
 
   function save() {
     if (!canSave) return;
@@ -1006,9 +1031,14 @@ function AdminCreateCohortModal({ onClose, onCreate }) {
           <AdminLabeledInput label="NAME" value={name} onChange={setName} placeholder="e.g. Batch 2027–2028" autoFocus />
           <AdminLabeledInput label="CODE (OPTIONAL)" value={code} onChange={setCode} placeholder="e.g. EXO-B-2728" />
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            <AdminLabeledInput label="START" value={start} onChange={setStart} placeholder="OCT 05 2027" />
-            <AdminLabeledInput label="END" value={end} onChange={setEnd} placeholder="JAN 28 2028" />
+            <AdminLabeledInput label="START" type="date" value={start} onChange={setStart} />
+            <AdminLabeledInput label="END" type="date" min={start} value={end} onChange={setEnd} />
           </div>
+          {start && end && !datesValid && (
+            <div className="t-mono" style={{ fontSize: 9, color: 'var(--red)', letterSpacing: '0.06em' }}>
+              END DATE MUST BE ON OR AFTER START DATE
+            </div>
+          )}
         </div>
 
         <div style={{ padding: '14px 24px 20px', display: 'flex', gap: 8, justifyContent: 'flex-end', borderTop: '1px solid var(--off-white-07)' }}>
@@ -1035,10 +1065,11 @@ function AdminEditCohortDatesModal({ cohort, onClose, onSave }) {
   const [id, setId] = React.useState(cohort?.id || '');
   const [name, setName] = React.useState(cohort?.name || '');
   const [code, setCode] = React.useState(cohort?.code || '');
-  const [start, setStart] = React.useState(cohort?.start || '');
-  const [end, setEnd] = React.useState(cohort?.end || '');
+  const [start, setStart] = React.useState(cohortDateInputValue(cohort?.start));
+  const [end, setEnd] = React.useState(cohortDateInputValue(cohort?.end));
   const cleanId = id.trim();
-  const canSave = name.trim().length >= 3 && /^[a-zA-Z0-9_-]+$/.test(cleanId);
+  const datesValid = hasValidCohortDateRange(start, end);
+  const canSave = name.trim().length >= 3 && /^[a-zA-Z0-9_-]+$/.test(cleanId) && datesValid;
 
   function save() {
     if (!canSave) return;
@@ -1073,9 +1104,14 @@ function AdminEditCohortDatesModal({ cohort, onClose, onSave }) {
           <AdminLabeledInput label="NAME" value={name} onChange={setName} placeholder="e.g. Batch 2027-2028" autoFocus />
           <AdminLabeledInput label="CODE" value={code} onChange={setCode} placeholder="e.g. EXO-B-2728" />
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            <AdminLabeledInput label="START" value={start} onChange={setStart} placeholder="OCT 05 2027" />
-            <AdminLabeledInput label="END" value={end} onChange={setEnd} placeholder="JAN 28 2028" />
+            <AdminLabeledInput label="START" type="date" value={start} onChange={setStart} />
+            <AdminLabeledInput label="END" type="date" min={start} value={end} onChange={setEnd} />
           </div>
+          {start && end && !datesValid && (
+            <div className="t-mono" style={{ fontSize: 9, color: 'var(--red)', letterSpacing: '0.06em' }}>
+              END DATE MUST BE ON OR AFTER START DATE
+            </div>
+          )}
         </div>
 
         <div style={{ padding: '14px 24px 20px', display: 'flex', gap: 8, justifyContent: 'flex-end', borderTop: '1px solid var(--off-white-07)' }}>
@@ -1097,11 +1133,13 @@ function AdminEditCohortDatesModal({ cohort, onClose, onSave }) {
   );
 }
 
-function AdminLabeledInput({ label, value, onChange, placeholder, autoFocus }) {
+function AdminLabeledInput({ label, value, onChange, placeholder, autoFocus, type = 'text', min }) {
   return (
     <div>
       <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.1em', marginBottom: 5 }}>{label}</div>
       <input
+        type={type}
+        min={min}
         autoFocus={autoFocus}
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -1369,8 +1407,8 @@ function AdminTrackControl() {
                         gap: 8,
                         alignItems: 'center',
                         padding: 10,
-                        border: '1px solid ' + (memberIsLead ? 'var(--lime)' : 'var(--off-white-07)'),
-                        background: memberIsLead ? 'rgba(201,242,74,0.06)' : 'var(--off-white-04)',
+                        border: '1px solid ' + (memberIsLead ? 'var(--accent)' : 'var(--off-white-07)'),
+                        background: memberIsLead ? 'var(--accent-wash)' : 'var(--off-white-04)',
                         borderRadius: 4,
                       }}>
                         <AvatarWithRing name={p.fullName || p.email || 'Exonaut'} avatarUrl={p.avatarUrl} size={32} tier={memberIsLead ? 'corps' : 'entry'} />
@@ -1378,7 +1416,7 @@ function AdminTrackControl() {
                           <div className="t-heading" style={{ fontSize: 12, margin: 0, textTransform: 'none', letterSpacing: 0, color: 'var(--off-white)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {p.fullName || p.email || 'Exonaut'}
                           </div>
-                          <div className="t-mono" style={{ fontSize: 8, color: memberIsLead ? 'var(--lime)' : 'var(--off-white-40)', letterSpacing: '0.08em', marginTop: 2 }}>
+                          <div className="t-mono" style={{ fontSize: 8, color: memberIsLead ? 'var(--accent)' : 'var(--off-white-40)', letterSpacing: '0.08em', marginTop: 2 }}>
                             {memberIsLead ? 'CURRENT LEAD' : (p.email || 'EXONAUT')}
                           </div>
                         </div>
@@ -1984,8 +2022,8 @@ function RosterAddRow({ user, onAdd }) {
       <button onClick={onAdd}
         title="Add to roster"
         style={{
-          background: 'var(--lime)', border: 'none', borderRadius: 2,
-          color: 'var(--on-lime)', cursor: 'pointer', padding: '4px 10px', fontSize: 10, fontWeight: 700,
+          background: 'var(--accent)', border: 'none', borderRadius: 2,
+          color: 'var(--on-accent)', cursor: 'pointer', padding: '4px 10px', fontSize: 10, fontWeight: 700,
           fontFamily: 'var(--font-mono)', letterSpacing: '0.06em',
         }}><i className="fa-solid fa-plus" style={{ marginRight: 4 }} />ADD</button>
     </div>

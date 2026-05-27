@@ -322,35 +322,83 @@
   window.__cohortStore = store;
 
   function activeCohort(profile) {
-    const id = profile?.cohortId || (typeof ME !== 'undefined' ? ME.cohort : '') || store.getSelectedId() || 'c2627';
+    const assignedId = profile?.id ? (state.assignments || {})[profile.id] : '';
+    const id = assignedId || profile?.cohortId || (typeof ME !== 'undefined' ? ME.cohort : '') || store.getSelectedId() || 'c2627';
     return store.getById(id) || store.getSelected() || (typeof COHORT !== 'undefined' ? COHORT : null);
   }
 
-  function parseDate(str) {
-    const d = new Date(str || '');
-    return isNaN(d.getTime()) ? null : d;
+  const DAY_MS = 86400000;
+  const MONTHS = {
+    jan: 0, january: 0, feb: 1, february: 1, mar: 2, march: 2, apr: 3, april: 3,
+    may: 4, jun: 5, june: 5, jul: 6, july: 6, aug: 7, august: 7,
+    sep: 8, sept: 8, september: 8, oct: 9, october: 9, nov: 10, november: 10,
+    dec: 11, december: 11,
+  };
+
+  function localDate(year, month, day) {
+    const parsed = new Date(year, month, day);
+    if (parsed.getFullYear() !== year || parsed.getMonth() !== month || parsed.getDate() !== day) return null;
+    parsed.setHours(0, 0, 0, 0);
+    return parsed;
+  }
+
+  function parseDate(value) {
+    if (value instanceof Date && !isNaN(value.getTime())) {
+      return localDate(value.getFullYear(), value.getMonth(), value.getDate());
+    }
+    const text = String(value || '').trim();
+    let match = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    if (match) return localDate(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+    match = text.match(/^([a-z]+)\s+(\d{1,2}),?\s+(\d{4})$/i);
+    if (!match) return null;
+    const month = MONTHS[match[1].toLowerCase()];
+    return month === undefined ? null : localDate(Number(match[3]), month, Number(match[2]));
+  }
+
+  function calendarDayNumber(date) {
+    return Math.floor(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / DAY_MS);
+  }
+
+  function timelineFor(cohort, today = new Date()) {
+    const start = parseDate(cohort?.start || cohort?.startDate);
+    const end = parseDate(cohort?.end || cohort?.demoDay);
+    const now = parseDate(today);
+    if (!start || !end || !now || calendarDayNumber(end) < calendarDayNumber(start)) {
+      return { valid: false, currentDay: 0, totalDays: 0, currentWeek: 1, totalWeeks: 0, daysToDemo: null, countdownLabel: 'SCHEDULE PENDING', status: 'pending' };
+    }
+    const startDay = calendarDayNumber(start);
+    const endDay = calendarDayNumber(end);
+    const todayDay = calendarDayNumber(now);
+    const totalDays = endDay - startDay + 1;
+    const totalWeeks = Math.max(1, Math.ceil(totalDays / 7));
+    const status = todayDay < startDay ? 'upcoming' : todayDay > endDay ? 'completed' : 'active';
+    const currentDay = status === 'upcoming' ? 0 : status === 'completed' ? totalDays : todayDay - startDay + 1;
+    const currentWeek = Math.min(totalWeeks, Math.max(1, Math.ceil(Math.max(1, currentDay) / 7)));
+    const daysToDemo = Math.max(0, endDay - todayDay);
+    const countdownLabel = status === 'completed'
+      ? 'PROGRAM COMPLETE'
+      : daysToDemo === 0 ? 'DEMO DAY' : `${daysToDemo} DAYS TO DEMO DAY`;
+    return { valid: true, start, end, currentDay, totalDays, currentWeek, totalWeeks, daysToDemo, countdownLabel, status };
   }
 
   function weekTotalFor(cohort) {
-    const start = parseDate(cohort?.start || cohort?.startDate);
-    const end = parseDate(cohort?.end || cohort?.demoDay);
-    if (!start || !end || end <= start) return (typeof COHORT !== 'undefined' ? COHORT.weekTotal : 12) || 12;
-    return Math.max(1, Math.ceil((end.getTime() - start.getTime() + 1) / (7 * 86400000)));
+    const timeline = timelineFor(cohort);
+    return timeline.valid ? timeline.totalWeeks : ((typeof COHORT !== 'undefined' ? COHORT.weekTotal : 12) || 12);
   }
 
   function weekWindowLabel(cohort, week) {
     const normalized = cohort ? { ...cohort, start: cohort.start || cohort.startDate, end: cohort.end || cohort.demoDay } : cohort;
     const start = parseDate(normalized?.start);
-    if (start && start.getTime() > Date.now()) {
-      const now = new Date();
-      const manila = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
-      const day = manila.getDay() || 7;
-      const monday = new Date(manila);
-      monday.setDate(manila.getDate() - day + 1);
-      const sunday = new Date(monday);
-      sunday.setDate(monday.getDate() + 6);
-      const fmt = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'Asia/Manila' }).toUpperCase();
-      return `${fmt(monday)} - ${fmt(sunday)}, ${sunday.getFullYear()}`;
+    const end = parseDate(normalized?.end);
+    if (start && end) {
+      const startDay = calendarDayNumber(start) + (Math.max(1, Number(week) || 1) - 1) * 7;
+      const endDay = Math.min(calendarDayNumber(end), startDay + 6);
+      const rangeStart = new Date(start);
+      rangeStart.setDate(rangeStart.getDate() + (Math.max(1, Number(week) || 1) - 1) * 7);
+      const rangeEnd = new Date(rangeStart);
+      rangeEnd.setDate(rangeStart.getDate() + (endDay - startDay));
+      const fmt = (date) => date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toUpperCase();
+      return `${fmt(rangeStart)} - ${fmt(rangeEnd)}, ${rangeEnd.getFullYear()}`;
     }
     if (window.EOW?.weekWindow) return window.EOW.weekWindow(normalized, week).label;
     return [normalized?.start, normalized?.end].filter(Boolean).join(' - ');
@@ -362,6 +410,7 @@
 
   Object.assign(window, {
     getActiveCohort: activeCohort,
+    getCohortTimeline: timelineFor,
     getCohortWeekTotal: weekTotalFor,
     getCohortWeekWindowLabel: weekWindowLabel,
     getCohortDemoDay: demoDayFor,

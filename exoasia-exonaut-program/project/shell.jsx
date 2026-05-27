@@ -172,7 +172,7 @@ function Sidebar({ current, onNavigate, onSignOut, mobileOpen = false, onMobileC
         )}
         {(hasAssignedProject || isFirstOfficer || hasProjectTasks) && (
           <>
-            <div className="sidebar-nav-section" style={{ color: 'var(--lime)' }}>Projects</div>
+            <div className="sidebar-nav-section" style={{ color: 'var(--accent)' }}>Projects</div>
             <button type="button" className={'sidebar-link' + (current === 'projects' ? ' active' : '')} onClick={() => onNavigate('projects')}>
               <i className="fa-solid fa-diagram-project" />
               <span>Projects</span>
@@ -196,7 +196,7 @@ function Sidebar({ current, onNavigate, onSignOut, mobileOpen = false, onMobileC
       <div className="sidebar-footer">
         <button title="Notifications" onClick={() => onNavigate('notifications')}>
           <i className="fa-solid fa-bell" />
-          {unreadCount > 0 && <span style={{ position: 'absolute', top: 6, right: 6, width: 6, height: 6, borderRadius: '50%', background: 'var(--lime)' }} />}
+          {unreadCount > 0 && <span style={{ position: 'absolute', top: 6, right: 6, width: 6, height: 6, borderRadius: '50%', background: 'var(--accent)' }} />}
         </button>
         <ThemeToggle compact />
         <button title="Settings" onClick={() => onNavigate('settings')}><i className="fa-solid fa-gear" /></button>
@@ -208,9 +208,12 @@ function Sidebar({ current, onNavigate, onSignOut, mobileOpen = false, onMobileC
 
 function Topbar({ crumbs, onNavigate, onMenuOpen, menuOpen = false }) {
   const { profile } = useCurrentUserProfile();
+  useCohort();
   const { unreadCount } = useNotifications(profile);
   const cohort = window.getActiveCohort?.(profile) || COHORT;
-  const weekTotal = window.getCohortWeekTotal?.(cohort) || COHORT.weekTotal;
+  const timeline = window.getCohortTimeline?.(cohort);
+  const week = timeline?.valid ? timeline.currentWeek : COHORT.week;
+  const weekTotal = timeline?.valid ? timeline.totalWeeks : (window.getCohortWeekTotal?.(cohort) || COHORT.weekTotal);
   const [time, setTime] = React.useState('');
   React.useEffect(() => {
     const tick = () => {
@@ -240,14 +243,14 @@ function Topbar({ crumbs, onNavigate, onMenuOpen, menuOpen = false }) {
       <div className="topbar-right">
         <span>{cohort?.code || COHORT.code}</span>
         <span style={{ color: 'var(--off-white-20)' }}>·</span>
-        <span>WK {COHORT.week}/{weekTotal}</span>
+        <span>WK {week}/{weekTotal}</span>
         <span style={{ color: 'var(--off-white-20)' }}>·</span>
         <span>{time} SGT</span>
         <button onClick={() => onNavigate && onNavigate('notifications')}
                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--off-white-68)', position: 'relative', padding: '0 6px' }}
                 title="Notifications">
           <i className="fa-solid fa-bell" />
-          {unreadCount > 0 && <span style={{ position: 'absolute', top: -2, right: 0, width: 6, height: 6, borderRadius: '50%', background: 'var(--lime)' }} />}
+          {unreadCount > 0 && <span style={{ position: 'absolute', top: -2, right: 0, width: 6, height: 6, borderRadius: '50%', background: 'var(--accent)' }} />}
         </button>
         <ThemeToggle compact />
         <span className="topbar-live"><span className="pulse" /> LIVE</span>

@@ -1143,7 +1143,7 @@ function ProjectsPage() {
       <div className="enter">
         <div className="section-head">
           <div>
-            <div className="t-label" style={{ marginBottom: 8, color: 'var(--lime)' }}>PROJECT DETAIL</div>
+            <div className="t-label" style={{ marginBottom: 8, color: 'var(--accent)' }}>PROJECT DETAIL</div>
             <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>{selected.title}</h1>
             <div className="t-body" style={{ marginTop: 6 }}>{selected.description || 'No project description provided.'}</div>
           </div>
@@ -1182,7 +1182,7 @@ function ProjectsPage() {
     <div className="enter">
       <div className="section-head">
         <div>
-          <div className="t-label" style={{ marginBottom: 8, color: 'var(--lime)' }}>PROJECTS</div>
+          <div className="t-label" style={{ marginBottom: 8, color: 'var(--accent)' }}>PROJECTS</div>
           <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>Projects</h1>
           <div className="t-body" style={{ marginTop: 6 }}>Projects assigned to your role or track.</div>
         </div>
@@ -1193,7 +1193,7 @@ function ProjectsPage() {
       <div className="project-card-grid">
         {visible.map(project => (
           <button key={project.id} className="project-card-button" onClick={() => setSelectedId(project.id)}>
-            <div className="t-label" style={{ color: 'var(--lime)', marginBottom: 8 }}>{project.status} Â· {project.trackCodes.map(trackName).join(' Â· ')}</div>
+            <div className="t-label" style={{ color: 'var(--accent)', marginBottom: 8 }}>{project.status} Â· {project.trackCodes.map(trackName).join(' Â· ')}</div>
             <h2>{project.title}</h2>
             <p>{project.description || 'Open project details.'}</p>
             <div className="project-card-meta">
@@ -1272,7 +1272,7 @@ function FirstOfficerDelegationsPage() {
     <div className="enter">
       <div className="section-head">
         <div>
-          <div className="t-label" style={{ marginBottom: 8, color: 'var(--lime)' }}>FIRST OFFICER Â· DELEGATIONS</div>
+          <div className="t-label" style={{ marginBottom: 8, color: 'var(--accent)' }}>FIRST OFFICER Â· DELEGATIONS</div>
           <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>Delegations</h1>
           <div className="t-body" style={{ marginTop: 6 }}>Create detailed briefs for Second Officers before work is broken down into project tasks.</div>
         </div>

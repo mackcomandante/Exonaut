@@ -46,10 +46,10 @@ function EowWeekStepper({ weekNumber, totalWeeks, onChange, window: win }) {
       {btn(canPrev, () => onChange(weekNumber - 1), 'fa-chevron-left')}
       <div className="commander-eow-current-week" style={{
         padding: '8px 16px', background: 'var(--off-white-07)',
-        border: '1px solid ' + (isCurrent ? 'var(--lime)' : 'var(--off-white-15)'),
+        border: '1px solid ' + (isCurrent ? 'var(--accent)' : 'var(--off-white-15)'),
         borderRadius: 2, minWidth: 220, textAlign: 'center',
       }}>
-        <div className="t-mono" style={{ fontSize: 9, letterSpacing: '0.1em', color: isCurrent ? 'var(--lime)' : 'var(--off-white-40)' }}>
+        <div className="t-mono" style={{ fontSize: 9, letterSpacing: '0.1em', color: isCurrent ? 'var(--accent)' : 'var(--off-white-40)' }}>
           WEEK {String(weekNumber).padStart(2, '0')} {isCurrent ? '· CURRENT' : ''}
         </div>
         <div className="t-mono" style={{ fontSize: 11, color: 'var(--off-white)', letterSpacing: '0.06em', marginTop: 3 }}>
@@ -60,7 +60,7 @@ function EowWeekStepper({ weekNumber, totalWeeks, onChange, window: win }) {
       {!isCurrent && (
         <button className="commander-eow-jump" onClick={() => onChange(EOW.currentWeek())} style={{
           padding: '8px 12px', background: 'transparent',
-          border: '1px solid var(--lime)', borderRadius: 2, color: 'var(--lime)',
+          border: '1px solid var(--accent)', borderRadius: 2, color: 'var(--accent)',
           cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.08em', fontWeight: 700,
         }}>JUMP TO CURRENT</button>
       )}

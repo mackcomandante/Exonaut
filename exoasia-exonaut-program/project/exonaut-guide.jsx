@@ -90,7 +90,7 @@ function ExonautGuidePage() {
               Complete each setup item as you move through your first Exoasia steps.
             </div>
           </div>
-          <div className="t-mono" style={{ fontSize: 28, fontWeight: 800, color: 'var(--lime)' }}>{progress}%</div>
+          <div className="t-mono" style={{ fontSize: 28, fontWeight: 800, color: 'var(--accent)' }}>{progress}%</div>
         </div>
         <div className="pillar-bar" style={{ marginBottom: 0 }}>
           <div className="fill" style={{ width: `${progress}%` }} />
@@ -138,7 +138,7 @@ function GuideSection({ section, checked, onToggle }) {
         <div>
           <div className="t-label-muted" style={{ marginBottom: 6 }}>{section.eyebrow}</div>
           <div className="t-heading" style={{ fontSize: 17 }}>
-            <i className={'fa-solid ' + section.icon} style={{ color: 'var(--lime)', marginRight: 8 }} />
+            <i className={'fa-solid ' + section.icon} style={{ color: 'var(--accent)', marginRight: 8 }} />
             {section.title}
           </div>
         </div>
