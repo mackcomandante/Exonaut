@@ -271,6 +271,184 @@ function Onboarding({ onComplete }) {
   );
 }
 
+function AuthDotGrid({
+  dotSize = 4,
+  gap = 20,
+  proximity = 115,
+  shockRadius = 190,
+  shockStrength = 0.22,
+}) {
+  const wrapperRef = React.useRef(null);
+  const canvasRef = React.useRef(null);
+  const dotsRef = React.useRef([]);
+  const pointerRef = React.useRef({ x: -1000, y: -1000, lastX: 0, lastY: 0, lastTime: 0 });
+  const [isDark, setIsDark] = React.useState(() => document.body.dataset.theme === 'dark');
+
+  React.useEffect(() => {
+    const observer = new MutationObserver(() => setIsDark(document.body.dataset.theme === 'dark'));
+    observer.observe(document.body, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => observer.disconnect();
+  }, []);
+
+  const palette = isDark
+    ? { base: [42, 52, 50], active: [184, 230, 48] }
+    : { base: [217, 226, 197], active: [143, 191, 21] };
+
+  const buildGrid = React.useCallback(() => {
+    const wrapper = wrapperRef.current;
+    const canvas = canvasRef.current;
+    if (!wrapper || !canvas) return;
+
+    const { width, height } = wrapper.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.round(width * dpr);
+    canvas.height = Math.round(height * dpr);
+    canvas.style.width = width + 'px';
+    canvas.style.height = height + 'px';
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const cell = dotSize + gap;
+    const cols = Math.floor((width + gap) / cell);
+    const rows = Math.floor((height + gap) / cell);
+    const startX = (width - (cell * cols - gap)) / 2 + dotSize / 2;
+    const startY = (height - (cell * rows - gap)) / 2 + dotSize / 2;
+    const dots = [];
+
+    for (let row = 0; row < rows; row += 1) {
+      for (let col = 0; col < cols; col += 1) {
+        dots.push({
+          cx: startX + col * cell,
+          cy: startY + row * cell,
+          x: 0,
+          y: 0,
+          vx: 0,
+          vy: 0,
+        });
+      }
+    }
+    dotsRef.current = dots;
+  }, [dotSize, gap]);
+
+  React.useEffect(() => {
+    buildGrid();
+    const observer = new ResizeObserver(buildGrid);
+    if (wrapperRef.current) observer.observe(wrapperRef.current);
+    return () => observer.disconnect();
+  }, [buildGrid]);
+
+  React.useEffect(() => {
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const getPointer = (event) => {
+      const rect = canvasRef.current && canvasRef.current.getBoundingClientRect();
+      if (!rect) return null;
+      return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+    };
+
+    const onMove = (event) => {
+      const position = getPointer(event);
+      if (!position) return;
+      const pointer = pointerRef.current;
+      const now = performance.now();
+      const elapsed = Math.max(now - pointer.lastTime, 16);
+      const vx = (position.x - pointer.lastX) / elapsed;
+      const vy = (position.y - pointer.lastY) / elapsed;
+      pointer.x = position.x;
+      pointer.y = position.y;
+
+      if (!reducedMotion && pointer.lastTime && Math.hypot(vx, vy) > 0.35) {
+        dotsRef.current.forEach(dot => {
+          const dx = dot.cx - pointer.x;
+          const dy = dot.cy - pointer.y;
+          const distance = Math.hypot(dx, dy);
+          if (distance < proximity) {
+            const push = (1 - distance / proximity) * 1.9;
+            dot.vx += (dx / Math.max(distance, 1) + vx * 0.45) * push;
+            dot.vy += (dy / Math.max(distance, 1) + vy * 0.45) * push;
+          }
+        });
+      }
+
+      pointer.lastX = position.x;
+      pointer.lastY = position.y;
+      pointer.lastTime = now;
+    };
+
+    const onClick = (event) => {
+      if (reducedMotion) return;
+      const position = getPointer(event);
+      if (!position) return;
+      dotsRef.current.forEach(dot => {
+        const dx = dot.cx - position.x;
+        const dy = dot.cy - position.y;
+        const distance = Math.hypot(dx, dy);
+        if (distance < shockRadius) {
+          const push = (1 - distance / shockRadius) * shockStrength;
+          dot.vx += dx * push;
+          dot.vy += dy * push;
+        }
+      });
+    };
+
+    window.addEventListener('mousemove', onMove, { passive: true });
+    window.addEventListener('click', onClick);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('click', onClick);
+    };
+  }, [proximity, shockRadius, shockStrength]);
+
+  React.useEffect(() => {
+    let rafId;
+    const proximitySquared = proximity * proximity;
+    const draw = () => {
+      const canvas = canvasRef.current;
+      const ctx = canvas && canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const pointer = pointerRef.current;
+
+      dotsRef.current.forEach(dot => {
+        dot.vx += -dot.x * 0.075;
+        dot.vy += -dot.y * 0.075;
+        dot.vx *= 0.84;
+        dot.vy *= 0.84;
+        dot.x += dot.vx;
+        dot.y += dot.vy;
+
+        const dx = dot.cx - pointer.x;
+        const dy = dot.cy - pointer.y;
+        const distanceSquared = dx * dx + dy * dy;
+        let color = palette.base;
+        if (distanceSquared < proximitySquared) {
+          const strength = 1 - Math.sqrt(distanceSquared) / proximity;
+          color = palette.base.map((value, index) =>
+            Math.round(value + (palette.active[index] - value) * strength)
+          );
+        }
+        ctx.beginPath();
+        ctx.fillStyle = 'rgb(' + color.join(',') + ')';
+        ctx.arc(dot.cx + dot.x, dot.cy + dot.y, dotSize / 2, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      rafId = requestAnimationFrame(draw);
+    };
+
+    draw();
+    return () => cancelAnimationFrame(rafId);
+  }, [dotSize, palette.base.join(','), palette.active.join(','), proximity]);
+
+  return (
+    <div className="auth-dot-grid" aria-hidden="true">
+      <div ref={wrapperRef} className="auth-dot-grid__wrap">
+        <canvas ref={canvasRef} className="auth-dot-grid__canvas" />
+      </div>
+    </div>
+  );
+}
+
 function RoleAuthScreen({ onAuthComplete }) {
   const selectedRole = 'exonaut';
   const [mode, setMode] = React.useState('signin');
@@ -341,7 +519,8 @@ function RoleAuthScreen({ onAuthComplete }) {
   }
 
   return (
-    <div className="hud-bg" style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 32, position: 'relative' }}>
+    <div className="hud-bg auth-screen" style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 32, position: 'relative' }}>
+      <AuthDotGrid />
       <div style={{ position: 'relative', zIndex: 2, width: 'min(520px, 100%)' }} className="enter">
         <div style={{ textAlign: 'center', marginBottom: 30 }}>
           <div style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: 48, letterSpacing: '0.1em', color: 'var(--ink)', lineHeight: 1 }}>EXOASIA</div>

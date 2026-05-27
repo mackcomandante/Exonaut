@@ -2790,6 +2790,39 @@ img, svg { display: block; max-width: 100%; }
 }
 .login-wrap > * { position: relative; z-index: 1; }
 
+.auth-screen {
+  isolation: isolate;
+  overflow: hidden;
+}
+.auth-dot-grid {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+.auth-dot-grid::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, transparent 15%, var(--bg-deep) 84%);
+  opacity: 0.45;
+}
+.auth-dot-grid__wrap,
+.auth-dot-grid__canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.auth-dot-grid__canvas {
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .auth-dot-grid {
+    opacity: 0.65;
+  }
+}
+
 /* ============================================================
    MOBILE FRAME
    ============================================================ */
