@@ -92,7 +92,7 @@ function ExonautGuidePage() {
           </div>
           <div className="t-mono" style={{ fontSize: 28, fontWeight: 800, color: 'var(--accent)' }}>{progress}%</div>
         </div>
-        <div className="pillar-bar" style={{ marginBottom: 0 }}>
+        <div className="pillar-bar" style={{ marginBottom: 0, '--pillar-color': 'var(--accent)' }}>
           <div className="fill" style={{ width: `${progress}%` }} />
         </div>
       </div>
