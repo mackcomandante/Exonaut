@@ -173,22 +173,10 @@ function Sidebar({ current, onNavigate, onSignOut, mobileOpen = false, onMobileC
         {(hasAssignedProject || isFirstOfficer || hasProjectTasks) && (
           <>
             <div className="sidebar-nav-section" style={{ color: 'var(--accent)' }}>Projects</div>
-            <button type="button" className={'sidebar-link' + (current === 'projects' ? ' active' : '')} onClick={() => onNavigate('projects')}>
+            <button type="button" className={'sidebar-link' + (['projects', 'first-projects', 'project-tasks'].includes(current) ? ' active' : '')} onClick={() => onNavigate('projects')}>
               <i className="fa-solid fa-diagram-project" />
               <span>Projects</span>
             </button>
-            {isFirstOfficer && (
-              <button type="button" className={'sidebar-link' + (current === 'first-projects' ? ' active' : '')} onClick={() => onNavigate('first-projects')}>
-                <i className="fa-solid fa-user-tie" />
-                <span>Project Lead Board</span>
-              </button>
-            )}
-            {(isFirstOfficer || hasProjectTasks) && (
-              <button type="button" className={'sidebar-link' + (current === 'project-tasks' ? ' active' : '')} onClick={() => onNavigate('project-tasks')}>
-                <i className="fa-solid fa-list-check" />
-                <span>Project Tasks</span>
-              </button>
-            )}
           </>
         )}
       </nav>

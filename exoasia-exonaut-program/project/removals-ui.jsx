@@ -37,9 +37,18 @@ function relTime(ts) {
 }
 
 function RemovalRequestCard({ req, actions, accent = 'var(--amber)' }) {
-  const user = USERS.find(u => u.id === req.userId);
-  const lead = LEADS.find(l => l.id === req.leadId);
-  const track = TRACKS.find(t => t.code === (user?.track));
+  const { profiles } = useUserProfiles();
+  const profileUser = (profiles || []).find(u => u.id === req.userId);
+  const profileLead = (profiles || []).find(u => u.id === req.leadId);
+  const legacyUser = (typeof USERS !== 'undefined' ? USERS : []).find(u => u.id === req.userId);
+  const legacyLead = (typeof LEADS !== 'undefined' ? LEADS : []).find(l => l.id === req.leadId);
+  const user = profileUser
+    ? { id: profileUser.id, name: profileUser.fullName || profileUser.email, avatarUrl: profileUser.avatarUrl, tier: 'entry', track: profileUser.trackCode }
+    : legacyUser;
+  const lead = profileLead
+    ? { id: profileLead.id, name: profileLead.fullName || profileLead.email }
+    : legacyLead;
+  const track = (typeof TRACKS !== 'undefined' ? TRACKS : []).find(t => t.code === (user?.track));
   const reasonLabel = window.__removalStore.reasonLabel(req.reason);
   const sourceLabel = req.source === 'exonaut' ? 'RESIGNATION' : 'REMOVAL';
 
@@ -149,22 +158,25 @@ function LeadEndorseModal({ user, onClose }) {
   const { profile } = useCurrentUserProfile();
   useCrownState();
   const crown = window.__crownStore.getUserCrown(profile.id);
-  const leadSlot = LEADS.find(l => l.track === (crown?.trackCode || profile.trackCode)) || LEADS.find(l => l.id === 'lead-ais') || LEADS[0];
   const { endorseByLead } = useRemovals();
   const [reason, setReason] = React.useState('');
   const [notes, setNotes] = React.useState('');
   const canSubmit = reason && notes.trim().length >= 20;
 
-  function submit() {
+  async function submit() {
     if (!canSubmit) return;
-    endorseByLead({
-      userId: user.id,
-      leadId: leadSlot?.id || 'lead-ais',
-      cohortId: getUserCohort(user.id),
-      reason,
-      notes: notes.trim(),
-    });
-    onClose();
+    try {
+      await endorseByLead({
+        userId: user.id,
+        leadId: profile.id,
+        cohortId: user.cohort || user.cohortId || getUserCohort(user.id),
+        reason,
+        notes: notes.trim(),
+      });
+      onClose();
+    } catch (err) {
+      alert((err && err.message) || 'Could not submit removal request.');
+    }
   }
 
   return (
@@ -222,9 +234,8 @@ function LeadRemovalsPanel() {
   useCrownState();
   const crown = window.__crownStore.getUserCrown(profile.id);
   const removals = useRemovals();
-  const leadSlot = LEADS.find(l => l.track === (crown?.trackCode || profile.trackCode)) || LEADS.find(l => l.id === 'lead-ais') || LEADS[0];
-  const LEAD_ID = leadSlot?.id || 'lead-ais';
-  const lead = LEADS.find(l => l.id === LEAD_ID);
+  const LEAD_ID = profile.id;
+  const lead = { id: profile.id, name: profile.fullName || profile.email, track: crown?.trackCode || profile.trackCode };
 
   const myRequests = removals.all.filter(r => r.leadId === LEAD_ID);
   const awaitingMe = myRequests.filter(r => r.status === 'pending' && r.source === 'exonaut');
@@ -299,15 +310,23 @@ function LeadRemovalsPanel() {
 }
 
 function LeadReviewModal({ req, action, onClose }) {
+  const { profile } = useCurrentUserProfile();
   const { leadEndorse, leadDeny } = useRemovals();
   const [note, setNote] = React.useState('');
-  const user = USERS.find(u => u.id === req.userId);
+  const { profiles } = useUserProfiles();
+  const profileUser = (profiles || []).find(u => u.id === req.userId);
+  const legacyUser = (typeof USERS !== 'undefined' ? USERS : []).find(u => u.id === req.userId);
+  const user = profileUser ? { name: profileUser.fullName || profileUser.email } : legacyUser;
   const isEndorse = action === 'endorse';
 
-  function submit() {
-    if (isEndorse) leadEndorse(req.id, req.leadId, note.trim());
-    else leadDeny(req.id, req.leadId, note.trim());
-    onClose();
+  async function submit() {
+    try {
+      if (isEndorse) await leadEndorse(req.id, profile.id, note.trim());
+      else await leadDeny(req.id, profile.id, note.trim());
+      onClose();
+    } catch (err) {
+      alert((err && err.message) || 'Could not update removal request.');
+    }
   }
 
   return (
@@ -413,15 +432,23 @@ function CommanderRemovalsPage() {
 }
 
 function CommanderReviewModal({ req, action, onClose }) {
+  const { profile } = useCurrentUserProfile();
   const { approve, deny } = useRemovals();
   const [note, setNote] = React.useState('');
-  const user = USERS.find(u => u.id === req.userId);
+  const { profiles } = useUserProfiles();
+  const profileUser = (profiles || []).find(u => u.id === req.userId);
+  const legacyUser = (typeof USERS !== 'undefined' ? USERS : []).find(u => u.id === req.userId);
+  const user = profileUser ? { name: profileUser.fullName || profileUser.email } : legacyUser;
   const isApprove = action === 'approve';
 
-  function submit() {
-    if (isApprove) approve(req.id, 'commander', note.trim());
-    else deny(req.id, 'commander', note.trim());
-    onClose();
+  async function submit() {
+    try {
+      if (isApprove) await approve(req.id, profile.id, note.trim());
+      else await deny(req.id, profile.id, note.trim());
+      onClose();
+    } catch (err) {
+      alert((err && err.message) || 'Could not update removal request.');
+    }
   }
 
   return (
@@ -525,11 +552,23 @@ function AdminRemovalsPage() {
 }
 
 function AdminExecuteConfirm({ req, onClose }) {
+  const { profile } = useCurrentUserProfile();
   const { execute } = useRemovals();
-  const user = USERS.find(u => u.id === req.userId);
+  const { profiles } = useUserProfiles();
+  const profileUser = (profiles || []).find(u => u.id === req.userId);
+  const legacyUser = (typeof USERS !== 'undefined' ? USERS : []).find(u => u.id === req.userId);
+  const user = profileUser ? { name: profileUser.fullName || profileUser.email } : legacyUser;
   const [confirm, setConfirm] = React.useState('');
   const expected = (user?.name || '').trim();
-  const canExecute = confirm.trim().toLowerCase() === expected.toLowerCase();
+  const canExecute = !!expected && confirm.trim().toLowerCase() === expected.toLowerCase();
+  async function submit() {
+    try {
+      await execute(req.id, profile.id);
+      onClose();
+    } catch (err) {
+      alert((err && err.message) || 'Could not execute removal.');
+    }
+  }
 
   return (
     <RemovalModal
@@ -539,7 +578,7 @@ function AdminExecuteConfirm({ req, onClose }) {
       primaryColor="var(--red)"
       primaryLabel="Execute Removal"
       primaryDisabled={!canExecute}
-      onPrimary={() => { execute(req.id, 'admin'); onClose(); }}
+      onPrimary={submit}
       onClose={onClose}
     >
       <div style={{ padding: 14, background: 'rgba(230,60,60,0.08)', border: '1px solid var(--red)', borderRadius: 2, marginBottom: 14 }}>
@@ -570,9 +609,10 @@ function AdminExecuteConfirm({ req, onClose }) {
 // EXONAUT — resignation submission card (embed in Profile or Settings)
 // ========================================================================
 function ExonautResignCard() {
+  const { profile } = useCurrentUserProfile();
   const removals = useRemovals();
   const [showForm, setShowForm] = React.useState(false);
-  const myId = (typeof ME !== 'undefined') ? ME.id : 'u1';
+  const myId = profile.id;
   const existing = removals.activeForUser(myId);
 
   // If there's an open request, show status instead of form
@@ -596,9 +636,13 @@ function ExonautResignCard() {
           {existing.status === 'approved' && 'WAITING ON: PLATFORM ADMIN (FINAL)'}
         </div>
         {existing.status === 'pending' && existing.source === 'exonaut' && (
-          <button className="btn btn-ghost btn-sm" onClick={() => {
+          <button className="btn btn-ghost btn-sm" onClick={async () => {
             if (confirm('Withdraw your resignation? You will remain in the program.')) {
-              removals.withdrawByExonaut(existing.id, myId);
+              try {
+                await removals.withdrawByExonaut(existing.id, myId);
+              } catch (err) {
+                alert((err && err.message) || 'Could not withdraw resignation.');
+              }
             }
           }}>
             <i className="fa-solid fa-rotate-left" /> WITHDRAW RESIGNATION
@@ -631,22 +675,37 @@ function ExonautResignCard() {
 }
 
 function ExonautResignModal({ onClose }) {
+  const { profile } = useCurrentUserProfile();
+  useCrownState();
   const { submitByExonaut } = useRemovals();
   const [reason, setReason] = React.useState('');
   const [notes, setNotes] = React.useState('');
   const [confirmed, setConfirmed] = React.useState(false);
   const canSubmit = reason && notes.trim().length >= 20 && confirmed;
-  const myId = (typeof ME !== 'undefined') ? ME.id : 'u1';
-  const me = USERS.find(u => u.id === myId) || { track: 'ais', cohort: 'c2627' };
-  const myLead = LEADS.find(l => l.track === me.track) || LEADS[0];
+  const myId = profile.id;
+  const me = (typeof USERS !== 'undefined' ? USERS : []).find(u => u.id === myId);
+  const myTrack = profile.trackCode || me?.track;
+  const activeCrown = window.__crownStore.getActiveCrownForTrack(myTrack);
+  const { profiles } = useUserProfiles();
+  const leadProfile = (profiles || []).find(p => p.id === activeCrown?.userId);
+  const myLead = leadProfile
+    ? { id: leadProfile.id, name: leadProfile.fullName || leadProfile.email }
+    : (typeof LEADS !== 'undefined' ? LEADS.find(l => l.track === myTrack) : null);
 
-  function submit() {
+  async function submit() {
     if (!canSubmit) return;
-    submitByExonaut({
-      userId: myId, cohortId: getUserCohort(myId), leadId: myLead?.id,
-      reason, notes: notes.trim(),
-    });
-    onClose();
+    try {
+      await submitByExonaut({
+        userId: myId,
+        cohortId: profile.cohortId || getUserCohort(myId),
+        leadId: activeCrown?.userId || null,
+        reason,
+        notes: notes.trim(),
+      });
+      onClose();
+    } catch (err) {
+      alert((err && err.message) || 'Could not submit resignation.');
+    }
   }
 
   return (

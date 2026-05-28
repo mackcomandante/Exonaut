@@ -7,6 +7,8 @@
   let state = {
     projects: [],
     tasks: [],
+    members: [],
+    resources: [],
     assignees: [],
     submissions: [],
     comments: [],
@@ -30,39 +32,39 @@
     important: { label: 'IMPORTANT', color: 'yellow', points: 3 },
   };
 
-  const PROJECT_ROSTER_KEY = 'exo:project-rosters:v1';
+  const ACTION_STATUSES = [
+    { id: 'not_started', label: 'Not Started' },
+    { id: 'in_progress', label: 'In Progress' },
+    { id: 'for_review', label: 'For Review' },
+    { id: 'done', label: 'Done' },
+    { id: 'blocked', label: 'Blocked' },
+    { id: 'cancelled', label: 'Cancelled' },
+  ];
 
-  function loadProjectRosters() {
-    try { return JSON.parse(localStorage.getItem(PROJECT_ROSTER_KEY) || '{}'); } catch { return {}; }
-  }
-
-  function saveProjectRosters(rosters) {
-    try { localStorage.setItem(PROJECT_ROSTER_KEY, JSON.stringify(rosters)); } catch {}
+  function normalizeStatus(status) {
+    return ({
+      backlog: 'not_started',
+      assigned: 'not_started',
+      submitted: 'for_review',
+      approved: 'done',
+      rejected: 'in_progress',
+    })[status] || status || 'not_started';
   }
 
   function projectRoster(projectId) {
-    return loadProjectRosters()[projectId] || [];
-  }
-
-  function setProjectRoster(projectId, userIds) {
-    const rosters = loadProjectRosters();
-    rosters[projectId] = [...new Set(userIds || [])];
-    saveProjectRosters(rosters);
-    notify();
+    return state.members.filter(member => member.projectId === projectId).map(member => member.userId);
   }
 
   function classifyTask({ urgent, important }) {
-    if (urgent && important) return { key: 'critical', status: 'assigned', sortOrder: -1000, ...TASK_CLASSES.critical };
-    if (urgent && !important) return { key: 'urgent', status: 'assigned', sortOrder: 0, ...TASK_CLASSES.urgent };
-    return { key: 'important', status: 'backlog', sortOrder: 1000, ...TASK_CLASSES.important };
+    if (urgent && important) return { key: 'critical', status: 'not_started', sortOrder: -1000, ...TASK_CLASSES.critical };
+    if (urgent && !important) return { key: 'urgent', status: 'not_started', sortOrder: 0, ...TASK_CLASSES.urgent };
+    return { key: 'important', status: 'not_started', sortOrder: 1000, ...TASK_CLASSES.important };
   }
 
   function deadlineState(task) {
-    if (!task?.dueDate || task.status === 'approved') return 'On Track';
+    if (!task?.dueDate || ['done', 'cancelled'].includes(task.status)) return 'On Track';
     const today = new Date().toISOString().slice(0, 10);
-    if (['assigned', 'in_progress'].includes(task.status) && task.dueDate <= today) return 'Critical';
-    if (task.status === 'backlog' && task.taskClass === 'important' && task.dueDate <= today) return 'Critical';
-    if (task.status === 'backlog' && task.taskClass === 'important' && task.dueDate > today) return 'At Risk';
+    if (task.status === 'blocked' || task.dueDate < today) return 'Critical';
     return 'On Track';
   }
 
@@ -103,7 +105,13 @@
       secondOfficerId: row.second_officer_id,
       trackLeadId: row.track_lead_id || row.second_officer_id,
       createdBy: row.created_by,
-      status: row.status || 'assigned',
+      status: normalizeStatus(row.status),
+      topic: row.topic || '',
+      nextStep: row.next_step || '',
+      blockers: row.blockers || '',
+      referenceLinks: Array.isArray(row.reference_links) ? row.reference_links : [],
+      progressNote: row.progress_note || '',
+      displayOrder: Number(row.display_order || row.sort_order || 0),
       priority: row.priority || row.task_class || 'important',
       urgent: !!row.urgent,
       important: row.important !== false,
@@ -120,6 +128,28 @@
       completedAt: row.completed_at,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
+    };
+  }
+
+  function toMember(row) {
+    return {
+      projectId: row.project_id,
+      userId: row.user_id,
+      memberRole: row.member_role || 'member',
+      joinedAt: row.joined_at,
+      addedBy: row.added_by,
+    };
+  }
+
+  function toResource(row) {
+    return {
+      id: row.id,
+      projectId: row.project_id,
+      title: row.title,
+      resourceType: row.resource_type || 'link',
+      url: row.url,
+      addedBy: row.added_by,
+      createdAt: row.created_at,
     };
   }
 
@@ -199,21 +229,25 @@
       return state;
     }
     try {
-      const [projectsResult, tasksResult, assigneesResult, submissionsResult, commentsResult, activityResult] = await Promise.all([
+      const [projectsResult, tasksResult, membersResult, resourcesResult, assigneesResult, submissionsResult, commentsResult, activityResult] = await Promise.all([
         window.__db.from('projects').select('*').order('created_at', { ascending: false }),
-        window.__db.from('project_tasks').select('*').order('sort_order', { ascending: true }).order('created_at', { ascending: false }),
+        window.__db.from('project_tasks').select('*').order('display_order', { ascending: true }).order('created_at', { ascending: false }),
+        window.__db.from('project_members').select('*').order('joined_at', { ascending: true }),
+        window.__db.from('project_resources').select('*').order('created_at', { ascending: false }),
         window.__db.from('project_task_assignees').select('*').order('created_at', { ascending: false }),
         window.__db.from('project_task_submissions').select('*').order('created_at', { ascending: false }),
         window.__db.from('project_task_comments').select('*').order('created_at', { ascending: false }),
         window.__db.from('project_task_activity').select('*').order('created_at', { ascending: false }),
       ]);
 
-      const error = projectsResult.error || tasksResult.error || assigneesResult.error || submissionsResult.error || commentsResult.error || activityResult.error;
+      const error = projectsResult.error || tasksResult.error || membersResult.error || resourcesResult.error || assigneesResult.error || submissionsResult.error || commentsResult.error || activityResult.error;
       if (error) throw error;
 
       state = {
         projects: (projectsResult.data || []).map(toProject),
         tasks: (tasksResult.data || []).map(toTask),
+        members: (membersResult.data || []).map(toMember),
+        resources: (resourcesResult.data || []).map(toResource),
         assignees: (assigneesResult.data || []).map(toAssignee),
         submissions: (submissionsResult.data || []).map(toSubmission),
         comments: (commentsResult.data || []).map(toComment),
@@ -251,11 +285,12 @@
 
   async function saveTask(data) {
     const createdBy = await actorId();
+    const existing = data.id ? state.tasks.find(task => task.id === data.id) : null;
     const classified = classifyTask({
       urgent: data.urgent !== undefined ? data.urgent : data.priority === 'critical' || data.priority === 'urgent',
       important: data.important !== undefined ? data.important : data.priority !== 'urgent',
     });
-    const status = data.status || classified.status;
+    const status = normalizeStatus(data.status || classified.status);
     const row = {
       id: data.id || 'ptask-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
       project_id: data.projectId,
@@ -266,6 +301,12 @@
       track_lead_id: data.trackLeadId || data.secondOfficerId || trackLeadForTrack(data.trackCode),
       created_by: data.createdBy || createdBy,
       status,
+      topic: data.topic || '',
+      next_step: data.nextStep || '',
+      blockers: data.blockers || '',
+      reference_links: data.referenceLinks || [],
+      progress_note: data.progressNote || '',
+      display_order: Number(data.displayOrder ?? data.sortOrder ?? classified.sortOrder),
       priority: classified.key,
       urgent: !!data.urgent,
       important: data.important !== false,
@@ -277,15 +318,48 @@
       points: Number(data.points || classified.points),
       due_date: data.dueDate || null,
       sort_order: Number(data.sortOrder ?? classified.sortOrder),
+      completed_at: status === 'done' ? (data.completedAt || new Date().toISOString()) : null,
     };
     const { error } = await window.__db.from('project_tasks').upsert(row, { onConflict: 'id' });
     if (error) throw error;
-    await logActivity(row.id, data.id ? 'task_updated' : 'task_created', {
-      title: row.title,
-      status: row.status,
-      class: row.task_class,
-      deadlineState: deadlineState(toTask(row)),
-    });
+    const progressChanged = !!data.id && row.progress_note && row.progress_note !== existing?.progressNote;
+    const statusChanged = !!data.id && existing && existing.status !== status;
+    if (!data.id) {
+      await logActivity(row.id, 'action_created', {
+        title: row.title,
+        status: row.status,
+        class: row.task_class,
+        deadlineState: deadlineState(toTask(row)),
+        progressNote: row.progress_note,
+      });
+    } else {
+      if (statusChanged) {
+        await logActivity(row.id, 'status_changed', {
+          title: row.title,
+          status: row.status,
+          fromStatus: existing.status,
+          class: row.task_class,
+          deadlineState: deadlineState(toTask(row)),
+        });
+      }
+      if (progressChanged) {
+        await logActivity(row.id, 'progress_update_added', {
+          title: row.title,
+          status: row.status,
+          class: row.task_class,
+          deadlineState: deadlineState(toTask(row)),
+          progressNote: row.progress_note,
+        });
+      }
+      if (!statusChanged && !progressChanged) {
+        await logActivity(row.id, 'action_updated', {
+          title: row.title,
+          status: row.status,
+          class: row.task_class,
+          deadlineState: deadlineState(toTask(row)),
+        });
+      }
+    }
     if (!data.id && data.consultedId && window.__notifStore) {
       window.__notifStore.add({
         toUserId: data.consultedId,
@@ -301,6 +375,7 @@
 
   window.__projectStore = {
     KANBAN_COLUMNS,
+    ACTION_STATUSES,
     TASK_CLASSES,
     PRIORITIES: Object.keys(TASK_CLASSES),
     classifyTask,
@@ -325,6 +400,7 @@
       const project = state.projects.find(p => p.id === projectId);
       if (!project) return 'none';
       if (project.firstOfficerId === userId) return 'first';
+      if (state.members.some(member => member.projectId === projectId && member.userId === userId && member.memberRole === 'lead')) return 'lead';
       if (state.tasks.some(t => t.projectId === projectId && (t.trackLeadId === userId || t.secondOfficerId === userId))) return 'track-lead';
       if (project.trackCodes.some(code => window.__crownStore?.getActiveCrownForTrack(code)?.userId === userId)) return 'track-lead';
       if (state.assignees.some(a => a.userId === userId && state.tasks.some(t => t.id === a.taskId && t.projectId === projectId))) return 'member';
@@ -340,13 +416,45 @@
     trackLeadForTrack,
     secondOfficerForTrack: trackLeadForTrack,
     projectRoster,
-    setProjectRoster,
     async createProject(data) {
       await upsertProject(data);
-      if (data.id || data.memberIds?.length) setProjectRoster(data.id || state.projects[0]?.id, data.memberIds || []);
+      const projectId = data.id || state.projects[0]?.id;
+      if (projectId) await this.setProjectMembers(projectId, data.memberIds || []);
+    },
+    async setProjectMembers(projectId, userIds) {
+      const addedBy = await actorId();
+      const project = state.projects.find(item => item.id === projectId);
+      const memberIds = [...new Set([project?.firstOfficerId, ...(userIds || [])].filter(Boolean))];
+      const rows = memberIds.map(userId => ({
+        project_id: projectId,
+        user_id: userId,
+        member_role: userId === project?.firstOfficerId ? 'lead' : 'member',
+        added_by: addedBy,
+      }));
+      if (rows.length) {
+        const { error } = await window.__db.from('project_members').upsert(rows, { onConflict: 'project_id,user_id' });
+        if (error) throw error;
+      }
+      await refresh();
     },
     async archiveProject(projectId) {
       const { error } = await window.__db.from('projects').update({ status: 'archived' }).eq('id', projectId);
+      if (error) throw error;
+      await refresh();
+    },
+    async deleteProject(projectId) {
+      await Promise.all([
+        window.__db.from('project_task_activity').delete().in('task_id', state.tasks.filter(t => t.projectId === projectId).map(t => t.id)),
+        window.__db.from('project_task_comments').delete().in('task_id', state.tasks.filter(t => t.projectId === projectId).map(t => t.id)),
+        window.__db.from('project_task_submissions').delete().in('task_id', state.tasks.filter(t => t.projectId === projectId).map(t => t.id)),
+        window.__db.from('project_task_assignees').delete().in('task_id', state.tasks.filter(t => t.projectId === projectId).map(t => t.id)),
+      ]);
+      await Promise.all([
+        window.__db.from('project_tasks').delete().eq('project_id', projectId),
+        window.__db.from('project_members').delete().eq('project_id', projectId),
+        window.__db.from('project_resources').delete().eq('project_id', projectId),
+      ]);
+      const { error } = await window.__db.from('projects').delete().eq('id', projectId);
       if (error) throw error;
       await refresh();
     },
@@ -391,15 +499,15 @@
           metadata: { taskId },
         }));
       }
-      await logActivity(taskId, 'assignees_updated', { count: rows.length });
+      await logActivity(taskId, 'assignment_changed', { count: rows.length });
       await refresh();
     },
     async moveTask(taskId, status) {
-      const patch = { status };
-      if (status === 'approved') patch.completed_at = new Date().toISOString();
+      const normalizedStatus = normalizeStatus(status);
+      const patch = { status: normalizedStatus, completed_at: normalizedStatus === 'done' ? new Date().toISOString() : null };
       const { error } = await window.__db.from('project_tasks').update(patch).eq('id', taskId);
       if (error) throw error;
-      await logActivity(taskId, 'status_changed', { status });
+      await logActivity(taskId, 'status_changed', { status: normalizedStatus });
       await refresh();
     },
     async submitTask({ taskId, note, linkUrl, fileUrl }) {
@@ -415,7 +523,7 @@
       };
       const [insertResult, taskResult] = await Promise.all([
         window.__db.from('project_task_submissions').insert(submission),
-        window.__db.from('project_tasks').update({ status: 'submitted', submitted_note: note || '' }).eq('id', taskId),
+        window.__db.from('project_tasks').update({ status: 'for_review', submitted_note: note || '' }).eq('id', taskId),
       ]);
       if (insertResult.error || taskResult.error) throw insertResult.error || taskResult.error;
       const task = state.tasks.find(t => t.id === taskId);
@@ -431,7 +539,7 @@
           });
         });
       }
-      await logActivity(taskId, 'submission_added', { submittedBy, hasFile: !!fileUrl, hasLink: !!linkUrl });
+      await logActivity(taskId, 'submitted_for_review', { submittedBy, hasFile: !!fileUrl, hasLink: !!linkUrl });
       await refresh();
     },
     async addComment(taskId, comment, kind = 'comment') {
@@ -478,7 +586,7 @@
       const recipients = assignees.length ? assignees.map(a => a.userId) : [task.trackLeadId || task.secondOfficerId].filter(Boolean);
       const [taskResult] = await Promise.all([
         window.__db.from('project_tasks').update({
-          status: 'approved',
+          status: 'done',
           review_note: note || 'Approved',
           completed_at: new Date().toISOString(),
         }).eq('id', taskId),
@@ -542,6 +650,20 @@
       await logActivity(taskId, 'approved', { recipients: recipients.length, points: task.points });
       await refresh();
     },
+    async addResource(data) {
+      const addedBy = await actorId();
+      const row = {
+        id: data.id || 'pres-' + Date.now(),
+        project_id: data.projectId,
+        title: data.title,
+        resource_type: data.resourceType || 'link',
+        url: data.url,
+        added_by: addedBy,
+      };
+      const { error } = await window.__db.from('project_resources').insert(row);
+      if (error) throw error;
+      await refresh();
+    },
   };
 
   window.useProjects = function useProjects() {
@@ -554,6 +676,8 @@
         .channel('project_management_realtime_' + Math.random().toString(36).slice(2))
         .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, refresh)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'project_tasks' }, refresh)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'project_members' }, refresh)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'project_resources' }, refresh)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'project_task_assignees' }, refresh)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'project_task_submissions' }, refresh)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'project_task_comments' }, refresh)
@@ -570,7 +694,7 @@
   window.__projectStore.refresh();
 })();
 
-function ProjectBuilderPage() {
+function ProjectBuilderPage({ roleLabel = 'PLATFORM ADMIN' } = {}) {
   const { profiles } = useUserProfiles();
   const { projects, tasks, loaded, error } = useProjects();
   useCrownState();
@@ -644,7 +768,7 @@ function ProjectBuilderPage() {
     <div className="enter">
       <div className="section-head">
         <div>
-          <div className="t-label" style={{ marginBottom: 8, color: 'var(--sky)' }}>PLATFORM ADMIN Â· PROJECTS</div>
+          <div className="t-label" style={{ marginBottom: 8, color: 'var(--sky)' }}>{roleLabel} Â· PROJECTS</div>
           <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>Project Builder</h1>
           <div className="t-body" style={{ marginTop: 6 }}>Create projects, assign a Project Lead, and open track boards for Track Leads / First Officers.</div>
         </div>
@@ -718,7 +842,10 @@ function ProjectBuilderPage() {
                     <h2 className="t-heading project-title">{project.title}</h2>
                     <div className="t-body">{project.description || 'No description yet.'}</div>
                   </div>
-                  <button className="btn btn-ghost btn-sm" onClick={() => window.__projectStore.archiveProject(project.id)}>Archive</button>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button className="btn btn-ghost btn-sm" onClick={() => window.__projectStore.archiveProject(project.id)}>Archive</button>
+                    <button className="btn btn-ghost btn-sm" style={{ color: 'var(--red)' }} onClick={() => { if (window.confirm(`Delete "${project.title}"? This will permanently remove all tasks, members, and activity. This cannot be undone.`)) window.__projectStore.deleteProject(project.id); }}>Delete</button>
+                  </div>
                 </div>
                 <div className="project-stat-grid">
                   <ProjectStat label="Project Lead" value={nameOf(project.firstOfficerId)} />
@@ -746,7 +873,7 @@ function ProjectStat({ label, value }) {
   );
 }
 
-function ProjectWorkspacePage({ mode = 'member' }) {
+function LegacyProjectWorkspacePage({ mode = 'member' }) {
   const { profile } = useCurrentUserProfile();
   const { profiles } = useUserProfiles();
   const { projects, tasks, assignees, submissions, comments, activity, error } = useProjects();
@@ -839,6 +966,363 @@ function ProjectWorkspacePage({ mode = 'member' }) {
         />
       )}
     </div>
+  );
+}
+
+function ProjectWorkspacePage({ selectedProjectId = '', onBack }) {
+  const { profile } = useCurrentUserProfile();
+  const { profiles } = useUserProfiles();
+  const { tasks, members, resources, assignees, submissions, comments, activity, error } = useProjects();
+  const visibleProjects = window.__projectStore.visibleProjects(profile).filter(project => project.status !== 'archived');
+  const [tab, setTab] = React.useState('register');
+  const [selectedId, setSelectedId] = React.useState(null);
+  const project = visibleProjects.find(item => item.id === selectedProjectId) || visibleProjects[0];
+  const actions = tasks.filter(task => task.projectId === project?.id);
+  const projectMembers = members.filter(member => member.projectId === project?.id);
+  const projectResources = resources.filter(resource => resource.projectId === project?.id);
+  const selectedAction = actions.find(task => task.id === selectedId);
+  const access = project ? window.__projectStore.projectAccess(profile.id, project.id) : 'none';
+  const canManage = profile.role === 'admin' || access === 'first' || access === 'lead';
+  const canEditActions = canManage || projectMembers.some(member => member.userId === profile.id);
+  const nameOf = id => profiles.find(person => person.id === id)?.fullName || profiles.find(person => person.id === id)?.email || 'Unassigned';
+  const complete = actions.filter(task => task.status === 'done').length;
+  const blocked = actions.filter(task => task.status === 'blocked').length;
+
+  if (!project) return <div className="enter"><div className="card-panel project-empty">No assigned projects available.</div></div>;
+  return (
+    <div className="enter project-workspace">
+      <header className="card-panel project-register-header">
+        <div>
+          <div className="t-label project-register-label">PROJECT ACTION REGISTER</div>
+          <div className="project-title-line"><h1 className="t-title">{project.title}</h1><ProjectState status={project.status} /></div>
+          <p className="t-body">{project.description || 'Shared actions, progress updates, and project resources.'}</p>
+          <div className="project-header-meta">
+            <span><i className="fa-solid fa-user-tie" /> {nameOf(project.firstOfficerId)}</span>
+            <span><i className="fa-solid fa-users" /> {projectMembers.length} members</span>
+            <span><i className="fa-regular fa-calendar" /> {prettyDate(project.startDate)} - {prettyDate(project.dueDate)}</span>
+          </div>
+        </div>
+        <div className="project-header-side">
+          {onBack && <button className="btn btn-ghost project-workspace-back" onClick={onBack}><i className="fa-solid fa-arrow-left" /> All Projects</button>}
+          <div className="project-metric-grid">
+            <ProjectMetric label="Actions" value={actions.length} />
+            <ProjectMetric label="Done" value={complete} />
+            <ProjectMetric label="Blocked" value={blocked} alert={blocked > 0} />
+            <ProjectMetric label="Complete" value={(actions.length ? Math.round(complete / actions.length * 100) : 0) + '%'} />
+          </div>
+        </div>
+      </header>
+      {error && <div className="card-panel project-error">{error}</div>}
+      <nav className="project-tabs">
+        {[['register', 'Action Register'], ['overview', 'Overview'], ['resources', 'Resources'], ['activity', 'Activity']].map(([id, label]) => (
+          <button key={id} className={tab === id ? 'active' : ''} onClick={() => setTab(id)}>{label}</button>
+        ))}
+      </nav>
+      {tab === 'register' && <ActionRegister project={project} actions={actions} members={projectMembers} assignees={assignees} profiles={profiles} canManage={canManage} canEditActions={canEditActions} onOpen={setSelectedId} />}
+      {tab === 'overview' && <ProjectOverview actions={actions} assignees={assignees} profiles={profiles} onOpen={setSelectedId} />}
+      {tab === 'resources' && <ProjectResources project={project} actions={actions} resources={projectResources} submissions={submissions.filter(item => actions.some(action => action.id === item.taskId))} profiles={profiles} canManage={canManage} />}
+      {tab === 'activity' && <ProjectActivity actions={actions} activity={activity.filter(item => actions.some(action => action.id === item.taskId))} profiles={profiles} />}
+      {selectedAction && <ActionModal key={selectedAction.id} action={selectedAction} project={project} members={projectMembers} profiles={profiles} assignees={assignees.filter(item => item.taskId === selectedAction.id)} comments={comments.filter(item => item.taskId === selectedAction.id)} activity={activity.filter(item => item.taskId === selectedAction.id)} canManage={canManage} canEditActions={canEditActions} onClose={() => setSelectedId(null)} />}
+    </div>
+  );
+}
+
+function ProjectState({ status }) {
+  const labels = { draft: 'On Hold', active: 'Active', completed: 'Completed' };
+  return <span className={'project-state state-' + status}>{labels[status] || status}</span>;
+}
+
+function ProjectMetric({ label, value, alert }) {
+  return <div className={'project-metric' + (alert ? ' alert' : '')}><strong>{value}</strong><span>{label}</span></div>;
+}
+
+function ActionStatus({ status }) {
+  const record = window.__projectStore.ACTION_STATUSES.find(item => item.id === status);
+  return <span className={'action-status action-' + status}>{record?.label || status}</span>;
+}
+
+function prettyDate(value) {
+  if (!value) return 'Not set';
+  return new Date(value.length === 10 ? value + 'T00:00:00' : value).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function actionOverdue(action) {
+  return !!action.dueDate && action.dueDate < new Date().toISOString().slice(0, 10) && !['done', 'cancelled'].includes(action.status);
+}
+
+function ActionRegister({ project, actions, members, assignees, profiles, canManage, canEditActions, onOpen }) {
+  const [search, setSearch] = React.useState('');
+  const [status, setStatus] = React.useState('all');
+  const [responsible, setResponsible] = React.useState('all');
+  const [creating, setCreating] = React.useState(false);
+  const nameOf = id => profiles.find(person => person.id === id)?.fullName || profiles.find(person => person.id === id)?.email || 'Unassigned';
+  const filtered = actions.filter(action => {
+    const owners = assignees.filter(item => item.taskId === action.id).map(item => item.userId);
+    const searchable = [action.topic, action.title, action.brief, action.nextStep, action.blockers].join(' ').toLowerCase();
+    return (!search || searchable.includes(search.toLowerCase())) && (status === 'all' || action.status === status) && (responsible === 'all' || owners.includes(responsible));
+  }).sort((a, b) => (a.displayOrder - b.displayOrder) || String(a.dueDate || '').localeCompare(String(b.dueDate || '')));
+  return (
+    <section className="card-panel action-register-panel">
+      <div className="action-toolbar">
+        <label className="action-search"><i className="fa-solid fa-magnifying-glass" /><input placeholder="Search actions..." value={search} onChange={event => setSearch(event.target.value)} /></label>
+        <select className="select" value={status} onChange={event => setStatus(event.target.value)}><option value="all">All statuses</option>{window.__projectStore.ACTION_STATUSES.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select>
+        <select className="select" value={responsible} onChange={event => setResponsible(event.target.value)}><option value="all">All responsible users</option>{members.map(member => <option key={member.userId} value={member.userId}>{nameOf(member.userId)}</option>)}</select>
+        {canEditActions && <button className="btn btn-primary" onClick={() => setCreating(value => !value)}><i className="fa-solid fa-plus" /> New Action</button>}
+      </div>
+      {creating && <NewActionForm project={project} members={members} profiles={profiles} canManage={canManage} onClose={() => setCreating(false)} />}
+      <div className="action-table-wrap">
+        <table className="action-table">
+          <thead><tr><th>#</th><th>Topic</th><th>Action / Particulars</th><th>Status</th><th>Next Step</th><th>Due</th><th>Responsible</th><th>Blockers</th><th>Links</th><th>Updated</th></tr></thead>
+          <tbody>
+            {filtered.map((action, index) => {
+              const owners = assignees.filter(item => item.taskId === action.id).map(item => nameOf(item.userId));
+              return (
+                <tr key={action.id} className={(action.status === 'blocked' ? 'blocked ' : '') + (actionOverdue(action) ? 'overdue' : '')} onClick={() => onOpen(action.id)}>
+                  <td data-label="#">{index + 1}</td><td data-label="Topic"><strong>{action.topic || '-'}</strong></td>
+                  <td data-label="Action"><span className="action-title">{action.title}</span><small>{action.brief}</small></td>
+                  <td data-label="Status"><ActionStatus status={action.status} /></td><td data-label="Next Step">{action.nextStep || '-'}</td>
+                  <td data-label="Due"><span className={actionOverdue(action) ? 'due-over' : ''}>{prettyDate(action.dueDate)}</span></td>
+                  <td data-label="Responsible">{owners.join(', ') || 'Unassigned'}</td>
+                  <td data-label="Blockers">{action.blockers ? <span className="blocker-note"><i className="fa-solid fa-triangle-exclamation" /> {action.blockers}</span> : '-'}</td>
+                  <td data-label="Links">{action.referenceLinks.length ? <span className="link-count"><i className="fa-solid fa-paperclip" /> {action.referenceLinks.length}</span> : '-'}</td>
+                  <td data-label="Updated">{prettyDate(action.updatedAt || action.createdAt)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        {!filtered.length && <div className="action-empty">No actions match this view.</div>}
+      </div>
+    </section>
+  );
+}
+
+function NewActionForm({ project, members, profiles, canManage, onClose }) {
+  const [draft, setDraft] = React.useState({ topic: '', title: '', brief: '', status: 'not_started', nextStep: '', dueDate: '', responsibleId: '', blockers: '' });
+  const [saving, setSaving] = React.useState(false);
+  const [error, setError] = React.useState('');
+  const nameOf = id => profiles.find(person => person.id === id)?.fullName || profiles.find(person => person.id === id)?.email || id;
+  async function save() {
+    if (!draft.title.trim()) {
+      setError('Action / Particulars is required.');
+      return;
+    }
+    setSaving(true);
+    setError('');
+    try {
+      const taskId = await window.__projectStore.saveTask({ projectId: project.id, trackCode: project.trackCodes[0] || 'GENERAL', accountableId: project.firstOfficerId, topic: draft.topic.trim(), title: draft.title.trim(), brief: draft.brief.trim(), status: draft.status, nextStep: draft.nextStep.trim(), blockers: draft.blockers.trim(), dueDate: draft.dueDate, displayOrder: Math.floor(Date.now() / 1000) });
+      if (draft.responsibleId) await window.__projectStore.assignTaskTeam(taskId, [draft.responsibleId]);
+      onClose();
+    } catch (err) {
+      const message = err?.message || 'Could not save this action.';
+      if (/column|relation|display_order|topic|next_step|project_members|project_resources/i.test(message)) {
+        setError('Action Register database setup is not applied yet. Run the project action register migration in Supabase, then try again.');
+      } else if (/row-level security|policy|permission/i.test(message)) {
+        setError('You do not have permission to create actions for this project.');
+      } else {
+        setError(message);
+      }
+    } finally {
+      setSaving(false);
+    }
+  }
+  return (
+    <div className="new-action-form">
+      {error && <div className="action-form-error"><i className="fa-solid fa-circle-exclamation" /> {error}</div>}
+      <div className="new-action-grid">
+        <input className="input" placeholder="Topic" value={draft.topic} onChange={event => setDraft(value => ({ ...value, topic: event.target.value }))} />
+        <input className="input" placeholder="Action / Particulars" value={draft.title} onChange={event => setDraft(value => ({ ...value, title: event.target.value }))} />
+        <select className="select" value={draft.responsibleId} onChange={event => setDraft(value => ({ ...value, responsibleId: event.target.value }))}><option value="">Responsible user</option>{members.map(member => <option key={member.userId} value={member.userId}>{nameOf(member.userId)}</option>)}</select>
+        <select className="select" value={draft.status} onChange={event => setDraft(value => ({ ...value, status: event.target.value }))}>{window.__projectStore.ACTION_STATUSES.filter(item => canManage || !['done', 'cancelled'].includes(item.id)).map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select>
+        <textarea className="textarea" placeholder="Description / details" value={draft.brief} onChange={event => setDraft(value => ({ ...value, brief: event.target.value }))} />
+        <textarea className="textarea" placeholder="Next step" value={draft.nextStep} onChange={event => setDraft(value => ({ ...value, nextStep: event.target.value }))} />
+        <input className="input" type="date" value={draft.dueDate} onChange={event => setDraft(value => ({ ...value, dueDate: event.target.value }))} />
+        <input className="input" placeholder="Initial blocker, if any" value={draft.blockers} onChange={event => setDraft(value => ({ ...value, blockers: event.target.value }))} />
+      </div>
+      <div className="task-composer-actions"><button className="btn btn-ghost btn-sm" disabled={saving} onClick={onClose}>Cancel</button><button className="btn btn-primary btn-sm" disabled={saving} onClick={save}>{saving ? 'Saving...' : 'Save Action'}</button></div>
+    </div>
+  );
+}
+
+function ProjectOverview({ actions, assignees, profiles, onOpen }) {
+  const done = actions.filter(action => action.status === 'done').length;
+  const forReview = actions.filter(action => action.status === 'for_review');
+  const completed = actions.filter(action => action.status === 'done');
+  const attention = actions.filter(action => action.status === 'blocked' || actionOverdue(action));
+  const workload = profiles.map(person => ({ person, count: assignees.filter(assignment => assignment.userId === person.id && actions.some(action => action.id === assignment.taskId && !['done', 'cancelled'].includes(action.status))).length })).filter(item => item.count).sort((a, b) => b.count - a.count);
+  const deadlines = actions.filter(action => action.dueDate && !['done', 'cancelled'].includes(action.status)).sort((a, b) => a.dueDate.localeCompare(b.dueDate)).slice(0, 6);
+  return (
+    <section className="project-overview">
+      <div className="project-overview-metrics">
+        <ProjectMetric value={actions.length} label="Total Actions" /><ProjectMetric value={done} label="Done" /><ProjectMetric value={actions.filter(action => action.status === 'in_progress').length} label="In Progress" />
+        <ProjectMetric value={actions.filter(action => action.status === 'blocked').length} label="Blocked" alert={actions.some(action => action.status === 'blocked')} /><ProjectMetric value={actions.filter(actionOverdue).length} label="Overdue" alert={actions.some(actionOverdue)} /><ProjectMetric value={(actions.length ? Math.round(done / actions.length * 100) : 0) + '%'} label="Complete" />
+      </div>
+      <div className="overview-columns">
+        <OverviewActionCard title="For Review" empty="No actions waiting for review." actions={forReview} assignees={assignees} profiles={profiles} onOpen={onOpen} />
+        <OverviewActionCard title="Done" empty="No completed actions yet." actions={completed} assignees={assignees} profiles={profiles} onOpen={onOpen} />
+        <div className="card-panel overview-panel"><h2>Attention Needed</h2>{!attention.length && <p className="empty-line">No blocked or overdue actions.</p>}{attention.map(action => <button key={action.id} className="attention-row" onClick={() => onOpen(action.id)}><strong>{action.title}</strong><span>{action.status === 'blocked' ? 'Blocked' : 'Overdue'} - {action.topic || 'General'}</span></button>)}</div>
+        <div className="card-panel overview-panel"><h2>Team Workload</h2>{!workload.length && <p className="empty-line">No active assigned actions.</p>}{workload.map(item => <div key={item.person.id} className="workload-row"><span>{item.person.fullName || item.person.email}</span><strong>{item.count} active</strong></div>)}</div>
+        <div className="card-panel overview-panel"><h2>Upcoming Deadlines</h2>{!deadlines.length && <p className="empty-line">No upcoming deadlines.</p>}{deadlines.map(action => <button key={action.id} className="deadline-row" onClick={() => onOpen(action.id)}><span>{prettyDate(action.dueDate)}</span><strong>{action.title}</strong></button>)}</div>
+      </div>
+    </section>
+  );
+}
+
+function OverviewActionCard({ title, empty, actions, assignees, profiles, onOpen }) {
+  const nameOf = id => profiles.find(person => person.id === id)?.fullName || profiles.find(person => person.id === id)?.email || 'Unassigned';
+  return (
+    <div className="card-panel overview-panel workflow-panel">
+      <h2>{title} <span className="workflow-count">{actions.length}</span></h2>
+      {!actions.length && <p className="empty-line">{empty}</p>}
+      {actions.map(action => {
+        const owners = assignees.filter(assignment => assignment.taskId === action.id).map(assignment => nameOf(assignment.userId)).join(', ') || 'Unassigned';
+        return (
+          <button key={action.id} className="overview-action-row" onClick={() => onOpen(action.id)}>
+            <strong>{action.title}</strong>
+            <span>{owners}{action.dueDate ? ' - ' + prettyDate(action.dueDate) : ''}</span>
+            <ActionStatus status={action.status} />
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function ProjectResources({ project, actions, resources, submissions, profiles, canManage }) {
+  const [adding, setAdding] = React.useState(false);
+  const [draft, setDraft] = React.useState({ title: '', resourceType: 'link', url: '' });
+  const nameOf = id => profiles.find(person => person.id === id)?.fullName || profiles.find(person => person.id === id)?.email || 'Project member';
+  const references = actions.flatMap(action => action.referenceLinks.map((url, index) => ({ id: action.id + '-' + index, title: action.title, resourceType: 'reference', url, addedBy: action.createdBy, createdAt: action.updatedAt })));
+  const deliverables = submissions.filter(item => item.linkUrl || item.fileUrl).map(item => ({ id: item.id, title: actions.find(action => action.id === item.taskId)?.title || 'Submitted deliverable', resourceType: 'deliverable', url: item.linkUrl || item.fileUrl, addedBy: item.submittedBy, createdAt: item.createdAt }));
+  const allResources = [...resources, ...references, ...deliverables];
+  async function save() {
+    if (!draft.title.trim() || !draft.url.trim()) return;
+    await window.__projectStore.addResource({ projectId: project.id, ...draft });
+    setDraft({ title: '', resourceType: 'link', url: '' });
+    setAdding(false);
+  }
+  return (
+    <section className="card-panel resources-panel">
+      <div className="panel-heading"><div><h2>Project Resources</h2><p>Important links and deliverables in one place.</p></div>{canManage && <button className="btn btn-primary btn-sm" onClick={() => setAdding(value => !value)}><i className="fa-solid fa-plus" /> Add Resource</button>}</div>
+      {adding && <div className="resource-form"><input className="input" placeholder="Resource title" value={draft.title} onChange={event => setDraft(value => ({ ...value, title: event.target.value }))} /><select className="select" value={draft.resourceType} onChange={event => setDraft(value => ({ ...value, resourceType: event.target.value }))}><option value="link">Link</option><option value="file">File</option><option value="brief">Brief</option></select><input className="input" placeholder="URL" value={draft.url} onChange={event => setDraft(value => ({ ...value, url: event.target.value }))} /><button className="btn btn-primary btn-sm" onClick={save}>Save</button></div>}
+      <div className="resource-list">{!allResources.length && <div className="action-empty">No resources have been added.</div>}{allResources.map(resource => <a key={resource.id} className="resource-row" href={resource.url} target="_blank" rel="noreferrer"><i className="fa-solid fa-link" /><div><strong>{resource.title}</strong><span>{resource.resourceType} - added by {nameOf(resource.addedBy)} - {prettyDate(resource.createdAt)}</span></div><i className="fa-solid fa-arrow-up-right-from-square" /></a>)}</div>
+    </section>
+  );
+}
+
+function ProjectActivity({ actions, activity, profiles }) {
+  const nameOf = id => profiles.find(person => person.id === id)?.fullName || profiles.find(person => person.id === id)?.email || 'Project member';
+  const actionOf = id => actions.find(action => action.id === id)?.title || 'Action';
+  return <section className="card-panel project-activity-panel"><h2>Activity</h2>{!activity.length && <div className="action-empty">No project activity yet.</div>}{activity.map(item => <div key={item.id} className="project-activity-row"><span className="activity-dot" /><div><strong>{nameOf(item.actorId)}</strong> {item.action.replaceAll('_', ' ')} <b>{actionOf(item.taskId)}</b><time>{prettyDate(item.createdAt)}</time></div></div>)}</section>;
+}
+
+function ActionModal({ action, project, members, profiles, assignees, comments, activity, canManage, canEditActions, onClose }) {
+  const [mode, setMode] = React.useState('view');
+  const [team, setTeam] = React.useState(assignees.map(assignment => assignment.userId));
+  const [edit, setEdit] = React.useState({ topic: action.topic, title: action.title, brief: action.brief, status: action.status, nextStep: action.nextStep, dueDate: action.dueDate || '', blockers: action.blockers, referenceLinks: action.referenceLinks.join('\n'), progressNote: action.progressNote });
+  const [comment, setComment] = React.useState('');
+  const [saving, setSaving] = React.useState(false);
+  const [error, setError] = React.useState('');
+  const nameOf = id => profiles.find(person => person.id === id)?.fullName || profiles.find(person => person.id === id)?.email || 'Unknown';
+  const canUpdate = canManage || (canEditActions && !['done', 'cancelled'].includes(action.status));
+  const canDelete = canEditActions;
+  const statusOptions = window.__projectStore.ACTION_STATUSES.filter(item => canManage || !['done', 'cancelled'].includes(item.id) || item.id === action.status);
+  const responsible = assignees.map(assignment => nameOf(assignment.userId)).join(', ') || 'Unassigned';
+  React.useEffect(() => {
+    const closeOnEscape = event => { if (event.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', closeOnEscape);
+    return () => document.removeEventListener('keydown', closeOnEscape);
+  }, [onClose]);
+  async function save() {
+    setSaving(true);
+    setError('');
+    try {
+      await window.__projectStore.saveTask({ ...action, ...edit, referenceLinks: edit.referenceLinks.split(/\n|,/).map(value => value.trim()).filter(Boolean), id: action.id, projectId: action.projectId, trackCode: action.trackCode });
+      await window.__projectStore.assignTaskTeam(action.id, team);
+      setMode('view');
+    } catch (err) {
+      setError(err?.message || 'Could not save this action.');
+    } finally {
+      setSaving(false);
+    }
+  }
+  async function postComment() { if (!comment.trim()) return; await window.__projectStore.addComment(action.id, comment.trim()); setComment(''); }
+  async function remove() {
+    if (!window.confirm(`Delete "${action.title}"? This action and its history will be removed.`)) return;
+    await window.__projectStore.deleteTask(action.id);
+    onClose();
+  }
+  return (
+    <div className="action-modal-backdrop" onClick={onClose}>
+      <section className="action-modal" role="dialog" aria-modal="true" aria-label={action.title} onClick={event => event.stopPropagation()}>
+        <header className="action-modal-head">
+          <div>
+            <div className="t-label project-register-label">{action.topic || 'GENERAL ACTION'}</div>
+            <h2>{action.title}</h2>
+          </div>
+          <div className="action-modal-controls">
+            <div className="action-mode-toggle" aria-label="Action display mode">
+              <button className={mode === 'view' ? 'active' : ''} onClick={() => setMode('view')}>View</button>
+              {canUpdate && <button className={mode === 'edit' ? 'active' : ''} onClick={() => setMode('edit')}>Edit</button>}
+            </div>
+            <button className="btn btn-ghost btn-sm" aria-label="Close action" onClick={onClose}><i className="fa-solid fa-xmark" /></button>
+          </div>
+        </header>
+        <div className="action-modal-body">
+          {mode === 'view' ? (
+            <div className="action-modal-columns">
+              <section className="action-modal-section action-summary">
+                <div className="action-modal-section-title">Action Details</div>
+                <div className="action-summary-status"><ActionStatus status={action.status} /></div>
+                <div className="action-summary-block action-summary-wide"><span>Description / details</span><p>{action.brief || 'No details provided.'}</p></div>
+                <div className="action-summary-block"><span>Next step</span><p>{action.nextStep || 'Not set'}</p></div>
+                <div className="action-summary-block"><span>Due date</span><p>{prettyDate(action.dueDate)}</p></div>
+                <div className="action-summary-block"><span>Responsible</span><p>{responsible}</p></div>
+                <div className="action-summary-block"><span>Project lead</span><p>{nameOf(project.firstOfficerId)}</p></div>
+                <div className="action-summary-block action-summary-wide"><span>Blockers</span><p className={action.blockers ? 'modal-blocker' : ''}>{action.blockers || 'No blockers recorded.'}</p></div>
+                <div className="action-summary-block action-summary-wide"><span>Latest progress update</span><p>{action.progressNote || 'No progress update recorded.'}</p></div>
+                <div className="action-summary-block action-summary-wide"><span>Reference links</span>{action.referenceLinks.length ? <div className="action-reference-links">{action.referenceLinks.map((url, index) => <a key={url + index} href={url} target="_blank" rel="noreferrer">{url}</a>)}</div> : <p>No reference links.</p>}</div>
+              </section>
+              <ActionModalHistory comments={comments} activity={activity} nameOf={nameOf} progressNote={action.progressNote} />
+              {canDelete && <div className="action-modal-delete"><button className="btn btn-ghost btn-sm danger-action" onClick={remove}>Delete Action</button></div>}
+            </div>
+          ) : (
+            <div className="action-modal-columns">
+              <section className="action-modal-section action-edit-form"><div className="action-modal-section-title">Edit Action</div>
+                {error && <div className="action-form-error"><i className="fa-solid fa-circle-exclamation" /> {error}</div>}
+                <input className="input" placeholder="Topic" value={edit.topic} onChange={event => setEdit(value => ({ ...value, topic: event.target.value }))} />
+                <input className="input" value={edit.title} onChange={event => setEdit(value => ({ ...value, title: event.target.value }))} />
+                <textarea className="textarea" placeholder="Description / details" value={edit.brief} onChange={event => setEdit(value => ({ ...value, brief: event.target.value }))} />
+                <div className="action-modal-field-grid"><label>Status<select className="select" value={edit.status} onChange={event => setEdit(value => ({ ...value, status: event.target.value }))}>{statusOptions.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label><label>Due date<input className="input" type="date" value={edit.dueDate} onChange={event => setEdit(value => ({ ...value, dueDate: event.target.value }))} /></label></div>
+                <label>Responsible<select multiple className="select assignee-select" value={team} onChange={event => setTeam(Array.from(event.target.selectedOptions).map(option => option.value))}>{members.map(member => <option key={member.userId} value={member.userId}>{nameOf(member.userId)}</option>)}</select></label>
+                <label>Next step<textarea className="textarea" value={edit.nextStep} onChange={event => setEdit(value => ({ ...value, nextStep: event.target.value }))} /></label>
+                <label>Blockers<textarea className="textarea" value={edit.blockers} onChange={event => setEdit(value => ({ ...value, blockers: event.target.value }))} /></label>
+                <label>Reference links<textarea className="textarea" placeholder="One URL per line" value={edit.referenceLinks} onChange={event => setEdit(value => ({ ...value, referenceLinks: event.target.value }))} /></label>
+                <label>Progress update<textarea className="textarea" placeholder="What changed today?" value={edit.progressNote} onChange={event => setEdit(value => ({ ...value, progressNote: event.target.value }))} /></label>
+                <div className="action-modal-actions"><button className="btn btn-ghost btn-sm" disabled={saving} onClick={() => setMode('view')}>Cancel</button><button className="btn btn-primary btn-sm" disabled={saving} onClick={save}>{saving ? 'Saving...' : 'Save Changes'}</button></div>
+              </section>
+              <ActionModalHistory comments={comments} activity={activity} nameOf={nameOf} progressNote={action.progressNote} allowComment comment={comment} setComment={setComment} postComment={postComment} />
+              {canDelete && <div className="action-modal-delete"><button className="btn btn-ghost btn-sm danger-action" onClick={remove}>Delete Action</button></div>}
+            </div>
+          )}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function ActionModalHistory({ comments, activity, nameOf, progressNote = '', allowComment = false, comment = '', setComment, postComment }) {
+  return (
+    <section className="action-modal-section action-modal-history">
+      <div className="action-modal-section-title">Comments and History</div>
+      {!comments.length && <p className="empty-line">No comments yet.</p>}
+      {comments.map(item => <div key={item.id} className={'comment-row ' + item.kind}><strong>{nameOf(item.authorId)}</strong><p>{item.comment}</p></div>)}
+      {allowComment && <div className="comment-form"><textarea className="textarea" placeholder="Add a comment" value={comment} onChange={event => setComment(event.target.value)} /><button className="btn btn-ghost btn-sm" onClick={postComment}>Add Comment</button></div>}
+      <div className="action-modal-timeline">
+        {progressNote && !activity.some(item => item.metadata?.progressNote === progressNote) && <div className="has-note"><span><strong>Latest Progress Update</strong><p>{progressNote}</p></span><time>Latest</time></div>}
+        {activity.map(item => <div key={item.id} className={item.metadata?.progressNote ? 'has-note' : ''}><span><strong>{item.action.replaceAll('_', ' ')}</strong>{item.metadata?.progressNote && <p>{item.metadata.progressNote}</p>}</span><time>{prettyDate(item.createdAt)}</time></div>)}
+      </div>
+    </section>
   );
 }
 
@@ -1118,7 +1602,7 @@ function TaskDetailModal({ task, project, profile, profiles, assignees, submissi
   );
 }
 
-function ProjectsPage() {
+function LegacyProjectsPage() {
   const { profile } = useCurrentUserProfile();
   const { profiles } = useUserProfiles();
   const { projects, tasks, loaded, error } = useProjects();
@@ -1413,6 +1897,61 @@ function DelegationDetail({ delegation, profiles, projects, onBack }) {
 
 function FirstOfficerProjectsPage() {
   return <ProjectWorkspacePage mode="project-lead" />;
+}
+
+function ProjectsPage() {
+  const { profile } = useCurrentUserProfile();
+  const { profiles } = useUserProfiles();
+  const { tasks, loaded, error } = useProjects();
+  const [selectedId, setSelectedId] = React.useState('');
+  const projects = window.__projectStore.visibleProjects(profile).filter(project => project.status !== 'archived');
+  const selected = projects.find(project => project.id === selectedId);
+  const nameOf = id => profiles.find(person => person.id === id)?.fullName || profiles.find(person => person.id === id)?.email || 'Unassigned';
+
+  if (selected) {
+    return <ProjectWorkspacePage selectedProjectId={selected.id} onBack={() => setSelectedId('')} />;
+  }
+
+  return (
+    <div className="enter projects-catalog">
+      <div className="section-head">
+        <div>
+          <div className="t-label project-register-label">PROJECTS</div>
+          <h1 className="t-title projects-catalog-title">Projects</h1>
+          <div className="t-body">Select a project to open its Action Register.</div>
+        </div>
+      </div>
+      {error && <div className="card-panel project-error">{error}</div>}
+      {!loaded && <div className="card-panel project-empty">Loading projects...</div>}
+      {loaded && !projects.length && <div className="card-panel project-empty">No assigned projects available.</div>}
+      <div className="project-card-grid">
+        {projects.map(project => {
+          const actions = tasks.filter(task => task.projectId === project.id);
+          const done = actions.filter(action => action.status === 'done').length;
+          const blocked = actions.filter(action => action.status === 'blocked').length;
+          return (
+            <button key={project.id} className="project-card-button project-register-card" onClick={() => setSelectedId(project.id)}>
+              <div className="project-card-head">
+                <ProjectState status={project.status} />
+                <span className="project-card-progress">{actions.length ? Math.round(done / actions.length * 100) : 0}% complete</span>
+              </div>
+              <h2>{project.title}</h2>
+              <p>{project.description || 'Open the project Action Register.'}</p>
+              <div className="project-card-meta">
+                <span><i className="fa-solid fa-user-tie" /> {nameOf(project.firstOfficerId)}</span>
+                <span><i className="fa-regular fa-calendar" /> {prettyDate(project.dueDate)}</span>
+              </div>
+              <div className="project-card-metrics">
+                <span><strong>{actions.length}</strong> Actions</span>
+                <span><strong>{done}</strong> Done</span>
+                <span className={blocked ? 'has-blocked' : ''}><strong>{blocked}</strong> Blocked</span>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 function ProjectTasksPage() {

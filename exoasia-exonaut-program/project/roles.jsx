@@ -192,6 +192,7 @@ function LeadHome({ onNavigate }) {
 function LeadRoster() {
   const { profile } = useCurrentUserProfile();
   const exonautRows = useSupabaseExonautRows();
+  const [removalUser, setRemovalUser] = React.useState(null);
   const leadTrack = profile.trackCode || 'AIS';
   const myExonauts = exonautRows.filter(u =>
     u.track === leadTrack && (!profile.cohortId || u.cohort === profile.cohortId)
@@ -207,13 +208,13 @@ function LeadRoster() {
       </div>
 
       <div className="lb-table">
-        <div className="lb-header" style={{ gridTemplateColumns: '48px 48px 1fr 100px 100px 100px 120px' }}>
+        <div className="lb-header" style={{ gridTemplateColumns: '48px 48px 1fr 100px 100px 100px 160px' }}>
           <div>#</div><div></div><div>EXONAUT</div><div>PTS</div><div>P1/P2/P3</div><div>BADGES</div><div>ACTIONS</div>
         </div>
         {myExonauts.map((u, i) => {
           const isAtRisk = u.points < 200;
           return (
-            <div key={u.id} className={'lb-row' + (isAtRisk ? '' : '')} style={{ gridTemplateColumns: '48px 48px 1fr 100px 100px 100px 120px' }}>
+            <div key={u.id} className={'lb-row' + (isAtRisk ? '' : '')} style={{ gridTemplateColumns: '48px 48px 1fr 100px 100px 100px 160px' }}>
               <div className="lb-rank">#{i+1}</div>
               <AvatarWithRing name={u.name} avatarUrl={u.avatarUrl} size={34} tier={u.tier} />
               <div className="lb-name">
@@ -227,11 +228,20 @@ function LeadRoster() {
                 <button className="btn btn-ghost btn-sm" title="Award pts"><i className="fa-solid fa-bolt" /></button>
                 <button className="btn btn-ghost btn-sm" title="Kudos"><i className="fa-solid fa-hand-sparkles" /></button>
                 <button className="btn btn-ghost btn-sm" title="Profile"><i className="fa-solid fa-eye" /></button>
+                <button className="btn btn-ghost btn-sm danger-action" title="Endorse removal" onClick={() => setRemovalUser(u)}>
+                  <i className="fa-solid fa-user-slash" />
+                </button>
               </div>
             </div>
           );
         })}
       </div>
+      {removalUser && (
+        <LeadEndorseModal
+          user={removalUser}
+          onClose={() => setRemovalUser(null)}
+        />
+      )}
     </div>
   );
 }
@@ -821,7 +831,7 @@ function CommanderLeads() {
   );
 }
 
-function CommanderProjectProgress() {
+function CommanderProjectProgress({ onNavigate }) {
   const { projects, tasks, assignees } = useProjects();
   const { profiles } = useUserProfiles();
   const { ledger } = usePoints();
@@ -853,7 +863,10 @@ function CommanderProjectProgress() {
             <div className="t-label" style={{ marginTop: 12, marginBottom: 8, color: 'var(--amber)' }}>COMMANDER - PROJECT DETAIL</div>
             <h1 className="t-title" style={{ fontSize: 38, margin: 0 }}>{selected.title}</h1>
           </div>
-          <span className="status-pill status-submitted">{selected.status.toUpperCase()}</span>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+            <span className="status-pill status-submitted">{selected.status.toUpperCase()}</span>
+            {onNavigate && <button className="btn btn-primary btn-sm" onClick={() => onNavigate('cmdr-action-register')}><i className="fa-solid fa-diagram-project" /> Open Projects</button>}
+          </div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 18 }}>
           <KPI label="FIRST OFFICER" value={nameOf(selected.firstOfficerId)} accent="platinum" sub="PROJECT LEAD" />

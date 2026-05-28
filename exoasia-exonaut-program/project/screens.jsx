@@ -677,11 +677,13 @@ function KudosFeed({ onGive }) {
 function RitualsPage() {
   const { profile } = useCurrentUserProfile();
   const rowsFromProfiles = useSupabaseExonautRows();
-  const { records, history, completeRitual } = useRitualState(profile.id);
   const [proofRitual, setProofRitual] = React.useState(null);
   const activeCohort = window.getActiveCohort?.(profile) || COHORT;
+  const timeline = window.getCohortTimeline?.(activeCohort);
+  const currentWeek = timeline?.valid ? timeline.currentWeek : COHORT.week;
+  const { records, history, completeRitual } = useRitualState(profile.id, currentWeek);
   const cohortWeekTotal = window.getCohortWeekTotal?.(activeCohort) || COHORT.weekTotal;
-  const weekLabel = window.getCohortWeekWindowLabel?.(activeCohort, COHORT.week) || '';
+  const weekLabel = window.getCohortWeekWindowLabel?.(activeCohort, currentWeek) || '';
   const weeks = Object.keys(history).length
     ? Object.keys(history).map(k => Number(k.replace('w', ''))).filter(Boolean)
     : [];
@@ -690,8 +692,8 @@ function RitualsPage() {
     const manilaDay = new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'Asia/Manila' }).format(new Date());
     if (manilaDay !== 'Fri') return;
     const sorted = [...rowsFromProfiles].sort((a, b) => b.points - a.points);
-    if (sorted[0]?.id === profile.id) completeRitual('iotw', { description: 'Auto logged from Friday leaderboard rank' }, { userId: profile.id, cohortId: profile.cohortId || 'c2627', source: 'intern-of-week' });
-  }, [rowsFromProfiles, profile.id]);
+    if (sorted[0]?.id === profile.id) completeRitual('iotw', { description: 'Auto logged from Friday leaderboard rank' }, { userId: profile.id, cohortId: profile.cohortId || 'c2627', source: 'intern-of-week', profile, week: currentWeek });
+  }, [rowsFromProfiles, profile.id, currentWeek]);
 
   function submitProof(ritual) {
     if (ritual.id === 'iotw') return;
@@ -705,7 +707,7 @@ function RitualsPage() {
           <div className="t-label" style={{ marginBottom: 8 }}>WEEKLY CADENCE</div>
           <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>Rituals</h1>
         </div>
-        <div className="t-mono" style={{ fontSize: 11, color: 'var(--off-white-40)' }}>WEEK {COHORT.week}/{cohortWeekTotal}</div>
+        <div className="t-mono" style={{ fontSize: 11, color: 'var(--off-white-40)' }}>WEEK {currentWeek}/{cohortWeekTotal}</div>
       </div>
 
       <div style={{ marginBottom: 28 }}>
@@ -769,7 +771,7 @@ function RitualsPage() {
           ritual={proofRitual}
           onClose={() => setProofRitual(null)}
           onSubmit={async (proof) => {
-            await completeRitual(proofRitual.id, proof, { userId: profile.id, cohortId: profile.cohortId || 'c2627' });
+            await completeRitual(proofRitual.id, proof, { userId: profile.id, cohortId: profile.cohortId || 'c2627', profile, week: currentWeek });
             setProofRitual(null);
           }}
         />
@@ -780,9 +782,20 @@ function RitualsPage() {
 
 function RitualProofModal({ ritual, onClose, onSubmit }) {
   const [description, setDescription] = React.useState('');
+  const [link, setLink] = React.useState('');
   const [file, setFile] = React.useState(null);
   const [fileDataUrl, setFileDataUrl] = React.useState('');
   const [saving, setSaving] = React.useState(false);
+  const isTeachBack = ritual.id === 'teach-bk';
+  const hasDescription = !!description.trim();
+  const hasLink = !!link.trim();
+  const hasFile = !!file;
+  const hasThumbnail = hasFile && String(file.type || '').startsWith('image/');
+  const teachBackLinkError = isTeachBack && !hasLink ? 'Teach-Back requires a video link.' : '';
+  const teachBackImageError = isTeachBack && !hasThumbnail ? 'Teach-Back requires a thumbnail image.' : '';
+  const canSubmit = isTeachBack
+    ? hasLink && hasThumbnail
+    : (hasDescription || hasLink || hasFile);
 
   function attachFile(nextFile) {
     setFile(nextFile || null);
@@ -794,14 +807,15 @@ function RitualProofModal({ ritual, onClose, onSubmit }) {
   }
 
   async function submit() {
-    if (!file || saving) return;
+    if (!canSubmit || saving) return;
     setSaving(true);
     try {
       await onSubmit({
         description: description.trim(),
-        fileName: file.name,
-        fileSize: file.size,
-        fileType: file.type,
+        link: link.trim(),
+        fileName: file?.name || '',
+        fileSize: file?.size || '',
+        fileType: file?.type || '',
         fileDataUrl,
       });
     } finally {
@@ -820,17 +834,27 @@ function RitualProofModal({ ritual, onClose, onSubmit }) {
           <button className="btn btn-ghost btn-sm" onClick={onClose}><i className="fa-solid fa-xmark" /></button>
         </div>
         <div className="task-section">
-          <label className="t-label-muted">UPLOAD PROOF</label>
-          <input className="input" type="file" onChange={e => attachFile(e.target.files && e.target.files[0])} />
+          <label className="t-label-muted">{isTeachBack ? 'THUMBNAIL IMAGE REQUIRED' : 'ATTACHMENT OPTIONAL'}</label>
+          <div className="t-body" style={{ fontSize: 12, color: 'var(--off-white-68)', marginBottom: 8 }}>
+            {isTeachBack ? 'Add the video link and upload a thumbnail.' : 'Add a note, link, image, or file.'}
+          </div>
+          <input className="input" type="file" accept={isTeachBack ? 'image/*' : undefined} onChange={e => attachFile(e.target.files && e.target.files[0])} />
           {file && <div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)', marginTop: 8 }}>{file.name}</div>}
+          {teachBackImageError && <div className="t-body" style={{ fontSize: 12, color: 'var(--red)', marginTop: 8 }}>{teachBackImageError}</div>}
         </div>
         <div className="task-section">
-          <label className="t-label-muted">DESCRIPTION OPTIONAL</label>
-          <textarea className="textarea" rows={4} value={description} onChange={e => setDescription(e.target.value)} placeholder="Add context, links, notes, or what you completed." />
+          <label className="t-label-muted">{isTeachBack ? 'VIDEO LINK REQUIRED' : 'LINK OPTIONAL'}</label>
+          <input className="input" value={link} onChange={e => setLink(e.target.value)} placeholder={isTeachBack ? 'Paste the YouTube or video link.' : 'Paste a link if this ritual lives elsewhere.'} />
+          {teachBackLinkError && <div className="t-body" style={{ fontSize: 12, color: 'var(--red)', marginTop: 8 }}>{teachBackLinkError}</div>}
+        </div>
+        <div className="task-section">
+          <label className="t-label-muted">{isTeachBack ? 'DESCRIPTION OPTIONAL' : 'DESCRIPTION'}</label>
+          <textarea className="textarea" rows={4} value={description} onChange={e => setDescription(e.target.value)} placeholder={isTeachBack ? 'What does this Teach-Back cover?' : 'Add context, notes, or what you completed.'} />
+          {!isTeachBack && !canSubmit && <div className="t-body" style={{ fontSize: 12, color: 'var(--off-white-40)', marginTop: 8 }}>Add at least a note, link, image, or file.</div>}
         </div>
         <div className="task-composer-actions">
           <button className="btn btn-ghost btn-sm" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary btn-sm" disabled={!file || saving} onClick={submit}>
+          <button className="btn btn-primary btn-sm" disabled={!canSubmit || saving} onClick={submit}>
             <i className="fa-solid fa-upload" /> {saving ? 'Submitting...' : 'Submit Proof'}
           </button>
         </div>
@@ -1475,7 +1499,7 @@ function CommunityPage() {
           <div className="t-body" style={{ marginTop: 6, color: 'var(--off-white-68)' }}>
             {tab === 'directory'
               ? 'Every Exonaut — active and alumni. Browse profiles to see badges, credentials, and projects.'
-              : 'Message board for the cohort. Post, vote, and comment.'}
+              : 'Thread for the cohort. Post, vote, and comment.'}
           </div>
         </div>
         <div className="t-mono" style={{ fontSize: 11, color: 'var(--off-white-68)', letterSpacing: '0.08em' }}>
@@ -1488,7 +1512,7 @@ function CommunityPage() {
         <div className="community-tabs" style={{ display: 'flex', gap: 2, padding: 2, background: 'var(--off-white-07)', borderRadius: 2, width: 'fit-content' }}>
           {[
             { id: 'directory', label: 'Directory', icon: 'fa-id-card' },
-            { id: 'board',     label: 'Message Board', icon: 'fa-comments' },
+            { id: 'board',     label: 'Thread', icon: 'fa-comments' },
           ].map(t => (
             <button key={t.id} onClick={() => setTab(t.id)} style={{
               padding: '8px 16px', background: tab === t.id ? 'var(--ink)' : 'transparent',

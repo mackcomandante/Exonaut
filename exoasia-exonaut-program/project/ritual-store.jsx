@@ -13,7 +13,21 @@
     return (window.ME && ME.cohort) || 'c2627';
   }
 
-  function weekKey(week = COHORT.week) {
+  function currentCohortWeek() {
+    const active = window.getActiveCohort?.() || null;
+    const timeline = active ? window.getCohortTimeline?.(active) : null;
+    return timeline?.valid ? timeline.currentWeek : COHORT.week;
+  }
+
+  function effectiveWeek(log) {
+    const liveWeek = currentCohortWeek();
+    const storedWeek = Number(log?.week) || liveWeek;
+    return storedWeek === Number(COHORT.week) && liveWeek !== Number(COHORT.week)
+      ? liveWeek
+      : storedWeek;
+  }
+
+  function weekKey(week = currentCohortWeek()) {
     return 'w' + String(week).padStart(2, '0');
   }
 
@@ -53,16 +67,16 @@
       cohortId: row.cohort_id || 'c2627',
       ritualId: row.ritual_id,
       ritualName: row.ritual_name,
-      week: Number(row.week) || COHORT.week,
+      week: Number(row.week) || currentCohortWeek(),
       points: Number(row.points) || 0,
       proof: row.proof || {},
       loggedAt: row.logged_at || row.created_at || new Date().toISOString(),
     };
   }
 
-  function recordsFor(userId = activeUserId(), week = COHORT.week) {
+  function recordsFor(userId = activeUserId(), week = currentCohortWeek()) {
     return state.logs
-      .filter(log => log.userId === userId && Number(log.week) === Number(week))
+      .filter(log => log.userId === userId && Number(effectiveWeek(log)) === Number(week))
       .reduce((acc, log) => {
         acc[log.ritualId] = logToRecord(log);
         return acc;
@@ -73,7 +87,7 @@
     return state.logs
       .filter(log => log.userId === userId)
       .reduce((acc, log) => {
-        const key = weekKey(log.week);
+        const key = weekKey(effectiveWeek(log));
         acc[key] = acc[key] || {};
         acc[key][log.ritualId] = logToRecord(log);
         return acc;
@@ -90,6 +104,17 @@
     return new Blob([bytes], { type: contentType });
   }
 
+  function dataUrlToFile(dataUrl, name, type) {
+    const blob = dataUrlToBlob(dataUrl);
+    if (!blob) return null;
+    try {
+      return new File([blob], name || 'ritual-media', { type: type || blob.type || 'application/octet-stream' });
+    } catch (e) {
+      blob.name = name || 'ritual-media';
+      return blob;
+    }
+  }
+
   async function uploadProof(userId, ritualId, proof) {
     if (!window.__db || !proof?.fileDataUrl) return '';
     const blob = dataUrlToBlob(proof.fileDataUrl);
@@ -104,6 +129,58 @@
       return '';
     }
     return path;
+  }
+
+  const THREAD_HASHTAGS = {
+    'mon-ign': '#MondayIgnition',
+    'mid-pls': '#MidWeekPulse',
+    iotw: '#InternOfWeek',
+    'teach-bk': '#TeachBack',
+  };
+
+  function threadBodyFor(log) {
+    const hashtag = THREAD_HASHTAGS[log.ritualId];
+    if (!hashtag) return '';
+    const description = String(log.proof?.description || '').trim();
+    const link = String(log.proof?.link || '').trim();
+    const fileName = String(log.proof?.fileName || '').trim();
+    const parts = [
+      log.ritualId === 'teach-bk'
+        ? 'New Teach-Back submitted.'
+        : `Completed ${log.ritualName}.`,
+    ];
+    if (description) parts.push(description);
+    if (link) parts.push(link);
+    if (fileName && !String(log.proof?.fileType || '').startsWith('image/') && !String(log.proof?.fileType || '').startsWith('video/')) {
+      parts.push(`Attachment submitted: ${fileName}`);
+    }
+    parts.push(hashtag);
+    return parts.join('\n\n');
+  }
+
+  async function createThreadPostForRitual(log, proof, profile) {
+    if (!window.__boardStore || log.ritualId === 'fri-win' || !THREAD_HASHTAGS[log.ritualId]) return;
+    const mediaFiles = [];
+    const fileType = String(proof?.fileType || '');
+    if ((fileType.startsWith('image/') || fileType.startsWith('video/')) && proof?.fileDataUrl) {
+      const file = dataUrlToFile(proof.fileDataUrl, proof.fileName, fileType);
+      if (file) mediaFiles.push(file);
+    }
+    try {
+      await window.__boardStore.createPost({
+        id: `post-${log.id}`,
+        channel: profile?.trackCode ? String(profile.trackCode).toLowerCase() : 'general',
+        title: log.ritualName,
+        body: threadBodyFor(log),
+        mentionIds: [],
+        files: mediaFiles,
+        profile,
+        sourceType: 'ritual',
+        sourceId: log.id,
+      });
+    } catch (err) {
+      console.warn('Could not create ritual Thread post:', err?.message || err);
+    }
   }
 
   async function refreshRemote() {
@@ -124,7 +201,7 @@
   async function completeRitual(ritualId, proof = {}, options = {}) {
     const userId = options.userId || activeUserId();
     const ritual = RITUALS.find(r => r.id === ritualId);
-    const week = options.week || COHORT.week;
+    const week = options.week || currentCohortWeek();
     if (!ritual) return null;
     const existing = state.logs.find(log => log.userId === userId && log.ritualId === ritualId && Number(log.week) === Number(week));
     if (existing) return logToRecord(existing);
@@ -132,6 +209,7 @@
     const filePath = await uploadProof(userId, ritualId, proof);
     const cleanProof = {
       description: proof.description || (typeof proof === 'string' ? proof : ''),
+      link: proof.link || '',
       fileName: proof.fileName || '',
       fileSize: proof.fileSize || '',
       fileType: proof.fileType || '',
@@ -181,6 +259,7 @@
         note: ritual.name,
       });
     }
+    await createThreadPostForRitual(log, proof, options.profile);
     return logToRecord(log);
   }
 
@@ -194,7 +273,7 @@
     weekKey,
   };
 
-  window.useRitualState = function useRitualState(userId) {
+  window.useRitualState = function useRitualState(userId, week) {
     const [, setTick] = React.useState(0);
     React.useEffect(() => {
       const unsub = window.__ritualStore.subscribe(() => setTick(t => t + 1));
@@ -203,7 +282,7 @@
     }, []);
     const id = userId || activeUserId();
     return {
-      records: recordsFor(id),
+      records: recordsFor(id, week || currentCohortWeek()),
       history: historyFor(id),
       completeRitual,
     };

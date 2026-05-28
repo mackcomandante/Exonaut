@@ -32,6 +32,33 @@ function formatAttachmentSize(size) {
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 }
 
+function cohortIdOf(profile) {
+  return profile?.cohortId || ME.cohort || 'c2627';
+}
+
+function trackLabel(trackCode) {
+  return (typeof TRACKS !== 'undefined' ? TRACKS : []).find(t => t.code === trackCode)?.short || trackCode || 'No track';
+}
+
+function profileDisplayName(profile) {
+  return profile?.fullName || profile?.email || profile?.name || 'Exonaut';
+}
+
+function userCanRemoveGroupMember(currentProfile, thread, memberProfile) {
+  if (!currentProfile || !thread?.isGroup || !memberProfile || memberProfile.id === currentProfile.id) return false;
+  if (['admin', 'commander'].includes(currentProfile.role)) return true;
+  const ledTracks = new Set();
+  if ((currentProfile.role || '') === 'lead' && currentProfile.trackCode) ledTracks.add(currentProfile.trackCode);
+  (typeof TRACKS !== 'undefined' ? TRACKS : []).forEach(track => {
+    if (window.__crownStore?.getActiveCrownForTrack?.(track.code)?.userId === currentProfile.id) ledTracks.add(track.code);
+  });
+  if (!ledTracks.size) return false;
+  return thread.participantIds.some(id => {
+    const p = (window.__profileDirectory || []).find(item => item.id === id);
+    return p && ledTracks.has(p.trackCode || 'AIS');
+  });
+}
+
 function fileIconForAttachment(file) {
   const name = String(file?.name || '').toLowerCase();
   const type = String(file?.type || '').toLowerCase();
@@ -105,6 +132,10 @@ function MessagesPage({ intent, onIntentHandled }) {
     threads,
     messagesForThread,
     createThread,
+    createGroup,
+    renameThread,
+    removeParticipant,
+    ensureTrackGroups,
     sendMessage,
     markThreadRead,
     timeAgo,
@@ -113,6 +144,8 @@ function MessagesPage({ intent, onIntentHandled }) {
   } = useMessages(profile);
   const [activeId, setActiveId] = React.useState('');
   const [composeOpen, setComposeOpen] = React.useState(false);
+  const [groupOpen, setGroupOpen] = React.useState(false);
+  const [detailsOpen, setDetailsOpen] = React.useState(false);
   const [draft, setDraft] = React.useState('');
   const [threadSearch, setThreadSearch] = React.useState('');
   const [attachments, setAttachments] = React.useState([]);
@@ -137,6 +170,11 @@ function MessagesPage({ intent, onIntentHandled }) {
     if (!activeId && threads[0]) setActiveId(threads[0].id);
     if (activeId && !threads.some(t => t.id === activeId)) setActiveId(threads[0]?.id || '');
   }, [threads.length, activeId]);
+
+  React.useEffect(() => {
+    if (!loaded || !profile?.id || !profiles.length || !ensureTrackGroups) return;
+    ensureTrackGroups(profiles).catch(err => console.warn('Could not ensure track group chat:', err.message || err));
+  }, [loaded, profile?.id, profile?.cohortId, profile?.trackCode, profiles.length]);
 
   React.useEffect(() => {
     if (activeThread) markThreadRead(activeThread.id);
@@ -192,8 +230,9 @@ function MessagesPage({ intent, onIntentHandled }) {
   };
 
   const directory = profiles
-    .filter(p => p.id && p.id !== profile.id)
+    .filter(p => p.id && p.id !== profile?.id)
     .sort((a, b) => (a.fullName || a.email || '').localeCompare(b.fullName || b.email || ''));
+  const cohortDirectory = directory.filter(p => (p.cohortId || 'c2627') === cohortIdOf(profile));
 
   return (
     <div className="messages-page enter">
@@ -207,9 +246,14 @@ function MessagesPage({ intent, onIntentHandled }) {
       <div className={'messages-layout' + (mobileConversationOpen ? ' conversation-open' : '')}>
         <div className="messages-thread-list card-panel">
           <div className="messages-thread-actions">
-            <button className="btn btn-primary" onClick={() => setComposeOpen(true)}>
-              <i className="fa-solid fa-pen-to-square" /> New Message
-            </button>
+            <div className="messages-thread-action-grid">
+              <button className="btn btn-primary" onClick={() => setComposeOpen(true)}>
+                <i className="fa-solid fa-pen-to-square" /> New Message
+              </button>
+              <button className="btn btn-ghost" onClick={() => setGroupOpen(true)}>
+                <i className="fa-solid fa-user-group" /> New Group
+              </button>
+            </div>
             <div className="messages-thread-search">
               <i className="fa-solid fa-magnifying-glass" />
               <input
@@ -243,18 +287,23 @@ function MessagesPage({ intent, onIntentHandled }) {
                 onClick={() => { setActiveId(thread.id); setMobileConversationOpen(true); }}
               >
                 <div className="messages-thread-avatar">
-                  <AvatarWithRing
-                    name={avatarName}
-                    avatarUrl={avatarUrl}
-                    size={34}
-                    tier={avatarRole === 'exonaut' ? 'entry' : 'corps'}
-                  />
+                  {thread.isGroup ? (
+                    <div className="messages-group-avatar"><i className="fa-solid fa-user-group" /></div>
+                  ) : (
+                    <AvatarWithRing
+                      name={avatarName}
+                      avatarUrl={avatarUrl}
+                      size={34}
+                      tier={avatarRole === 'exonaut' ? 'entry' : 'corps'}
+                    />
+                  )}
                 </div>
                 <div className="messages-thread-main">
                   <div className="messages-thread-title">
                     <span>{thread.title}</span>
                     {thread.unreadCount > 0 && <b>{thread.unreadCount}</b>}
                   </div>
+                  {thread.isGroup && <div className="messages-thread-meta">{thread.threadType === 'track_group' ? 'Track Group' : 'Group'} / {thread.participantIds.length} members</div>}
                   <div className="messages-thread-preview">{thread.preview}</div>
                 </div>
                 <div className="messages-thread-time">{thread.lastMessage ? timeAgo(thread.lastMessage.createdAt) : ''}</div>
@@ -270,9 +319,16 @@ function MessagesPage({ intent, onIntentHandled }) {
                 <button type="button" className="messages-mobile-back" onClick={() => setMobileConversationOpen(false)} aria-label="Back to conversations">
                   <i className="fa-solid fa-arrow-left" /> Conversations
                 </button>
-                <div>
-                  <div className="t-heading" style={{ marginBottom: 2 }}>{activeThread.title}</div>
-                  <div className="t-micro">{activeThread.participantNames.join(' / ')}</div>
+                <div className="messages-conversation-title">
+                  <div>
+                    <div className="t-heading" style={{ marginBottom: 2 }}>{activeThread.title}</div>
+                    <div className="t-micro">{activeThread.isGroup ? `${activeThread.participantIds.length} members` : activeThread.participantNames.join(' / ')}</div>
+                  </div>
+                  {activeThread.isGroup && (
+                    <button type="button" className="message-group-details-btn" onClick={() => setDetailsOpen(true)} title="Group Details">
+                      <i className="fa-solid fa-sliders" />
+                    </button>
+                  )}
                 </div>
               </div>
               <div className="messages-body">
@@ -362,6 +418,35 @@ function MessagesPage({ intent, onIntentHandled }) {
         />
       )}
 
+      {groupOpen && (
+        <GroupComposeModal
+          profiles={cohortDirectory}
+          cohortId={cohortIdOf(profile)}
+          onClose={() => setGroupOpen(false)}
+          onCreate={async (payload) => {
+            const thread = await createGroup(payload);
+            setActiveId(thread.id);
+            setMobileConversationOpen(true);
+            setGroupOpen(false);
+          }}
+        />
+      )}
+
+      {detailsOpen && activeThread && (
+        <GroupDetailsModal
+          thread={activeThread}
+          profiles={profiles}
+          currentProfile={profile}
+          onClose={() => setDetailsOpen(false)}
+          onRename={async (title) => {
+            await renameThread({ threadId: activeThread.id, title });
+          }}
+          onRemove={async (userId) => {
+            await removeParticipant({ threadId: activeThread.id, userId });
+          }}
+        />
+      )}
+
       {previewImage && (
         <div className="message-preview-backdrop" onClick={() => setPreviewImage(null)}>
           <div className={'message-preview-dialog' + (String(previewImage.type || '').startsWith('image/') ? '' : ' file')} onClick={e => e.stopPropagation()}>
@@ -386,6 +471,150 @@ function MessagesPage({ intent, onIntentHandled }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function GroupComposeModal({ profiles, cohortId, onClose, onCreate }) {
+  const [title, setTitle] = React.useState('');
+  const [query, setQuery] = React.useState('');
+  const [track, setTrack] = React.useState('all');
+  const [selected, setSelected] = React.useState([]);
+  const [saving, setSaving] = React.useState(false);
+  const availableTracks = Array.from(new Set(profiles.map(p => p.trackCode || 'AIS').filter(Boolean))).sort();
+  const matches = profiles.filter(p => {
+    if (track !== 'all' && (p.trackCode || 'AIS') !== track) return false;
+    const q = query.trim().toLowerCase();
+    if (!q) return true;
+    return [p.fullName, p.email, p.trackCode, p.role].some(v => String(v || '').toLowerCase().includes(q));
+  });
+  const selectedProfiles = selected.map(id => profiles.find(p => p.id === id)).filter(Boolean);
+  const canCreate = title.trim().length >= 3 && title.trim().length <= 60 && selected.length >= 2;
+
+  function toggle(id) {
+    setSelected(current => current.includes(id) ? current.filter(item => item !== id) : [...current, id]);
+  }
+
+  async function submit() {
+    if (!canCreate) return;
+    setSaving(true);
+    try {
+      await onCreate({ title: title.trim(), participantIds: selected });
+    } catch (err) {
+      alert((err && err.message) || 'Could not create group.');
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="messages-modal group-compose-modal card-panel" onClick={e => e.stopPropagation()}>
+        <div className="messages-modal-head">
+          <div>
+            <div className="t-micro">NEW GROUP</div>
+            <div className="t-heading">Create group chat</div>
+          </div>
+          <button className="btn btn-ghost btn-sm" onClick={onClose}><i className="fa-solid fa-xmark" /></button>
+        </div>
+        <input className="input" value={title} onChange={e => setTitle(e.target.value)} placeholder="Group name" maxLength={60} />
+        <div className="group-picker-filters">
+          <div className="messages-thread-search">
+            <i className="fa-solid fa-magnifying-glass" />
+            <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search Exonauts..." />
+          </div>
+          <select className="select" value={track} onChange={e => setTrack(e.target.value)}>
+            <option value="all">All tracks</option>
+            {availableTracks.map(code => <option key={code} value={code}>{trackLabel(code)}</option>)}
+          </select>
+        </div>
+        <div className="selected-member-chips">
+          {selectedProfiles.map(p => <button key={p.id} onClick={() => toggle(p.id)}>{profileDisplayName(p)} <i className="fa-solid fa-xmark" /></button>)}
+          {!selectedProfiles.length && <span>Select at least 2 Exonauts from this cohort.</span>}
+        </div>
+        <div className="messages-recipient-list group-member-picker">
+          {matches.map(p => (
+            <button key={p.id} className={'messages-recipient' + (selected.includes(p.id) ? ' active' : '')} onClick={() => toggle(p.id)}>
+              <AvatarWithRing name={profileDisplayName(p)} avatarUrl={p.avatarUrl} size={30} tier={p.role === 'exonaut' ? 'entry' : 'corps'} />
+              <span>
+                <strong>{profileDisplayName(p)}</strong>
+                <em>{trackLabel(p.trackCode)} / {p.cohortId || cohortId}</em>
+              </span>
+              <i className={'fa-solid ' + (selected.includes(p.id) ? 'fa-circle-check' : 'fa-plus')} />
+            </button>
+          ))}
+          {matches.length === 0 && <div className="messages-empty compact">No Exonauts found.</div>}
+        </div>
+        <div className="messages-modal-actions">
+          <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary" disabled={!canCreate || saving} onClick={submit}>
+            <i className="fa-solid fa-user-group" /> {saving ? 'Creating...' : 'Create Group'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function GroupDetailsModal({ thread, profiles, currentProfile, onClose, onRename, onRemove }) {
+  const [title, setTitle] = React.useState(thread.title || '');
+  const [saving, setSaving] = React.useState(false);
+  const participants = (thread.participantIds || []).map(id => profiles.find(p => p.id === id) || { id, fullName: 'Exonaut' });
+  const canRename = thread.threadType === 'group';
+
+  async function rename() {
+    if (!canRename || title.trim() === thread.title) return;
+    setSaving(true);
+    try {
+      await onRename(title.trim());
+      setSaving(false);
+    } catch (err) {
+      alert((err && err.message) || 'Could not rename group.');
+      setSaving(false);
+    }
+  }
+
+  async function remove(userId) {
+    const member = participants.find(p => p.id === userId);
+    if (!window.confirm(`Remove ${profileDisplayName(member)} from this group?`)) return;
+    try {
+      await onRemove(userId);
+    } catch (err) {
+      alert((err && err.message) || 'Could not remove member.');
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="messages-modal group-details-modal card-panel" onClick={e => e.stopPropagation()}>
+        <div className="messages-modal-head">
+          <div>
+            <div className="t-micro">{thread.threadType === 'track_group' ? 'TRACK GROUP' : 'GROUP DETAILS'}</div>
+            <div className="t-heading">{thread.title}</div>
+          </div>
+          <button className="btn btn-ghost btn-sm" onClick={onClose}><i className="fa-solid fa-xmark" /></button>
+        </div>
+        <label className="group-details-label">Group name</label>
+        <div className="group-rename-row">
+          <input className="input" disabled={!canRename} value={title} onChange={e => setTitle(e.target.value)} />
+          <button className="btn btn-primary" disabled={!canRename || saving || title.trim() === thread.title} onClick={rename}>Rename Group</button>
+        </div>
+        {thread.threadType === 'track_group' && <p className="group-details-note">Default track groups are synced from the cohort roster and cannot be renamed.</p>}
+        <div className="group-participant-list">
+          {participants.map(p => {
+            const canRemove = userCanRemoveGroupMember(currentProfile, thread, p);
+            return (
+              <div className="group-participant-row" key={p.id}>
+                <AvatarWithRing name={profileDisplayName(p)} avatarUrl={p.avatarUrl} size={32} tier={p.role === 'exonaut' ? 'entry' : 'corps'} />
+                <span>
+                  <strong>{profileDisplayName(p)}</strong>
+                  <em>{trackLabel(p.trackCode)} / {p.role || 'exonaut'}</em>
+                </span>
+                {canRemove && <button className="btn btn-ghost btn-sm danger-action" onClick={() => remove(p.id)}>Remove</button>}
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
@@ -488,4 +717,4 @@ function MessageComposeModal({ profiles, onClose, onCreate, initialRecipientId =
   );
 }
 
-Object.assign(window, { MessagesPage, MessageComposeModal });
+Object.assign(window, { MessagesPage, MessageComposeModal, GroupComposeModal, GroupDetailsModal });

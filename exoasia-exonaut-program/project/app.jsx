@@ -135,8 +135,8 @@ function App() {
     const exonautRoutes = ['dashboard', 'leaderboard', 'profile', 'mission', 'missions', 'credentials', 'projects', 'first-projects', 'project-tasks', 'messages', 'community', 'exonaut-guide', 'kudos', 'rituals', 'announce', 'notifications', 'alumni', 'settings'];
     const trackOpsRoutes = ['lead-home', 'lead-roster', 'lead-queue', 'lead-grade', 'lead-manual-credit', 'lead-announce', 'lead-removals', 'crown-pass'];
     const leadRoutes = ['lead-home', 'lead-roster', 'lead-queue', 'lead-grade', 'lead-manual-credit', 'lead-announce', 'lead-removals', 'lead-projects', 'lead-project-tasks', 'lead-profile', 'messages', 'community', 'kudos', 'notifications', 'settings'];
-    const commanderRoutes = ['cmdr-home', 'cmdr-profile', 'cmdr-leads', 'cmdr-projects', 'cmdr-exonauts', 'cmdr-esc', 'cmdr-health', 'cmdr-eow', 'cmdr-crowns', 'cmdr-removals', 'cmdr-manual-credit', 'cmdr-announce', 'messages', 'community', 'kudos', 'notifications', 'settings'];
-    const adminRoutes = ['pa-cohorts', 'pa-missions', 'pa-projects', 'pa-managers', 'pa-assign', 'pa-users', 'pa-console', 'pa-manual-credit', 'pa-removals', 'pa-announce', 'pa-profile', 'messages', 'community', 'kudos', 'notifications', 'settings'];
+    const commanderRoutes = ['cmdr-home', 'cmdr-profile', 'cmdr-leads', 'cmdr-projects', 'cmdr-project-builder', 'cmdr-action-register', 'cmdr-exonauts', 'cmdr-esc', 'cmdr-health', 'cmdr-eow', 'cmdr-crowns', 'cmdr-removals', 'cmdr-manual-credit', 'cmdr-announce', 'messages', 'community', 'kudos', 'notifications', 'settings'];
+    const adminRoutes = ['pa-cohorts', 'pa-missions', 'pa-projects', 'pa-action-register', 'pa-managers', 'pa-assign', 'pa-users', 'pa-console', 'pa-manual-credit', 'pa-removals', 'pa-announce', 'pa-profile', 'messages', 'community', 'kudos', 'notifications', 'settings'];
     const routeBase = (routeId || '').split(':')[0];
     if (role === 'lead') return leadRoutes.includes(routeBase);
     if (role === 'commander') return commanderRoutes.includes(routeBase);
@@ -200,9 +200,9 @@ function App() {
     mission:     ['EXONAUT', 'Track', missionId || ''],
     missions:    ['EXONAUT', 'Track'],
     credentials: ['EXONAUT', 'Certificates & Badges'],
-    projects: ['PROJECTS', 'Assigned Projects'],
-    'first-projects': ['PROJECTS', 'Project Lead Board'],
-    'project-tasks': ['PROJECTS', 'Project Tasks'],
+    projects: ['PROJECTS', 'Projects'],
+    'first-projects': ['PROJECTS', 'Projects'],
+    'project-tasks': ['PROJECTS', 'Projects'],
     community:   ['EXONAUT', 'Community'],
     messages:    ['COMMUNICATIONS', 'Messages'],
     'exonaut-guide': ['EXONAUT', 'Exonaut Guide'],
@@ -220,7 +220,7 @@ function App() {
     'lead-manual-credit': ['LEAD', 'Manual Activity Credit'],
     'lead-announce': ['LEAD', 'Announcements'],
     'lead-projects': ['LEAD', 'Projects'],
-    'lead-project-tasks': ['LEAD', 'Project Tasks'],
+    'lead-project-tasks': ['LEAD', 'Projects'],
     'lead-removals': ['TRACK OPS', 'Removals'],
     'crown-pass': ['TRACK OPS', 'Pass the Crown'],
     'lead-profile': ['LEAD', 'Profile'],
@@ -229,6 +229,8 @@ function App() {
     'cmdr-profile': ['COMMANDER', 'Profile'],
     'cmdr-leads':  ['COMMANDER', 'Track Progress'],
     'cmdr-projects': ['COMMANDER', 'Project Progress'],
+    'cmdr-project-builder': ['COMMANDER', 'Project Builder'],
+    'cmdr-action-register': ['COMMANDER', 'Projects'],
     'cmdr-exonauts': ['COMMANDER', 'Exonauts'],
     'cmdr-esc':    ['COMMANDER', 'Escalations'],
     'cmdr-health': ['COMMANDER', 'Cohort Health'],
@@ -241,6 +243,7 @@ function App() {
     'pa-cohorts':  ['PLATFORM ADMIN', 'Cohort Management'],
     'pa-missions': ['PLATFORM ADMIN', 'Track Creation'],
     'pa-projects': ['PLATFORM ADMIN', 'Project Builder'],
+    'pa-action-register': ['PLATFORM ADMIN', 'Projects'],
     'pa-managers': ['PLATFORM ADMIN', 'Track Management'],
     'pa-assign':   ['PLATFORM ADMIN', 'Exonaut Assignment'],
     'pa-users':    ['PLATFORM ADMIN', 'User Directory'],
@@ -269,8 +272,8 @@ function App() {
     }
     else if (route === 'credentials') page = <CertificatesBadgesPage />;
     else if (route === 'projects') page = <ProjectsPage />;
-    else if (route === 'first-projects') page = <FirstOfficerProjectsPage />;
-    else if (route === 'project-tasks') page = <ProjectTasksPage />;
+    else if (route === 'first-projects') page = <ProjectsPage />;
+    else if (route === 'project-tasks') page = <ProjectsPage />;
     else if (route === 'messages')    page = <MessagesPage intent={messageIntent} onIntentHandled={() => setMessageIntent(null)} />;
     else if (route === 'community')   page = <CommunityPage />;
     else if (route === 'exonaut-guide') page = <ExonautGuidePage />;
@@ -301,7 +304,7 @@ function App() {
     else if (route === 'lead-manual-credit') page = <ManualActivityCreditPage />;
     else if (route === 'lead-removals') page = <LeadRemovalsPanel />;
     else if (route === 'lead-projects') page = <ProjectsPage />;
-    else if (route === 'lead-project-tasks') page = <ProjectTasksPage />;
+    else if (route === 'lead-project-tasks') page = <ProjectsPage />;
     else if (route === 'lead-profile') page = <RoleProfile roleKey="lead" />;
     else if (route === 'messages')    page = <MessagesPage />;
     else if (route === 'community')   page = <CommunityPage />;
@@ -314,7 +317,9 @@ function App() {
     sidebar = <CommanderSidebar current={route} onNavigate={navigateFromSidebar} onSignOut={signOut} mobileOpen={mobileNavOpen} onMobileClose={() => setMobileNavOpen(false)} />;
     if (route === 'cmdr-home')        page = <CommanderHome onNavigate={navigate} />;
     else if (route === 'cmdr-leads')  page = <CommanderLeads />;
-    else if (route === 'cmdr-projects') page = <CommanderProjectProgress />;
+    else if (route === 'cmdr-projects') page = <CommanderProjectProgress onNavigate={navigate} />;
+    else if (route === 'cmdr-project-builder') page = <ProjectBuilderPage roleLabel="COMMANDER" />;
+    else if (route === 'cmdr-action-register') page = <ProjectsPage />;
     else if (route === 'cmdr-exonauts') page = <CommanderExonauts />;
     else if (route === 'cmdr-esc')    page = <CommanderEscalations />;
     else if (route === 'cmdr-health') page = <CommanderHealth />;
@@ -335,6 +340,7 @@ function App() {
     if (route === 'pa-cohorts')      page = <AdminCohorts />;
     else if (route === 'pa-missions') page = <AdminMissionBuilder />;
     else if (route === 'pa-projects') page = <ProjectBuilderPage />;
+    else if (route === 'pa-action-register') page = <ProjectsPage />;
     else if (route === 'pa-managers') page = <AdminTrackControl />;
     else if (route === 'pa-assign')  page = <AdminAssign />;
     else if (route === 'pa-users')   page = <AdminUsers />;
@@ -394,8 +400,6 @@ function LeadSidebar({ current, onNavigate, onSignOut, mobileOpen = false, onMob
   const { unreadCount: messageUnread } = useMessages(profile);
   const { profiles } = useUserProfiles();
   useProjects();
-  const isFirstOfficer = window.__projectStore.userIsFirstOfficer(profile.id);
-  const hasProjectTasks = window.__projectStore.firstOfficerTasks(profile.id).length > 0;
   const displayName = profile.fullName || 'Mission Lead';
   const allSubs = useSubs();
   React.useEffect(() => { window.refreshSubs?.(); }, []);
@@ -421,7 +425,6 @@ function LeadSidebar({ current, onNavigate, onSignOut, mobileOpen = false, onMob
     { id: 'lead-queue',  label: 'Review Queue',  icon: 'fa-clipboard-check', count: pendingCount },
     { id: 'lead-roster', label: 'Roster',        icon: 'fa-users' },
     { id: 'lead-projects', label: 'Projects',    icon: 'fa-diagram-project' },
-    ...(isFirstOfficer || hasProjectTasks ? [{ id: 'lead-project-tasks', label: 'Project Tasks', icon: 'fa-list-check' }] : []),
     { id: 'lead-manual-credit', label: 'Manual Credit', icon: 'fa-clipboard-check' },
     { id: 'lead-announce', label: 'Announcements', icon: 'fa-bullhorn' },
     { id: 'kudos',       label: 'Kudos',         icon: 'fa-hand-sparkles' },
@@ -445,7 +448,7 @@ function LeadSidebar({ current, onNavigate, onSignOut, mobileOpen = false, onMob
       <nav className="sidebar-nav">
         <div className="sidebar-nav-section">Me</div>
         {me.map(l => (
-          <button type="button" key={l.id} className={'sidebar-link' + (current === l.id ? ' active' : '')} onClick={() => onNavigate(l.id)}>
+          <button type="button" key={l.id} className={'sidebar-link' + (current === l.id || (l.id === 'lead-projects' && current === 'lead-project-tasks') ? ' active' : '')} onClick={() => onNavigate(l.id)}>
             <i className={'fa-solid ' + l.icon} />
             <span>{l.label}</span>
             {l.count ? <span className="badge-count">{l.count}</span> : null}
@@ -486,19 +489,46 @@ function CommanderSidebar({ current, onNavigate, onSignOut, mobileOpen = false, 
     { id: 'messages',      label: 'Messages',   icon: 'fa-envelope', count: messageUnread },
     { id: 'community',     label: 'Community',      icon: 'fa-users-rectangle' },
   ];
-  const links = [
-    { id: 'cmdr-home',     label: 'Command Bridge', icon: 'fa-tower-observation' },
-    { id: 'cmdr-leads',    label: 'Track Progress', icon: 'fa-chart-line' },
-    { id: 'cmdr-projects', label: 'Project Progress', icon: 'fa-diagram-project' },
-    { id: 'cmdr-exonauts', label: 'Exonauts',       icon: 'fa-user-astronaut' },
-    { id: 'cmdr-esc',      label: 'Escalations',    icon: 'fa-triangle-exclamation', count: escalations.length },
-    { id: 'cmdr-health',   label: 'Cohort Health',  icon: 'fa-heart-pulse' },
-    { id: 'cmdr-eow',      label: 'Exonaut of Week', icon: 'fa-trophy' },
-    { id: 'cmdr-crowns',   label: 'Crown Transfers', icon: 'fa-crown' },
-    { id: 'cmdr-removals', label: 'Removals',        icon: 'fa-user-slash' },
-    { id: 'cmdr-manual-credit', label: 'Manual Credit', icon: 'fa-clipboard-check' },
-    { id: 'cmdr-announce', label: 'Announcements', icon: 'fa-bullhorn' },
-    { id: 'kudos',         label: 'Kudos',          icon: 'fa-hand-sparkles' },
+  const sections = [
+    {
+      title: 'Command',
+      links: [
+        { id: 'cmdr-home', label: 'Command Bridge', icon: 'fa-tower-observation' },
+        { id: 'cmdr-health', label: 'Cohort Health', icon: 'fa-heart-pulse' },
+        { id: 'cmdr-esc', label: 'Escalations', icon: 'fa-triangle-exclamation', count: escalations.length },
+      ],
+    },
+    {
+      title: 'Track & People',
+      links: [
+        { id: 'cmdr-leads', label: 'Track Progress', icon: 'fa-chart-line' },
+        { id: 'cmdr-exonauts', label: 'Exonauts', icon: 'fa-user-astronaut' },
+        { id: 'cmdr-crowns', label: 'Crown Transfers', icon: 'fa-crown' },
+      ],
+    },
+    {
+      title: 'Projects',
+      links: [
+        { id: 'cmdr-projects', label: 'Project Dashboard', icon: 'fa-chart-simple' },
+        { id: 'cmdr-project-builder', label: 'Project Builder', icon: 'fa-diagram-project' },
+        { id: 'cmdr-action-register', label: 'Action Register', icon: 'fa-list-check' },
+      ],
+    },
+    {
+      title: 'Ops',
+      links: [
+        { id: 'cmdr-manual-credit', label: 'Manual Credit', icon: 'fa-clipboard-check' },
+        { id: 'cmdr-removals', label: 'Removals', icon: 'fa-user-slash' },
+        { id: 'cmdr-announce', label: 'Announcements', icon: 'fa-bullhorn' },
+      ],
+    },
+    {
+      title: 'Culture',
+      links: [
+        { id: 'cmdr-eow', label: 'EOW Awards', icon: 'fa-trophy' },
+        { id: 'kudos', label: 'Kudos', icon: 'fa-hand-sparkles' },
+      ],
+    },
   ];
   return (
     <aside id="application-navigation" className={'sidebar' + (mobileOpen ? ' mobile-open' : '')} aria-label="Application navigation">
@@ -531,13 +561,17 @@ function CommanderSidebar({ current, onNavigate, onSignOut, mobileOpen = false, 
       <CohortSwitcher />
 
       <nav className="sidebar-nav">
-        <div className="sidebar-nav-section">Org View</div>
-        {links.map(l => (
-          <button type="button" key={l.id} className={'sidebar-link' + (current === l.id ? ' active' : '')} onClick={() => onNavigate(l.id)}>
-            <i className={'fa-solid ' + l.icon} style={{ color: l.id === 'cmdr-esc' ? 'var(--red)' : undefined }} />
-            <span>{l.label}</span>
-            {l.count ? <span className="badge-count" style={{ background: 'var(--red)', color: 'white' }}>{l.count}</span> : null}
-          </button>
+        {sections.map(section => (
+          <React.Fragment key={section.title}>
+            <div className="sidebar-nav-section">{section.title}</div>
+            {section.links.map(l => (
+              <button type="button" key={l.id} className={'sidebar-link' + (current === l.id ? ' active' : '')} onClick={() => onNavigate(l.id)}>
+                <i className={'fa-solid ' + l.icon} style={{ color: l.id === 'cmdr-esc' ? 'var(--red)' : undefined }} />
+                <span>{l.label}</span>
+                {l.count ? <span className="badge-count" style={{ background: 'var(--red)', color: 'white' }}>{l.count}</span> : null}
+              </button>
+            ))}
+          </React.Fragment>
         ))}
       </nav>
       <div className="sidebar-footer">

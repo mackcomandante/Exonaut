@@ -1,239 +1,326 @@
-// ============================================================================
-// Removal / Resignation workflow store
-//
-// Two initiation paths, converging on Admin execution:
-//
-//   LEAD-INITIATED (removal for cause):
-//     Lead endorses → 'endorsed' → Commander approves → 'approved' → Admin executes → 'executed'
-//
-//   EXONAUT-INITIATED (voluntary resignation):
-//     Exonaut submits → 'pending' → Lead endorses → 'endorsed' → Commander approves → 'approved' → Admin executes → 'executed'
-//
-// At each stage the current role-holder can approve (advance) or deny (terminal).
-// Exonaut can also withdraw their own pending resignation.
-//
-// An 'executed' request flags the user as removed; they're filtered out of
-// getCohortUsers() and all roster/directory views. Persists to localStorage.
-// ============================================================================
-
+// Removal / resignation workflow store. Supabase is primary; localStorage is a
+// fallback for offline/dev use.
 (function () {
   const KEY = 'exo:removals:v2';
+  const TABLE = 'removal_requests';
 
-  // Valid reasons — shown in Lead's endorsement form & surfaced in reviews.
   const REASONS = [
-    { id: 'no-show',     label: 'No-show / Absenteeism',      desc: 'Missed 3+ consecutive rituals or standups without notice', source: 'lead' },
-    { id: 'misconduct',  label: 'Code of Conduct Violation',  desc: 'Breached program integrity (plagiarism, harassment, disrespect)', source: 'lead' },
-    { id: 'academic',    label: 'Performance Floor Breach',   desc: 'Points < 100 for 2+ weeks; failed remediation plan', source: 'lead' },
-    { id: 'conflict',    label: 'Program Fit / Conflict',     desc: 'Irreconcilable conflict with track scope or team', source: 'lead' },
-    { id: 'withdrawal',  label: 'Voluntary Withdrawal',       desc: 'Exonaut formally requested to exit the program', source: 'lead' },
-    { id: 'other',       label: 'Other (explain in notes)',   desc: 'Requires detailed justification in notes field', source: 'lead' },
+    { id: 'no-show', label: 'No-show / Absenteeism', desc: 'Missed 3+ consecutive rituals or standups without notice', source: 'lead' },
+    { id: 'misconduct', label: 'Code of Conduct Violation', desc: 'Breached program integrity (plagiarism, harassment, disrespect)', source: 'lead' },
+    { id: 'academic', label: 'Performance Floor Breach', desc: 'Points < 100 for 2+ weeks; failed remediation plan', source: 'lead' },
+    { id: 'conflict', label: 'Program Fit / Conflict', desc: 'Irreconcilable conflict with track scope or team', source: 'lead' },
+    { id: 'withdrawal', label: 'Voluntary Withdrawal', desc: 'Exonaut formally requested to exit the program', source: 'lead' },
+    { id: 'other', label: 'Other (explain in notes)', desc: 'Requires detailed justification in notes field', source: 'lead' },
   ];
 
-  // Exonaut-facing resignation reasons (lighter tone than removal reasons).
   const RESIGN_REASONS = [
-    { id: 'personal',    label: 'Personal / Family',          desc: 'Health, caregiving, or personal circumstances' },
-    { id: 'financial',   label: 'Financial',                  desc: 'Cannot sustain the program financially' },
-    { id: 'career',      label: 'Career Opportunity',         desc: 'Received an offer I need to accept' },
-    { id: 'fit',         label: 'Program Fit',                desc: 'The program is not the right fit for me' },
-    { id: 'health',      label: 'Health / Wellbeing',         desc: 'Mental or physical health needs attention' },
-    { id: 'other',       label: 'Other (explain)',            desc: 'Other reason — please explain in the message' },
+    { id: 'personal', label: 'Personal / Family', desc: 'Health, caregiving, or personal circumstances' },
+    { id: 'financial', label: 'Financial', desc: 'Cannot sustain the program financially' },
+    { id: 'career', label: 'Career Opportunity', desc: 'Received an offer I need to accept' },
+    { id: 'fit', label: 'Program Fit', desc: 'The program is not the right fit for me' },
+    { id: 'health', label: 'Health / Wellbeing', desc: 'Mental or physical health needs attention' },
+    { id: 'other', label: 'Other (explain)', desc: 'Other reason - please explain in the message' },
   ];
 
-  function loadState() {
-    try {
-      const raw = localStorage.getItem(KEY);
-      if (raw) {
-        const p = JSON.parse(raw);
-        return { requests: Array.isArray(p.requests) ? p.requests : [] };
-      }
-    } catch (e) {}
-    // Seed demo data spanning every workflow state so all 4 roles have something to see.
-    return {
-      requests: [
-        // 1. Exonaut resignation awaiting Lead endorsement
-        {
-          id: 'rm_seed_1',
-          userId: 'u5', cohortId: 'c2627', leadId: 'lead-ais',
-          source: 'exonaut',
-          reason: 'personal',
-          notes: 'I need to step away to care for a parent who has been hospitalized. I appreciate the opportunity and hope to re-apply in a future batch.',
-          status: 'pending',
-          createdAt: Date.now() - 1000 * 60 * 60 * 14,
-          endorsedBy: null, endorsedAt: null, endorseNote: null,
-          reviewedBy: null, reviewedAt: null, reviewNote: null,
-          denyNote: null,
-          executedBy: null, executedAt: null,
-        },
-        // 2. Lead-initiated removal awaiting Commander approval
-        {
-          id: 'rm_seed_2',
-          userId: 'u19', cohortId: 'c2627', leadId: 'lead-ais',
-          source: 'lead',
-          reason: 'no-show',
-          notes: 'Missed 4 consecutive weekly rituals. Phone + email unreturned for 12 days. Remediation plan was ignored.',
-          status: 'endorsed',
-          createdAt: Date.now() - 1000 * 60 * 60 * 22,
-          endorsedBy: 'lead-ais', endorsedAt: Date.now() - 1000 * 60 * 60 * 22, endorseNote: null,
-          reviewedBy: null, reviewedAt: null, reviewNote: null,
-          denyNote: null,
-          executedBy: null, executedAt: null,
-        },
-        // 3. Lead-initiated, commander-approved, waiting for Admin execution
-        {
-          id: 'rm_seed_3',
-          userId: 'u27', cohortId: 'c2627', leadId: 'lead-clim',
-          source: 'lead',
-          reason: 'academic',
-          notes: 'Points at 78 across 3 weeks. Two remediation 1:1s with no improvement in deliverables.',
-          status: 'approved',
-          createdAt: Date.now() - 1000 * 60 * 60 * 72,
-          endorsedBy: 'lead-clim', endorsedAt: Date.now() - 1000 * 60 * 60 * 72, endorseNote: null,
-          reviewedBy: 'commander', reviewedAt: Date.now() - 1000 * 60 * 60 * 6, reviewNote: 'Approved. Please execute after exit interview.',
-          denyNote: null,
-          executedBy: null, executedAt: null,
-        },
-        // 4. Executed (historical record)
-        {
-          id: 'rm_seed_4',
-          userId: 'u33', cohortId: 'c2627', leadId: 'lead-biotech',
-          source: 'exonaut',
-          reason: 'health',
-          notes: 'Formally requested exit on Nov 14; family medical circumstances.',
-          status: 'executed',
-          createdAt: Date.now() - 1000 * 60 * 60 * 24 * 14,
-          endorsedBy: 'lead-biotech', endorsedAt: Date.now() - 1000 * 60 * 60 * 24 * 13, endorseNote: 'Endorsed. Smooth handoff of open deliverables arranged.',
-          reviewedBy: 'commander', reviewedAt: Date.now() - 1000 * 60 * 60 * 24 * 13, reviewNote: null,
-          denyNote: null,
-          executedBy: 'admin', executedAt: Date.now() - 1000 * 60 * 60 * 24 * 12,
-        },
-      ],
-    };
-  }
+  const state = { requests: [], loaded: false };
+  const listeners = new Set();
 
-  function persist() {
+  function notify() { listeners.forEach(fn => fn()); }
+  function hasDb() { return !!window.__db; }
+  function nowIso() { return new Date().toISOString(); }
+  function newId() {
+    if (window.crypto?.randomUUID) return 'rm_' + window.crypto.randomUUID();
+    return 'rm_' + Math.random().toString(36).slice(2, 11);
+  }
+  function parseTime(value) {
+    if (!value) return null;
+    if (typeof value === 'number') return value;
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  function localRows() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(KEY) || '{}');
+      return Array.isArray(parsed.requests)
+        ? parsed.requests.filter(r => !String(r?.id || '').startsWith('rm_seed_'))
+        : [];
+    } catch (e) {
+      return [];
+    }
+  }
+  function persistLocal() {
+    if (hasDb()) return;
     try { localStorage.setItem(KEY, JSON.stringify({ requests: state.requests })); } catch (e) {}
   }
-
-  const state = loadState();
-  const listeners = new Set();
-  function notify() { listeners.forEach(fn => fn()); }
+  function fromRow(row) {
+    return {
+      id: row.id,
+      userId: row.user_id,
+      leadId: row.lead_id,
+      cohortId: row.cohort_id,
+      source: row.source || 'lead',
+      reason: row.reason || 'other',
+      notes: row.notes || '',
+      status: row.status || 'pending',
+      createdAt: parseTime(row.created_at),
+      endorsedBy: row.endorsed_by,
+      endorsedAt: parseTime(row.endorsed_at),
+      endorseNote: row.endorse_note,
+      reviewedBy: row.reviewed_by,
+      reviewedAt: parseTime(row.reviewed_at),
+      reviewNote: row.review_note,
+      denyNote: row.deny_note,
+      executedBy: row.executed_by,
+      executedAt: parseTime(row.executed_at),
+    };
+  }
+  function toRow(req) {
+    const iso = value => value ? new Date(value).toISOString() : null;
+    return {
+      id: req.id,
+      user_id: req.userId,
+      lead_id: req.leadId || null,
+      cohort_id: req.cohortId || null,
+      source: req.source || 'lead',
+      reason: req.reason || 'other',
+      notes: req.notes || '',
+      status: req.status || 'pending',
+      endorsed_by: req.endorsedBy || null,
+      endorsed_at: iso(req.endorsedAt),
+      endorse_note: req.endorseNote || null,
+      reviewed_by: req.reviewedBy || null,
+      reviewed_at: iso(req.reviewedAt),
+      review_note: req.reviewNote || null,
+      deny_note: req.denyNote || null,
+      executed_by: req.executedBy || null,
+      executed_at: iso(req.executedAt),
+      created_at: iso(req.createdAt) || nowIso(),
+      updated_at: nowIso(),
+    };
+  }
+  function sortRequests() {
+    state.requests.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  }
+  function upsertLocal(req) {
+    const idx = state.requests.findIndex(r => r.id === req.id);
+    if (idx >= 0) state.requests[idx] = req;
+    else state.requests.unshift(req);
+    sortRequests();
+    persistLocal();
+    notify();
+  }
+  function removeLocal(id) {
+    state.requests = state.requests.filter(r => r.id !== id);
+    persistLocal();
+    notify();
+  }
+  function activeForUser(userId) {
+    return state.requests.find(r => r.userId === userId && r.status !== 'denied' && r.status !== 'executed');
+  }
+  async function persistInsert(req) {
+    if (!hasDb()) return req;
+    const { data, error } = await window.__db.from(TABLE).insert(toRow(req)).select('*').single();
+    if (error) throw error;
+    return fromRow(data);
+  }
+  async function persistUpdate(req) {
+    if (!hasDb()) return req;
+    const { data, error } = await window.__db.from(TABLE).update(toRow(req)).eq('id', req.id).select('*').single();
+    if (error) throw error;
+    return fromRow(data);
+  }
+  async function persistDelete(id) {
+    if (!hasDb()) return;
+    const { error } = await window.__db.from(TABLE).delete().eq('id', id);
+    if (error) throw error;
+  }
 
   const store = {
+    async refresh() {
+      if (!hasDb()) {
+        state.requests = localRows();
+        sortRequests();
+        state.loaded = true;
+        notify();
+        return state.requests;
+      }
+      const { data, error } = await window.__db.from(TABLE).select('*').order('created_at', { ascending: false });
+      if (error) {
+        console.warn('Could not load removal requests:', error.message || error);
+        return state.requests;
+      }
+      state.requests = (data || []).map(fromRow);
+      state.loaded = true;
+      notify();
+      return state.requests;
+    },
+    subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
+    subscribeRemote() {
+      if (!hasDb()) return () => {};
+      const channel = window.__db
+        .channel('removal-requests-store')
+        .on('postgres_changes', { event: '*', schema: 'public', table: TABLE }, () => store.refresh())
+        .subscribe();
+      return () => {
+        if (window.__db && channel) window.__db.removeChannel(channel);
+      };
+    },
     getAll() { return state.requests.slice(); },
     byStatus(status) { return state.requests.filter(r => r.status === status); },
     byUser(userId) { return state.requests.filter(r => r.userId === userId); },
     forLead(leadId) { return state.requests.filter(r => r.leadId === leadId); },
-    activeForUser(userId) {
-      // Open request (any non-terminal state)
-      return state.requests.find(r => r.userId === userId && r.status !== 'denied' && r.status !== 'executed');
-    },
-    isRemoved(userId) {
-      return state.requests.some(r => r.userId === userId && r.status === 'executed');
-    },
+    activeForUser,
+    isRemoved(userId) { return state.requests.some(r => r.userId === userId && r.status === 'executed'); },
 
-    // --- Lead-initiated removal — skips 'pending', starts at 'endorsed'
-    endorseByLead({ userId, leadId, cohortId, reason, notes }) {
-      if (store.activeForUser(userId)) return store.activeForUser(userId);
+    async endorseByLead({ userId, leadId, cohortId, reason, notes }) {
+      const existing = activeForUser(userId);
+      if (existing) return existing;
       const req = {
-        id: 'rm_' + Math.random().toString(36).slice(2, 9),
-        userId, leadId, cohortId,
+        id: newId(),
+        userId,
+        leadId,
+        cohortId,
         source: 'lead',
         reason: reason || 'other',
         notes: notes || '',
         status: 'endorsed',
         createdAt: Date.now(),
-        endorsedBy: leadId, endorsedAt: Date.now(), endorseNote: null,
-        reviewedBy: null, reviewedAt: null, reviewNote: null,
+        endorsedBy: leadId,
+        endorsedAt: Date.now(),
+        endorseNote: null,
+        reviewedBy: null,
+        reviewedAt: null,
+        reviewNote: null,
         denyNote: null,
-        executedBy: null, executedAt: null,
+        executedBy: null,
+        executedAt: null,
       };
-      state.requests.unshift(req);
-      persist(); notify();
-      return req;
+      upsertLocal(req);
+      try {
+        const saved = await persistInsert(req);
+        upsertLocal(saved);
+        return saved;
+      } catch (err) {
+        if (hasDb()) await store.refresh();
+        throw err;
+      }
     },
 
-    // --- Exonaut-initiated resignation — starts at 'pending' (awaiting lead)
-    submitByExonaut({ userId, cohortId, leadId, reason, notes }) {
-      if (store.activeForUser(userId)) return store.activeForUser(userId);
+    async submitByExonaut({ userId, cohortId, leadId, reason, notes }) {
+      const existing = activeForUser(userId);
+      if (existing) return existing;
       const req = {
-        id: 'rm_' + Math.random().toString(36).slice(2, 9),
-        userId, leadId, cohortId,
+        id: newId(),
+        userId,
+        leadId,
+        cohortId,
         source: 'exonaut',
         reason: reason || 'other',
         notes: notes || '',
         status: 'pending',
         createdAt: Date.now(),
-        endorsedBy: null, endorsedAt: null, endorseNote: null,
-        reviewedBy: null, reviewedAt: null, reviewNote: null,
+        endorsedBy: null,
+        endorsedAt: null,
+        endorseNote: null,
+        reviewedBy: null,
+        reviewedAt: null,
+        reviewNote: null,
         denyNote: null,
-        executedBy: null, executedAt: null,
+        executedBy: null,
+        executedAt: null,
       };
-      state.requests.unshift(req);
-      persist(); notify();
-      return req;
+      upsertLocal(req);
+      try {
+        const saved = await persistInsert(req);
+        upsertLocal(saved);
+        return saved;
+      } catch (err) {
+        if (hasDb()) await store.refresh();
+        throw err;
+      }
     },
 
-    // --- Lead step on exonaut-submitted resignation ---
-    leadEndorse(requestId, leadId, note) {
+    async leadEndorse(requestId, leadId, note) {
       const r = state.requests.find(x => x.id === requestId);
-      if (!r || r.status !== 'pending') return;
-      r.status = 'endorsed';
-      r.endorsedBy = leadId || r.leadId;
-      r.endorsedAt = Date.now();
-      r.endorseNote = note || '';
-      persist(); notify();
+      if (!r || r.status !== 'pending') return null;
+      const next = { ...r, status: 'endorsed', endorsedBy: leadId || r.leadId, endorsedAt: Date.now(), endorseNote: note || '' };
+      upsertLocal(next);
+      try {
+        const saved = await persistUpdate(next);
+        upsertLocal(saved);
+        return saved;
+      } catch (err) {
+        if (hasDb()) await store.refresh();
+        throw err;
+      }
     },
-    leadDeny(requestId, leadId, note) {
+    async leadDeny(requestId, leadId, note) {
       const r = state.requests.find(x => x.id === requestId);
-      if (!r || r.status !== 'pending') return;
-      r.status = 'denied';
-      r.reviewedBy = leadId || r.leadId;
-      r.reviewedAt = Date.now();
-      r.denyNote = note || '';
-      persist(); notify();
+      if (!r || r.status !== 'pending') return null;
+      const next = { ...r, status: 'denied', reviewedBy: leadId || r.leadId, reviewedAt: Date.now(), denyNote: note || '' };
+      upsertLocal(next);
+      try {
+        const saved = await persistUpdate(next);
+        upsertLocal(saved);
+        return saved;
+      } catch (err) {
+        if (hasDb()) await store.refresh();
+        throw err;
+      }
     },
-
-    // --- Commander step ---
-    approve(requestId, commanderId, note) {
+    async approve(requestId, commanderId, note) {
       const r = state.requests.find(x => x.id === requestId);
-      if (!r || r.status !== 'endorsed') return;
-      r.status = 'approved';
-      r.reviewedBy = commanderId || 'commander';
-      r.reviewedAt = Date.now();
-      r.reviewNote = note || '';
-      persist(); notify();
+      if (!r || r.status !== 'endorsed') return null;
+      const next = { ...r, status: 'approved', reviewedBy: commanderId, reviewedAt: Date.now(), reviewNote: note || '' };
+      upsertLocal(next);
+      try {
+        const saved = await persistUpdate(next);
+        upsertLocal(saved);
+        return saved;
+      } catch (err) {
+        if (hasDb()) await store.refresh();
+        throw err;
+      }
     },
-    deny(requestId, commanderId, note) {
+    async deny(requestId, commanderId, note) {
       const r = state.requests.find(x => x.id === requestId);
-      if (!r || r.status !== 'endorsed') return;
-      r.status = 'denied';
-      r.reviewedBy = commanderId || 'commander';
-      r.reviewedAt = Date.now();
-      r.denyNote = note || '';
-      persist(); notify();
+      if (!r || r.status !== 'endorsed') return null;
+      const next = { ...r, status: 'denied', reviewedBy: commanderId, reviewedAt: Date.now(), denyNote: note || '' };
+      upsertLocal(next);
+      try {
+        const saved = await persistUpdate(next);
+        upsertLocal(saved);
+        return saved;
+      } catch (err) {
+        if (hasDb()) await store.refresh();
+        throw err;
+      }
     },
-
-    // --- Admin step ---
-    execute(requestId, adminId) {
+    async execute(requestId, adminId) {
       const r = state.requests.find(x => x.id === requestId);
-      if (!r || r.status !== 'approved') return;
-      r.status = 'executed';
-      r.executedBy = adminId || 'admin';
-      r.executedAt = Date.now();
-      persist(); notify();
+      if (!r || r.status !== 'approved') return null;
+      const next = { ...r, status: 'executed', executedBy: adminId, executedAt: Date.now() };
+      upsertLocal(next);
+      try {
+        const saved = await persistUpdate(next);
+        upsertLocal(saved);
+        return saved;
+      } catch (err) {
+        if (hasDb()) await store.refresh();
+        throw err;
+      }
     },
-
-    // --- Exonaut can withdraw their own pending resignation ---
-    withdrawByExonaut(requestId, userId) {
-      const idx = state.requests.findIndex(x => x.id === requestId);
-      if (idx === -1) return;
-      const r = state.requests[idx];
-      if (r.status !== 'pending' || r.userId !== userId) return;
-      state.requests.splice(idx, 1);
-      persist(); notify();
+    async withdrawByExonaut(requestId, userId) {
+      const r = state.requests.find(x => x.id === requestId);
+      if (!r || r.status !== 'pending' || r.userId !== userId) return;
+      removeLocal(requestId);
+      try {
+        await persistDelete(requestId);
+      } catch (err) {
+        if (hasDb()) await store.refresh();
+        throw err;
+      }
     },
-
-    subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
     getReasons() { return REASONS; },
     getResignReasons() { return RESIGN_REASONS; },
     reasonLabel(id) {
@@ -242,13 +329,23 @@
     },
   };
 
+  state.requests = hasDb() ? [] : localRows();
+  sortRequests();
+  if (hasDb()) store.refresh();
+  const unsubscribeRemote = store.subscribeRemote();
+  window.addEventListener?.('beforeunload', unsubscribeRemote);
+
   window.__removalStore = store;
   window.REMOVAL_REASONS = REASONS;
   window.RESIGN_REASONS = RESIGN_REASONS;
 
   window.useRemovals = function useRemovals() {
     const [, setTick] = React.useState(0);
-    React.useEffect(() => store.subscribe(() => setTick(t => t + 1)), []);
+    React.useEffect(() => {
+      const unsub = store.subscribe(() => setTick(t => t + 1));
+      store.refresh();
+      return unsub;
+    }, []);
     return {
       all: store.getAll(),
       pending: store.byStatus('pending'),
@@ -270,15 +367,14 @@
     };
   };
 
-  window.isUserRemoved = function isUserRemoved(userId) { return store.isRemoved(userId); };
-  window.getActiveRemovalFor = function getActiveRemovalFor(userId) { return store.activeForUser(userId); };
+  window.isUserRemoved = userId => store.isRemoved(userId);
+  window.getActiveRemovalFor = userId => store.activeForUser(userId);
 
-  // Status → display metadata helper (used by all role views)
   window.REMOVAL_STATUS_META = {
-    pending:  { label: 'AWAITING MANAGER',   color: 'var(--amber)',    icon: 'fa-user-clock' },
+    pending: { label: 'AWAITING MANAGER', color: 'var(--amber)', icon: 'fa-user-clock' },
     endorsed: { label: 'AWAITING COMMANDER', color: 'var(--lavender)', icon: 'fa-hourglass-half' },
-    approved: { label: 'AWAITING ADMIN',     color: 'var(--sky)',      icon: 'fa-check-double' },
-    denied:   { label: 'DENIED',             color: 'var(--off-white-40)', icon: 'fa-ban' },
-    executed: { label: 'REMOVED',            color: 'var(--red)',      icon: 'fa-user-slash' },
+    approved: { label: 'AWAITING ADMIN', color: 'var(--sky)', icon: 'fa-check-double' },
+    denied: { label: 'DENIED', color: 'var(--off-white-40)', icon: 'fa-ban' },
+    executed: { label: 'REMOVED', color: 'var(--red)', icon: 'fa-user-slash' },
   };
 })();

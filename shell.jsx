@@ -7,7 +7,7 @@ function Sidebar({ current, onNavigate, onSignOut, mobileOpen, onMobileClose }) 
     { id: 'profile',       label: 'My Profile',       icon: 'fa-id-badge' },
     { id: 'certs',         label: 'Certs & Badges',   icon: 'fa-medal' },
     { id: 'community',     label: 'Community',         icon: 'fa-users' },
-    { id: 'message-board', label: 'Message Board',     icon: 'fa-comments' },
+    { id: 'message-board', label: 'Thread',            icon: 'fa-comments' },
   ];
   const links = [
     { id: 'dashboard',   label: 'Dashboard',   icon: 'fa-gauge-high' },

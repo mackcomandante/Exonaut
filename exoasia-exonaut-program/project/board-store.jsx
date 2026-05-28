@@ -95,6 +95,8 @@
       authorId: post.authorId || '',
       authorName: post.authorName || profileFor(post.authorId)?.fullName || 'Exonaut',
       authorRole: post.authorRole || profileFor(post.authorId)?.role || 'exonaut',
+      sourceType: post.sourceType || '',
+      sourceId: post.sourceId || '',
       mentionIds: Array.isArray(post.mentionIds) ? post.mentionIds : [],
       createdAt: post.createdAt || nowIso(),
       updatedAt: post.updatedAt || post.createdAt || nowIso(),
@@ -137,6 +139,8 @@
       authorId: row.author_id,
       authorName: row.author_name,
       authorRole: row.author_role,
+      sourceType: row.source_type || '',
+      sourceId: row.source_id || '',
       mentionIds: row.mention_ids || [],
       createdAt: row.created_at,
       updatedAt: row.updated_at,
@@ -323,20 +327,26 @@
     countComments,
     timeAgo,
     refresh,
-    async createPost({ channel, title, body, mentionIds, files, profile }) {
+    async createPost({ channel, title, body, mentionIds, files, profile, sourceType, sourceId, id }) {
       const authorId = await authUserId(profile);
       if (window.__db && !isUuid(authorId)) throw new Error('You must be signed in to create a post.');
+      if (sourceType && sourceId) {
+        const existing = state.posts.find(post => post.sourceType === sourceType && post.sourceId === sourceId);
+        if (existing) return existing;
+      }
       if (!String(title || '').trim() && !String(body || '').trim() && !(files || []).length) {
         throw new Error('Add text, an image, or a video before posting.');
       }
       const post = normalizePost({
-        id: genId('post-'),
+        id: id || genId('post-'),
         channel,
         title,
         body,
         authorId,
         authorName: profile?.fullName || ME.name,
         authorRole: profile?.role || 'exonaut',
+        sourceType,
+        sourceId,
         mentionIds,
         createdAt: nowIso(),
       });
@@ -352,6 +362,8 @@
         author_id: authorId,
         author_name: post.authorName,
         author_role: post.authorRole,
+        source_type: post.sourceType || null,
+        source_id: post.sourceId || null,
         mention_ids: post.mentionIds,
       };
       const insertPost = await window.__db.from('community_posts').insert(postRow);

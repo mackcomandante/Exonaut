@@ -303,6 +303,7 @@ function PlatformAdminSidebar({ current, onNavigate, onSignOut, mobileOpen = fal
     { id: 'pa-assign',   label: 'Exonaut Assignment', icon: 'fa-user-gear' },
     { id: 'pa-managers', label: 'Track Management',   icon: 'fa-route' },
     { id: 'pa-projects', label: 'Project Builder',     icon: 'fa-diagram-project' },
+    { id: 'pa-action-register', label: 'Projects', icon: 'fa-diagram-project' },
     { id: 'pa-users',    label: 'User Directory',     icon: 'fa-address-book' },
     { id: 'pa-console',  label: 'System Console',     icon: 'fa-shield-halved' },
     { id: 'pa-manual-credit', label: 'Manual Credit', icon: 'fa-clipboard-check' },

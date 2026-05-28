@@ -1,4 +1,4 @@
-// Direct messages store - Supabase-backed. localStorage is only a no-Supabase dev fallback.
+// Direct and group messages store - Supabase-backed. localStorage is only a no-Supabase dev fallback.
 (function () {
   if (window.__messageStore) return;
 
@@ -92,12 +92,34 @@
     return ((window.__profileDirectory || []).find(x => x.id === userId) || {}).role || 'exonaut';
   }
 
+  function normalizeParticipant(p = {}) {
+    return {
+      userId: p.userId || p.user_id || '',
+      memberRole: p.memberRole || p.member_role || 'member',
+      removedAt: p.removedAt || p.removed_at || null,
+      createdAt: p.createdAt || p.created_at || null,
+    };
+  }
+
+  function activeParticipantIds(t) {
+    const meta = Array.isArray(t.participants) ? t.participants : [];
+    if (meta.length) return meta.filter(p => !p.removedAt).map(p => p.userId).filter(Boolean);
+    return (t.participantIds || []).filter(Boolean);
+  }
+
   function normalizeThread(t) {
     const participantIds = Array.isArray(t.participantIds) ? t.participantIds : [];
+    const participants = Array.isArray(t.participants) && t.participants.length
+      ? t.participants.map(normalizeParticipant).filter(p => p.userId)
+      : participantIds.map(id => normalizeParticipant({ userId: id }));
     return {
       id: t.id || genId('thread-'),
       title: String(t.title || '').trim(),
       participantIds,
+      participants,
+      threadType: t.threadType || t.thread_type || 'direct',
+      cohortId: t.cohortId || t.cohort_id || '',
+      trackCode: t.trackCode || t.track_code || '',
       createdBy: t.createdBy || currentUserId(),
       createdAt: t.createdAt || new Date().toISOString(),
       updatedAt: t.updatedAt || t.createdAt || new Date().toISOString(),
@@ -160,11 +182,16 @@
 
   function fromThreadRow(row, participantRows) {
     const participants = (participantRows || []).filter(p => p.thread_id === row.id);
-    const myParticipant = participants.find(p => p.user_id === currentUserId());
+    const activeParticipants = participants.filter(p => !p.removed_at);
+    const myParticipant = participants.find(p => p.user_id === currentUserId() && !p.removed_at);
     return normalizeThread({
       id: row.id,
       title: row.title || '',
-      participantIds: participants.map(p => p.user_id),
+      participantIds: activeParticipants.map(p => p.user_id),
+      participants,
+      threadType: row.thread_type || 'direct',
+      cohortId: row.cohort_id || '',
+      trackCode: row.track_code || '',
       createdBy: row.created_by,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
@@ -176,6 +203,9 @@
     return {
       id: t.id,
       title: t.title || '',
+      thread_type: t.threadType || 'direct',
+      cohort_id: t.cohortId || null,
+      track_code: t.trackCode || null,
       created_by: t.createdBy || currentUserId(),
       created_at: t.createdAt || new Date().toISOString(),
       updated_at: t.updatedAt || new Date().toISOString(),
@@ -208,9 +238,10 @@
     const userId = profile?.id || currentUserId();
     const seen = new Set();
     return state.threads
-      .filter(t => (t.participantIds || []).includes(userId))
+      .filter(t => activeParticipantIds(t).includes(userId))
       .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
       .filter(t => {
+        if (t.threadType !== 'direct') return true;
         const key = participantKey(t.participantIds);
         if (seen.has(key)) return false;
         seen.add(key);
@@ -232,15 +263,17 @@
 
   function findExistingThread(participantIds) {
     return state.threads
-      .filter(t => sameParticipantSet(t.participantIds || [], participantIds || []))
+      .filter(t => (t.threadType || 'direct') === 'direct')
+      .filter(t => sameParticipantSet(activeParticipantIds(t), participantIds || []))
       .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))[0] || null;
   }
 
   function messagesForThread(threadId) {
     const thread = state.threads.find(t => t.id === threadId);
-    const relatedIds = thread
+    const relatedIds = thread && thread.threadType === 'direct'
       ? state.threads
-        .filter(t => sameParticipantSet(t.participantIds || [], thread.participantIds || []))
+        .filter(t => (t.threadType || 'direct') === 'direct')
+        .filter(t => sameParticipantSet(activeParticipantIds(t), activeParticipantIds(thread)))
         .map(t => t.id)
       : [threadId];
     return state.messages
@@ -251,7 +284,8 @@
   function enrichThread(thread, userId) {
     const messages = messagesForThread(thread.id);
     const last = messages[messages.length - 1] || null;
-    const others = (thread.participantIds || []).filter(id => id !== userId);
+    const participantIds = activeParticipantIds(thread);
+    const others = participantIds.filter(id => id !== userId);
     const fallbackTitle = others.length
       ? others.map(profileName).join(', ')
       : 'Saved notes';
@@ -261,13 +295,15 @@
     ).length;
     return {
       ...thread,
+      participantIds,
       title: thread.title || fallbackTitle,
-      participantNames: (thread.participantIds || []).map(profileName),
-      participantAvatars: (thread.participantIds || []).map(profileAvatar),
+      participantNames: participantIds.map(profileName),
+      participantAvatars: participantIds.map(profileAvatar),
       otherParticipantIds: others,
       otherParticipantNames: others.map(profileName),
       otherParticipantAvatars: others.map(profileAvatar),
       otherParticipantRoles: others.map(profileRole),
+      isGroup: thread.threadType === 'group' || thread.threadType === 'track_group' || participantIds.length > 2,
       lastMessage: last,
       preview: last ? messagePreview(last) : 'No messages yet.',
       unreadCount,
@@ -307,8 +343,9 @@
     }
     const participantResult = await window.__db
       .from('message_participants')
-      .select('thread_id, user_id, last_read_at')
-      .eq('user_id', userId);
+      .select('thread_id, user_id, last_read_at, member_role, removed_at, created_at')
+      .eq('user_id', userId)
+      .is('removed_at', null);
     if (participantResult.error) {
       if (isMissingRemote(participantResult.error)) {
         state.loaded = true;
@@ -329,7 +366,7 @@
     }
     const [threadResult, allParticipantsResult, messageResult] = await Promise.all([
       window.__db.from('message_threads').select('*').in('id', threadIds).order('updated_at', { ascending: false }),
-      window.__db.from('message_participants').select('thread_id, user_id, last_read_at').in('thread_id', threadIds),
+      window.__db.from('message_participants').select('thread_id, user_id, last_read_at, member_role, removed_at, created_at').in('thread_id', threadIds),
       window.__db.from('messages').select('*').in('thread_id', threadIds).order('created_at', { ascending: true }),
     ]);
     const error = threadResult.error || allParticipantsResult.error || messageResult.error;
@@ -367,17 +404,20 @@
   }
 
   const store = {
+    activeParticipantIds,
     threadsFor: visibleThreads,
     messagesForThread,
     unreadCount(profile) {
       return visibleThreads(profile).reduce((sum, t) => sum + t.unreadCount, 0);
     },
-    async createThread({ participantIds, title, body, attachments, profile }) {
+    async createThread({ participantIds, title, body, attachments, profile, threadType = 'direct', cohortId = '', trackCode = '', id = '' }) {
       const userId = window.__db ? await remoteUserId(profile) : (profile?.id || currentUserId());
       if (window.__db && !isUuid(userId)) throw new Error('Sign in with Supabase to send messages.');
       const ids = Array.from(new Set([userId, ...(participantIds || [])].filter(Boolean)));
       if (ids.length < 2) throw new Error('Choose at least one recipient.');
-      const existingThread = findExistingThread(ids);
+      const normalizedType = threadType || (ids.length > 2 ? 'group' : 'direct');
+      if (normalizedType !== 'direct' && ids.length < 3) throw new Error('Choose at least two other members for a group.');
+      const existingThread = normalizedType === 'direct' ? findExistingThread(ids) : null;
       if (existingThread) {
         const message = await store.sendMessage({ threadId: existingThread.id, body, attachments, profile });
         return {
@@ -388,9 +428,13 @@
       }
       const now = new Date().toISOString();
       const thread = normalizeThread({
-        id: genId('thread-'),
+        id: id || genId(normalizedType === 'track_group' ? 'track-group-' : 'thread-'),
         title,
+        threadType: normalizedType,
+        cohortId,
+        trackCode,
         participantIds: ids,
+        participants: ids.map(id => normalizeParticipant({ userId: id, memberRole: id === userId ? 'creator' : 'member', createdAt: now })),
         createdBy: userId,
         createdAt: now,
         updatedAt: now,
@@ -416,9 +460,11 @@
           const participantRows = ids.map(id => ({
             thread_id: thread.id,
             user_id: id,
+            member_role: id === userId ? 'creator' : 'member',
             last_read_at: id === userId ? now : null,
+            removed_at: null,
           }));
-          const { error: participantError } = await window.__db.from('message_participants').insert(participantRows);
+          const { error: participantError } = await window.__db.from('message_participants').upsert(participantRows, { onConflict: 'thread_id,user_id' });
           if (participantError) throw participantError;
           if (firstMessage) {
             const { error: messageError } = await window.__db.from('messages').insert(toMessageRow(firstMessage));
@@ -437,6 +483,122 @@
       }
       return thread;
     },
+    async ensureTrackGroups({ profile, profiles = [] }) {
+      const userId = window.__db ? await remoteUserId(profile) : (profile?.id || currentUserId());
+      const cohortId = profile?.cohortId || ME.cohort || 'c2627';
+      const trackCode = profile?.trackCode || ME.track || 'AIS';
+      if (!cohortId || !trackCode) return null;
+      const track = (typeof TRACKS !== 'undefined' ? TRACKS : []).find(item => item.code === trackCode);
+      const cohort = (typeof COHORTS !== 'undefined' ? COHORTS : []).find(item => item.id === cohortId);
+      const roster = (profiles || [])
+        .filter(p => p.id && (p.cohortId || 'c2627') === cohortId && (p.trackCode || 'AIS') === trackCode)
+        .filter(p => (p.role || 'exonaut') === 'exonaut' || p.id === userId);
+      const leadId = window.__crownStore?.getActiveCrownForTrack?.(trackCode)?.userId;
+      const ids = Array.from(new Set([userId, leadId, ...roster.map(p => p.id)].filter(Boolean)));
+      if (!ids.length) return null;
+      const threadId = `track-group-${cohortId}-${trackCode}`;
+      const existing = state.threads.find(t => t.id === threadId);
+      const title = `${track?.short || trackCode} Track - ${cohort?.code || cohortId}`;
+      const now = new Date().toISOString();
+      if (!existing) {
+        const thread = normalizeThread({
+          id: threadId,
+          title,
+          threadType: 'track_group',
+          cohortId,
+          trackCode,
+          participantIds: ids,
+          participants: ids.map(id => normalizeParticipant({ userId: id, memberRole: id === leadId ? 'track_lead' : 'member', createdAt: now })),
+          createdBy: userId,
+          createdAt: now,
+          updatedAt: now,
+          lastReadAt: now,
+        });
+        state.threads.unshift(thread);
+        notify();
+        if (window.__db) {
+          const { error: threadError } = await window.__db.from('message_threads').insert(toThreadRow(thread));
+          if (threadError && threadError.code !== '23505') throw threadError;
+          const { error: participantError } = await window.__db.from('message_participants').upsert(ids.map(id => ({
+            thread_id: threadId,
+            user_id: id,
+            member_role: id === leadId ? 'track_lead' : 'member',
+            last_read_at: id === userId ? now : null,
+            removed_at: null,
+          })), { onConflict: 'thread_id,user_id' });
+          if (participantError) throw participantError;
+          refresh(profile);
+        }
+        return thread;
+      }
+      const existingIds = activeParticipantIds(existing);
+      const missingIds = ids.filter(id => !existingIds.includes(id));
+      if (missingIds.length) {
+        existing.participantIds = Array.from(new Set([...existingIds, ...missingIds]));
+        existing.participants = [
+          ...(existing.participants || []),
+          ...missingIds.map(id => normalizeParticipant({ userId: id, memberRole: id === leadId ? 'track_lead' : 'member', createdAt: now })),
+        ];
+        notify();
+        if (window.__db) {
+          const { error } = await window.__db.from('message_participants').upsert(missingIds.map(id => ({
+            thread_id: threadId,
+            user_id: id,
+            member_role: id === leadId ? 'track_lead' : 'member',
+            removed_at: null,
+          })), { onConflict: 'thread_id,user_id' });
+          if (error) throw error;
+          refresh(profile);
+        }
+      }
+      return existing;
+    },
+    async createGroup({ title, participantIds, profile }) {
+      const cleanTitle = String(title || '').trim();
+      if (cleanTitle.length < 3 || cleanTitle.length > 60) throw new Error('Group name must be 3-60 characters.');
+      const cohortId = profile?.cohortId || ME.cohort || 'c2627';
+      return store.createThread({ participantIds, title: cleanTitle, body: '', attachments: [], profile, threadType: 'group', cohortId });
+    },
+    async renameThread({ threadId, title, profile }) {
+      const cleanTitle = String(title || '').trim();
+      if (cleanTitle.length < 3 || cleanTitle.length > 60) throw new Error('Group name must be 3-60 characters.');
+      const userId = window.__db ? await remoteUserId(profile) : (profile?.id || currentUserId());
+      const thread = state.threads.find(t => t.id === threadId);
+      if (!thread || !activeParticipantIds(thread).includes(userId)) throw new Error('You are not a participant in this group.');
+      if (thread.threadType === 'track_group') throw new Error('Default track groups cannot be renamed.');
+      const oldTitle = thread.title;
+      thread.title = cleanTitle;
+      thread.updatedAt = new Date().toISOString();
+      notify();
+      if (window.__db) {
+        const { error } = await window.__db.from('message_threads').update({ title: cleanTitle, updated_at: thread.updatedAt }).eq('id', threadId);
+        if (error) throw error;
+      }
+      if (oldTitle !== cleanTitle) {
+        await store.sendMessage({ threadId, body: `${profileName(userId)} renamed the group to ${cleanTitle}.`, attachments: [], profile, system: true });
+      }
+      return thread;
+    },
+    async removeParticipant({ threadId, userId: removeUserId, profile }) {
+      const actor = window.__db ? await remoteUserId(profile) : (profile?.id || currentUserId());
+      const thread = state.threads.find(t => t.id === threadId);
+      if (!thread || !activeParticipantIds(thread).includes(actor)) throw new Error('You are not a participant in this group.');
+      if (actor === removeUserId) throw new Error('You cannot remove yourself here.');
+      const now = new Date().toISOString();
+      thread.participantIds = activeParticipantIds(thread).filter(id => id !== removeUserId);
+      thread.participants = (thread.participants || []).map(p => p.userId === removeUserId ? { ...p, removedAt: now } : p);
+      thread.updatedAt = now;
+      notify();
+      if (window.__db) {
+        const { error } = await window.__db
+          .from('message_participants')
+          .update({ removed_at: now })
+          .eq('thread_id', threadId)
+          .eq('user_id', removeUserId);
+        if (error) throw error;
+      }
+      await store.sendMessage({ threadId, body: `${profileName(removeUserId)} was removed from the group.`, attachments: [], profile, system: true });
+    },
     async sendMessage({ threadId, body, attachments, profile }) {
       const text = String(body || '').trim();
       const files = Array.isArray(attachments) ? attachments.map(normalizeAttachment).filter(Boolean) : [];
@@ -444,12 +606,17 @@
       const userId = window.__db ? await remoteUserId(profile) : (profile?.id || currentUserId());
       if (window.__db && !isUuid(userId)) throw new Error('Sign in with Supabase to send messages.');
       const now = new Date().toISOString();
-      const message = normalizeMessage({ threadId, senderId: userId, body: text, attachments: files, createdAt: now });
-      state.messages.push(message);
       const thread = state.threads.find(t => t.id === threadId);
       if (thread) {
+        if (!activeParticipantIds(thread).includes(userId)) throw new Error('You are no longer a participant in this conversation.');
+      } else {
+        throw new Error('Conversation not found.');
+      }
+      const message = normalizeMessage({ threadId, senderId: userId, body: text, attachments: files, createdAt: now });
+      state.messages.push(message);
+      if (thread) {
         thread.updatedAt = now;
-        if ((thread.participantIds || []).includes(userId)) thread.lastReadAt = now;
+        if (activeParticipantIds(thread).includes(userId)) thread.lastReadAt = now;
       }
       notify();
       if (window.__db) {
@@ -476,7 +643,7 @@
       if (window.__db && !isUuid(userId)) return;
       const now = new Date().toISOString();
       const thread = state.threads.find(t => t.id === threadId);
-      if (!thread || !(thread.participantIds || []).includes(userId)) return;
+      if (!thread || !activeParticipantIds(thread).includes(userId)) return;
       thread.lastReadAt = now;
       notify();
       if (window.__db) {
@@ -512,6 +679,10 @@
       messagesForThread: store.messagesForThread,
       unreadCount: threads.reduce((sum, t) => sum + t.unreadCount, 0),
       createThread: (data) => store.createThread({ ...data, profile }),
+      createGroup: (data) => store.createGroup({ ...data, profile }),
+      renameThread: (data) => store.renameThread({ ...data, profile }),
+      removeParticipant: (data) => store.removeParticipant({ ...data, profile }),
+      ensureTrackGroups: (profiles) => store.ensureTrackGroups({ profile, profiles }),
       sendMessage: (data) => store.sendMessage({ ...data, profile }),
       markThreadRead: (threadId) => store.markThreadRead(threadId, profile),
       timeAgo,

@@ -1,4 +1,4 @@
--- Supabase-backed direct messages.
+-- Supabase-backed direct and group messages.
 -- Run after migrations/create_user_profiles_roles.sql.
 
 CREATE TABLE IF NOT EXISTS public.message_threads (
@@ -26,11 +26,24 @@ CREATE TABLE IF NOT EXISTS public.messages (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
+ALTER TABLE public.message_threads
+  ADD COLUMN IF NOT EXISTS thread_type text NOT NULL DEFAULT 'direct'
+    CHECK (thread_type IN ('direct', 'group', 'track_group')),
+  ADD COLUMN IF NOT EXISTS cohort_id text,
+  ADD COLUMN IF NOT EXISTS track_code text;
+
+ALTER TABLE public.message_participants
+  ADD COLUMN IF NOT EXISTS member_role text NOT NULL DEFAULT 'member'
+    CHECK (member_role IN ('creator', 'member', 'track_lead')),
+  ADD COLUMN IF NOT EXISTS removed_at timestamptz;
+
 ALTER TABLE public.messages
   ADD COLUMN IF NOT EXISTS attachments jsonb NOT NULL DEFAULT '[]'::jsonb;
 
 CREATE INDEX IF NOT EXISTS idx_message_threads_updated ON public.message_threads(updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_message_threads_type_scope ON public.message_threads(thread_type, cohort_id, track_code);
 CREATE INDEX IF NOT EXISTS idx_message_participants_user ON public.message_participants(user_id);
+CREATE INDEX IF NOT EXISTS idx_message_participants_active ON public.message_participants(thread_id, user_id) WHERE removed_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_messages_thread_created ON public.messages(thread_id, created_at);
 
 ALTER TABLE public.message_threads ENABLE ROW LEVEL SECURITY;
@@ -48,6 +61,7 @@ AS $$
     FROM public.message_participants mp
     WHERE mp.thread_id = target_thread_id
       AND mp.user_id = auth.uid()
+      AND mp.removed_at IS NULL
   );
 $$;
 
@@ -61,8 +75,60 @@ AS $$
     SELECT 1
     FROM public.message_threads mt
     WHERE mt.id = target_thread_id
-      AND mt.created_by = auth.uid()
+      AND (
+        mt.created_by = auth.uid()
+        OR (
+          mt.thread_type = 'track_group'
+          AND (
+            public.is_message_participant(target_thread_id)
+            OR EXISTS (
+              SELECT 1
+              FROM public.user_profiles up
+              WHERE up.id = auth.uid()
+                AND COALESCE(up.cohort_id, 'c2627') = mt.cohort_id
+                AND COALESCE(up.track_code, 'AIS') = mt.track_code
+            )
+          )
+        )
+      )
   );
+$$;
+
+CREATE OR REPLACE FUNCTION public.can_manage_message_participants(target_thread_id text)
+RETURNS boolean
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT
+    public.has_any_role(ARRAY['admin', 'commander'])
+    OR EXISTS (
+      SELECT 1
+      FROM public.message_threads mt
+      WHERE mt.id = target_thread_id
+        AND mt.created_by = auth.uid()
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM public.message_threads mt
+      JOIN public.user_profiles lead_profile
+        ON lead_profile.id = auth.uid()
+       AND lead_profile.role = 'lead'
+       AND (
+          COALESCE(lead_profile.track_code, 'AIS') = mt.track_code
+          OR EXISTS (
+            SELECT 1
+            FROM public.message_participants mp
+            JOIN public.user_profiles up ON up.id = mp.user_id
+            WHERE mp.thread_id = mt.id
+              AND mp.removed_at IS NULL
+              AND COALESCE(up.track_code, 'AIS') = COALESCE(lead_profile.track_code, 'AIS')
+          )
+       )
+      WHERE mt.id = target_thread_id
+        AND public.is_message_participant(target_thread_id)
+    )
+  ;
 $$;
 
 DO $$
@@ -143,11 +209,18 @@ WITH CHECK (
 );
 
 DROP POLICY IF EXISTS "message_participants_update_self" ON public.message_participants;
-CREATE POLICY "message_participants_update_self"
+DROP POLICY IF EXISTS "message_participants_update_self_or_manager" ON public.message_participants;
+CREATE POLICY "message_participants_update_self_or_manager"
 ON public.message_participants
 FOR UPDATE
-USING (user_id = auth.uid())
-WITH CHECK (user_id = auth.uid());
+USING (
+  user_id = auth.uid()
+  OR public.can_manage_message_participants(message_participants.thread_id)
+)
+WITH CHECK (
+  user_id = auth.uid()
+  OR public.can_manage_message_participants(message_participants.thread_id)
+);
 
 DROP POLICY IF EXISTS "messages_select_participants" ON public.messages;
 CREATE POLICY "messages_select_participants"

@@ -412,7 +412,7 @@ function RitualComposer({ ritual, weekNum, onClose, onDone }) {
           </button>
         </div>
         <div className="t-body" style={{ color: 'var(--off-white-68)', marginBottom: 16, fontSize: 13 }}>
-          Share your proof. This will post to Message Board — General with {ritual.hashtag}, log the ritual, and award points automatically.
+          Share your proof. This will post to Thread — General with {ritual.hashtag}, log the ritual, and award points automatically.
         </div>
         <textarea
           autoFocus

@@ -124,7 +124,7 @@ function CommunityBoard({ channel, onChannelChange, sort, search, composerOpen, 
     <div className="board-layout">
       <aside className="board-sidebar">
         <div className="board-eyebrow">CHANNELS</div>
-        <nav className="board-channel-list" aria-label="Message board channels">
+        <nav className="board-channel-list" aria-label="Thread channels">
           {BOARD_CHANNELS.map(item => (
             <button className={'board-channel ' + (channel === item.id ? 'active' : '')} key={item.id} onClick={() => onChannelChange(item.id)}>
               <i className={'fa-solid ' + item.icon} style={{ color: channel === item.id ? item.color : undefined }} />
