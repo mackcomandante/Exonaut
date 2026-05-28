@@ -1612,7 +1612,7 @@ img, svg { display: block; max-width: 100%; }
 }
 .project-tabs button.active { border-color: var(--accent); color: var(--accent); }
 .project-error { color: var(--coral); padding: 12px 16px; }
-.action-register-panel { padding: 16px; }
+.action-register-panel { overflow: hidden; padding: 16px; }
 .action-toolbar {
   align-items: center;
   display: grid;
@@ -1665,7 +1665,7 @@ img, svg { display: block; max-width: 100%; }
   gap: 9px;
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
-.action-table-wrap { max-width: 100%; overflow-x: auto; }
+.action-table-wrap { overflow-x: auto; width: 100%; }
 .action-table { border-collapse: separate; border-spacing: 0; min-width: 1120px; table-layout: fixed; width: 100%; }
 .action-table th {
   border-bottom: 1px solid var(--hairline);
