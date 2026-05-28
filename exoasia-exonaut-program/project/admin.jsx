@@ -309,6 +309,7 @@ function PlatformAdminSidebar({ current, onNavigate, onSignOut, mobileOpen = fal
     { id: 'pa-manual-credit', label: 'Manual Credit', icon: 'fa-clipboard-check' },
     { id: 'pa-removals', label: 'Removals',           icon: 'fa-user-slash' },
     { id: 'pa-announce', label: 'Announcements',      icon: 'fa-bullhorn' },
+    { id: 'knowledge-base', label: 'Knowledge Base',  icon: 'fa-book-open' },
     { id: 'kudos',       label: 'Kudos',              icon: 'fa-hand-sparkles' },
   ];
   return (

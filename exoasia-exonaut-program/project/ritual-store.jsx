@@ -170,7 +170,7 @@
       await window.__boardStore.createPost({
         id: `post-${log.id}`,
         channel: profile?.trackCode ? String(profile.trackCode).toLowerCase() : 'general',
-        title: log.ritualName,
+        title: proof?.title || log.proof?.title || log.ritualName,
         body: threadBodyFor(log),
         mentionIds: [],
         files: mediaFiles,
@@ -208,6 +208,7 @@
 
     const filePath = await uploadProof(userId, ritualId, proof);
     const cleanProof = {
+      title: proof.title || '',
       description: proof.description || (typeof proof === 'string' ? proof : ''),
       link: proof.link || '',
       fileName: proof.fileName || '',

@@ -26,6 +26,7 @@ function App() {
   const ExtrasToastStack = window.ToastStack || (() => null);
   const ExtrasTweaksFab = window.TweaksFab || (() => null);
   const ExtrasTweaksPanel = window.TweaksPanel || (() => null);
+  const ChatbotWidget = window.Chatbot || (() => null);
 
   const mergedTweaks = {
     density: 'default', accent: 'lime', dashVariant: 'default',
@@ -132,11 +133,11 @@ function App() {
   };
 
   const routeAllowedForRole = (role, routeId) => {
-    const exonautRoutes = ['dashboard', 'leaderboard', 'profile', 'mission', 'missions', 'credentials', 'projects', 'first-projects', 'project-tasks', 'messages', 'community', 'exonaut-guide', 'kudos', 'rituals', 'announce', 'notifications', 'alumni', 'settings'];
+    const exonautRoutes = ['dashboard', 'leaderboard', 'profile', 'mission', 'missions', 'credentials', 'projects', 'first-projects', 'project-tasks', 'messages', 'community', 'knowledge-base', 'exonaut-guide', 'kudos', 'rituals', 'announce', 'notifications', 'alumni', 'settings'];
     const trackOpsRoutes = ['lead-home', 'lead-roster', 'lead-queue', 'lead-grade', 'lead-manual-credit', 'lead-announce', 'lead-removals', 'crown-pass'];
-    const leadRoutes = ['lead-home', 'lead-roster', 'lead-queue', 'lead-grade', 'lead-manual-credit', 'lead-announce', 'lead-removals', 'lead-projects', 'lead-project-tasks', 'lead-profile', 'messages', 'community', 'kudos', 'notifications', 'settings'];
-    const commanderRoutes = ['cmdr-home', 'cmdr-profile', 'cmdr-leads', 'cmdr-projects', 'cmdr-project-builder', 'cmdr-action-register', 'cmdr-exonauts', 'cmdr-esc', 'cmdr-health', 'cmdr-eow', 'cmdr-crowns', 'cmdr-removals', 'cmdr-manual-credit', 'cmdr-announce', 'messages', 'community', 'kudos', 'notifications', 'settings'];
-    const adminRoutes = ['pa-cohorts', 'pa-missions', 'pa-projects', 'pa-action-register', 'pa-managers', 'pa-assign', 'pa-users', 'pa-console', 'pa-manual-credit', 'pa-removals', 'pa-announce', 'pa-profile', 'messages', 'community', 'kudos', 'notifications', 'settings'];
+    const leadRoutes = ['lead-home', 'lead-roster', 'lead-queue', 'lead-grade', 'lead-manual-credit', 'lead-announce', 'lead-removals', 'lead-projects', 'lead-project-tasks', 'lead-profile', 'messages', 'community', 'knowledge-base', 'kudos', 'notifications', 'settings'];
+    const commanderRoutes = ['cmdr-home', 'cmdr-profile', 'cmdr-leads', 'cmdr-projects', 'cmdr-project-builder', 'cmdr-action-register', 'cmdr-exonauts', 'cmdr-esc', 'cmdr-health', 'cmdr-eow', 'cmdr-crowns', 'cmdr-removals', 'cmdr-manual-credit', 'cmdr-announce', 'messages', 'community', 'knowledge-base', 'kudos', 'notifications', 'settings'];
+    const adminRoutes = ['pa-cohorts', 'pa-missions', 'pa-projects', 'pa-action-register', 'pa-managers', 'pa-assign', 'pa-users', 'pa-console', 'pa-manual-credit', 'pa-removals', 'pa-announce', 'pa-profile', 'messages', 'community', 'knowledge-base', 'kudos', 'notifications', 'settings'];
     const routeBase = (routeId || '').split(':')[0];
     if (role === 'lead') return leadRoutes.includes(routeBase);
     if (role === 'commander') return commanderRoutes.includes(routeBase);
@@ -204,6 +205,7 @@ function App() {
     'first-projects': ['PROJECTS', 'Projects'],
     'project-tasks': ['PROJECTS', 'Projects'],
     community:   ['EXONAUT', 'Community'],
+    'knowledge-base': ['EXONAUT', 'Knowledge Base'],
     messages:    ['COMMUNICATIONS', 'Messages'],
     'exonaut-guide': ['EXONAUT', 'Exonaut Guide'],
     kudos:       ['EXONAUT', 'Kudos'],
@@ -276,6 +278,7 @@ function App() {
     else if (route === 'project-tasks') page = <ProjectsPage />;
     else if (route === 'messages')    page = <MessagesPage intent={messageIntent} onIntentHandled={() => setMessageIntent(null)} />;
     else if (route === 'community')   page = <CommunityPage />;
+    else if (route === 'knowledge-base') page = <KnowledgeBasePage />;
     else if (route === 'exonaut-guide') page = <ExonautGuidePage />;
     else if (route === 'kudos')       page = <KudosFeed onGive={() => setKudosOpen(true)} />;
     else if (route === 'rituals')     page = <RitualsPage />;
@@ -308,6 +311,7 @@ function App() {
     else if (route === 'lead-profile') page = <RoleProfile roleKey="lead" />;
     else if (route === 'messages')    page = <MessagesPage />;
     else if (route === 'community')   page = <CommunityPage />;
+    else if (route === 'knowledge-base') page = <KnowledgeBasePage />;
     else if (route === 'kudos')       page = <KudosFeed onGive={() => setKudosOpen(true)} />;
     else if (route === 'notifications') page = <NotificationsPage />;
     else if (route === 'settings')    page = <SettingsPage />;
@@ -331,6 +335,7 @@ function App() {
     else if (route === 'cmdr-profile') page = <RoleProfile roleKey="commander" />;
     else if (route === 'messages')    page = <MessagesPage />;
     else if (route === 'community')   page = <CommunityPage />;
+    else if (route === 'knowledge-base') page = <KnowledgeBasePage />;
     else if (route === 'kudos')       page = <KudosFeed onGive={() => setKudosOpen(true)} />;
     else if (route === 'notifications') page = <NotificationsPage />;
     else if (route === 'settings')    page = <SettingsPage />;
@@ -351,6 +356,7 @@ function App() {
     else if (route === 'pa-profile') page = <RoleProfile roleKey="admin" />;
     else if (route === 'messages')   page = <MessagesPage />;
     else if (route === 'community')  page = <CommunityPage />;
+    else if (route === 'knowledge-base') page = <KnowledgeBasePage />;
     else if (route === 'kudos')      page = <KudosFeed onGive={() => setKudosOpen(true)} />;
     else if (route === 'notifications') page = <NotificationsPage />;
     else if (route === 'settings')   page = <SettingsPage />;
@@ -378,16 +384,19 @@ function App() {
                    onCelebrate={onCelebrate} />
 
       {roleView !== 'login' && (
-        <button className="floating-action floating-kudos" onClick={() => setKudosOpen(true)}
-          style={{
-            position: 'fixed', bottom: 20, right: 80, zIndex: 140,
-            background: 'var(--accent)', color: 'var(--on-accent)',
-            border: 'none', borderRadius: '50%', width: 48, height: 48,
-            display: 'grid', placeItems: 'center', fontSize: 16, fontWeight: 700,
-            boxShadow: 'var(--accent-glow)', cursor: 'pointer',
-          }} title="Give Kudos">
-          <i className="fa-solid fa-hand-sparkles" />
-        </button>
+        <>
+          <button className="floating-action floating-kudos" onClick={() => setKudosOpen(true)}
+            style={{
+              position: 'fixed', bottom: 20, right: 80, zIndex: 140,
+              background: 'var(--accent)', color: 'var(--on-accent)',
+              border: 'none', borderRadius: '50%', width: 48, height: 48,
+              display: 'grid', placeItems: 'center', fontSize: 16, fontWeight: 700,
+              boxShadow: 'var(--accent-glow)', cursor: 'pointer',
+            }} title="Give Kudos">
+            <i className="fa-solid fa-hand-sparkles" />
+          </button>
+          <ChatbotWidget />
+        </>
       )}
     </div>
   );
@@ -419,6 +428,7 @@ function LeadSidebar({ current, onNavigate, onSignOut, mobileOpen = false, onMob
     { id: 'lead-profile', label: 'My Profile', icon: 'fa-id-badge' },
     { id: 'messages', label: 'Messages', icon: 'fa-envelope', count: messageUnread },
     { id: 'community',   label: 'Community',     icon: 'fa-users-rectangle' },
+    { id: 'knowledge-base', label: 'Knowledge Base', icon: 'fa-book-open' },
   ];
   const links = [
     { id: 'lead-home',   label: 'Track Command', icon: 'fa-satellite-dish' },
@@ -526,6 +536,7 @@ function CommanderSidebar({ current, onNavigate, onSignOut, mobileOpen = false, 
       title: 'Culture',
       links: [
         { id: 'cmdr-eow', label: 'EOW Awards', icon: 'fa-trophy' },
+        { id: 'knowledge-base', label: 'Knowledge Base', icon: 'fa-book-open' },
         { id: 'kudos', label: 'Kudos', icon: 'fa-hand-sparkles' },
       ],
     },

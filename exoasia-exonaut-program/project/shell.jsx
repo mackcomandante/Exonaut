@@ -91,6 +91,7 @@ function Sidebar({ current, onNavigate, onSignOut, mobileOpen = false, onMobileC
   ];
   const ops = [
     { id: 'community',   label: 'Community',    icon: 'fa-users' },
+    { id: 'knowledge-base', label: 'Knowledge Base', icon: 'fa-book-open' },
     { id: 'kudos',       label: 'Kudos',        icon: 'fa-hand-sparkles' },
     { id: 'rituals',     label: 'Rituals',      icon: 'fa-calendar-check' },
     { id: 'announce',    label: 'Announcements',icon: 'fa-bullhorn' },

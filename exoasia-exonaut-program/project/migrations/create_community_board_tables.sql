@@ -10,6 +10,8 @@ CREATE TABLE IF NOT EXISTS public.community_posts (
   channel text NOT NULL DEFAULT 'general',
   title text NOT NULL DEFAULT '',
   body text NOT NULL DEFAULT '',
+  source_type text,
+  source_id text,
   mention_ids uuid[] NOT NULL DEFAULT '{}',
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
@@ -48,6 +50,9 @@ CREATE TABLE IF NOT EXISTS public.community_comments (
 
 CREATE INDEX IF NOT EXISTS idx_community_posts_created ON public.community_posts(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_community_posts_channel ON public.community_posts(channel);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_community_posts_source
+ON public.community_posts(source_type, source_id)
+WHERE source_type IS NOT NULL AND source_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_community_media_post ON public.community_post_media(post_id);
 CREATE INDEX IF NOT EXISTS idx_community_likes_post ON public.community_post_likes(post_id);
 CREATE INDEX IF NOT EXISTS idx_community_comments_post ON public.community_comments(post_id, created_at);

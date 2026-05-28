@@ -597,10 +597,12 @@ function RoleAuthScreen({ onAuthComplete, tweaks, setTweak }) {
         </div>
 
         <div className="card-hud auth-login-card" style={{ background: 'var(--bg-darkest)', border: '1px solid var(--off-white-07)', borderRadius: 6 }}>
-          <div className="t-label" style={{ marginBottom: 10 }}>SECURE ACCESS</div>
-          <h1 className="t-title" style={{ fontSize: 34, margin: '0 0 10px 0' }}>Exonaut Portal</h1>
-          <div style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 16, color: 'var(--accent)', marginBottom: 26 }}>
-            "We don't wait for the map. We build it."
+          <div style={{ textAlign: 'center', marginBottom: 26 }}>
+            <div className="t-label" style={{ marginBottom: 10 }}>SECURE ACCESS</div>
+            <h1 className="t-title" style={{ fontSize: 34, margin: '0 0 10px 0' }}>Exonaut Portal</h1>
+            <div style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 16, color: 'var(--accent)' }}>
+              "We don't wait for the map. We build it."
+            </div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 20 }}>

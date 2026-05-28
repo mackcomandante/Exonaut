@@ -1,0 +1,1256 @@
+{
+  "meta": {
+    "generatedAt": "2026-05-28T09:11:37.796Z",
+    "description": "Exonaut Program fixed knowledge base — injected as AI context."
+  },
+  "program": {
+    "name": "Exonaut Program",
+    "organization": "Exoasia Innovation Hub",
+    "cohort": {
+      "code": "EXO-BATCH-2026",
+      "name": "Batch 2026–2027",
+      "week": 2,
+      "weekTotal": 12,
+      "size": 30,
+      "startDate": "OCT 06 2026",
+      "demoDay": "JAN 29 2027"
+    },
+    "summary": "1. Executive Summary\n\nThe Exonaut Program Platform is a full-stack web application that manages, gamifies, and celebrates the Exoasia Innovation Hub internship experience. It is the digital home of every Exonaut — from the moment they accept their offer through their entire post-program alumni journey.\n\nThe platform replaces spreadsheets, manual tracking, and fragmented group chats with a single, beautifully designed system that makes excellence visible, competition healthy, and culture contagious.\n\nThe platform serves three primary audiences:\n\nExonauts (Active Interns) — track their missions, points, badges, rank, and cohort standing in real time\n\nMission Leads & Admins — manage cohorts, assign missions, award badges, post announcements, and generate reports\n\nAlumni (Exonaut Corps) — maintain lifelong access to their profile, badges, and alumni network\n\nThe system is built around three pillars that every Exonaut must fulfill:\n\nPillar 1 — Project: Quality and completion of track deliverables and missions\n\nPillar 2 — Client: Relationship management and satisfaction score from their assigned client\n\nPillar 3 — Recruitment: Successfully identifying and referring the next Exonaut\n\nThe platform must be production-ready, mobile-responsive, deployable as a web app (ideally React + Node.js or a modern full-stack framework), and designed in Exoasia's brand colors.\n\n3. User Roles & Permissions\nRole\nWho\nAccess Level\nSuper Admin\nMack Comandante\nFull platform access. Can do everything.\nAdmin\nProgram Directors, Exoasia Staff\nManage cohorts, missions, badges, users, reports. Cannot delete admins.\nMission Lead\nTrack mentors, senior staff\nManage their track's missions, grade submissions, award kudos, view their cohort's leaderboard.\nExonaut (Active)\nCurrent batch interns\nView own dashboard, submit missions, give kudos, view leaderboard, manage profile.\nExonaut Corps (Alumni)\nGraduates\nRead-only access to their own historic profile, badges, and alumni directory. Can participate in alumni events.\nGuest / Recruiter\nProspective interns, partners\nView public leaderboard and public Exonaut profiles (if enabled). Cannot log in.\n\nRole assignment is done by Admin at account creation or when upgrading an Exonaut to Alumni status after Launch Day.\n\n7. Points System\n\nPoints are the currency of the platform. Every meaningful action earns points. Points determine rank, tier, and badge eligibility.\n\n7.1  Points Table\nAction\nPoints\nNotes\nMission submitted on time (Pillar 1)\n+10 to +50\nVaries by mission weight, set by Admin\nMission approved — Good\n+10 bonus\nAdded on top of submission points\nMission approved — Excellent\n+20 bonus\nAdded on top of submission points\nMission revised and resubmitted\n+5\nFor showing commitment after feedback\nClient touchpoint logged\n+15\nPer verified touchpoint\nClient satisfaction score 4★\n+20\nAwarded by Mission Lead\nClient satisfaction score 5★\n+35\nAwarded by Mission Lead\nClient deliverable accepted\n+25\nPer accepted client deliverable\nRecruit candidate submitted\n+30\nName + contact info submitted\nRecruit passes interview\n+50\nCandidate accepts offer\nRecruit completes Batch 1 month\n+25\nRetention bonus — your recruit stays\nTeach-Back session conducted\n+15\nVerified by Mission Lead\nAttend Monday Ignition\n+5\nPer session (max 12)\nPost Friday Win Wall\n+5\nPer week (max 12)\nPost Mid-Week Pulse\n+3\nPer week (max 12)\nGive peer kudos\n+2\nPer kudos given (max 3/week)\nReceive peer kudos\n+3\nPer kudos received (uncapped)\nIntern of the Week — winner\n+25\nWeekly award\nMidpoint Fire Check — completed\n+10\nFlat attendance bonus\nPledge signed (Day 1)\n+50\nOne-time onboarding bonus\nLinkedIn post published\n+20\nVerified by screenshot or tag\nDemo Day presentation delivered\n+50\nOne-time, all Exonauts who present\nPerfect Pillar — max Project score\n+100\nOne-time, end of program\nPerfect Pillar — max Client score\n+100\nOne-time, end of program\nPerfect Pillar — max Recruit score\n+100\nOne-time, end of program\n\nPoints deductions are not used. Poor performance results in missed opportunities for bonus points — not penalties.\n\n7.2  Pillar Weights\n\nFor Tier and special award calculations, pillar scores are weighted:\n\nPillar 1 — Project: 40% of total pillar score\n\nPillar 2 — Client: 35% of total pillar score\n\nPillar 3 — Recruitment: 25% of total pillar score\n\nRaw total points (unweighted) determine the leaderboard rank. Weighted pillar scores determine tier upgrades and special badge eligibility.\n\n8. Tier & Rank System\n\n8.1  Tier Definitions\nTier\nPoints Required\nVisual Identity\nExonaut (Entry)\n0+\nLime #C9E500 border · White background icon\nExonaut Builder\n100+\nBronze #CD7F32 border · Bronze icon\nExonaut Prime\n300+\nSilver #A8B4BE border · Silver icon\nExonaut Elite\n600+\nGold #C9A000 border · Gold icon\nExonaut Apex\n900+\nPlatinum #8BE8FF border · Platinum icon with glow\nExonaut Corps (Alumni)\nProgram completion\nLavender #B095C5 border · Permanent status\n\nTier upgrades are automatic and immediate once the point threshold is crossed. A notification is sent and a Tier Upgrade celebration animation plays on the Exonaut's dashboard.\n\nTier downgrades do not occur during a program. Once a tier is achieved it is kept for the remainder of the cohort.\n\n8.2  Rank\n\nRank is the Exonaut's position on the cohort leaderboard, sorted by total raw points. Rank is real-time and updates every time points are added.\n\nRank is displayed as '#1 of 30' format\n\nThe change vs last week is shown as ↑3 (green) or ↓2 (red)\n\nThe top 3 ranks are displayed with gold/silver/bronze crown icons\n\nAll 30 positions are visible on the full leaderboard\n\n9. Badge System\n\nBadges are the most emotionally resonant part of the platform. They are digital certificates of achievement that live on every Exonaut's profile forever.\n\n9.1  Badge Categories\nCategory\nDescription\nMilestone Tiers (4)\nAwarded when an Exonaut crosses a point threshold: Bronze Builder, Silver Strategist, Gold Innovator, Platinum Disruptor\nTrack Completion (7)\nAwarded when the Exonaut completes all missions within their assigned track: AI Strategist, Venture Builder, L&D Champion, Experience Maker, AI Dev Builder, Policy Analyst, Content Creator\nPillar Badges (4)\nAwarded for achieving maximum score on a pillar: Delivery Machine (Project), Innovation Catalyst (Project), Client Champion (Client), Talent Scout (Recruitment)\nSpecial Awards (7)\nProgram-end awards: Perfect Trifecta, Track MVP, Intern of the Week, Most Likely to Disrupt, Culture Carrier, Full Cycle, Pipeline Builder\n\nTotal: 22 possible badges per cohort. Most Exonauts earn 4–10. An Exonaut who earns all 22 is an extremely rare achievement.\n\n9.2  Badge Display Rules\n\nEarned badges: Full color, with name, date, and description on hover/tap\n\nUnearned badges: Greyed-out silhouette with 'Locked' label — visible to motivate\n\nNew badge earned: Full-screen celebration animation on first view (confetti + badge zoom-in)\n\nBadge ID format: EXO-BADGE-[CATEGORY]-[CODE]-[BATCH] e.g. EXO-BADGE-MIL-GLD-2026\n\nDownloadable certificate: Each badge links to a downloadable PDF certificate (pre-filled with Exonaut's name, date, cohort)\n\n9.3  Badge Award Triggers\n\nMilestone tier badges: Auto-awarded when point threshold is crossed (system-generated)\n\nTrack completion badge: Auto-awarded when all track missions are marked Approved by Mission Lead\n\nPillar badges: Manually awarded by Admin or Mission Lead on the badge management screen\n\nSpecial awards: Manually awarded by Admin only — usually at Demo Day\n\nIntern of the Week badge: Auto-awarded weekly based on leaderboard logic, confirmed by Admin\n\n11. Mission Management\n\nMissions are the tasks and deliverables that Exonauts complete during the program. They are the primary driver of Project pillar points.\n\n11.1  Mission Data Model\nField\nDescription\nMission ID\nAuto-generated: EXO-MSN-[TRACK]-[BATCH]-[NUM]\nTitle\nShort mission name, max 80 characters\nDescription\nFull brief, rich text, max 2000 characters\nTrack\nOne of 7 tracks (or 'All Tracks' for cohort-wide missions)\nAssigned To\nIndividual Exonaut or all Exonauts in a track\nPoints Value\nBase points for on-time submission (set by Admin)\nDue Date\nHard deadline with time\nPillar\nProject / Client / Recruitment\nDeliverable Type\nDocument · Presentation · Video · Link · Tool/Code · Event Plan\nStatus\nNot Started / In Progress / Submitted / Approved / Needs Revision / Overdue\nSubmission\nFile upload or URL link\nMission Lead Feedback\nRich text, visible to Exonaut after review\nGrade\nNeeds Revision / Good / Excellent (not numeric)\nBonus Points Awarded\nSet by Mission Lead at grading (0 / +10 / +20)\n\n11.2  Mission Workflow\n\nAdmin or Mission Lead creates mission and assigns it\n\nExonaut receives notification (in-app + email)\n\nExonaut marks mission 'In Progress' (optional but tracked for engagement metrics)\n\nExonaut submits deliverable (file upload or URL) before deadline\n\nMission Lead reviews within 48 hours and grades it\n\nIf 'Needs Revision': Exonaut is notified with feedback. They can resubmit once.\n\nIf 'Good' or 'Excellent': Points are auto-awarded. Badge eligibility is rechecked.\n\nMission marked Approved. Visible on Exonaut profile history.\n\n11.3  Mission Feed & Filters\n\nFilter by: All / My Track / All Tracks\n\nFilter by: Status / Due Date / Pillar\n\nSort by: Due Date (default) / Points Value / Status\n\nOverdue missions are highlighted in red\n\n'Assigned this week' section at top\n\n12. Peer Kudos System\n\nKudos is the social recognition engine. It drives the 'lift before you climb' culture and powers the Culture Carrier badge.\n\nAny Exonaut can give kudos to any other Exonaut in their cohort\n\nMaximum 3 kudos given per Exonaut per week (resets Monday)\n\nKudos are public — posted to the cohort activity feed with the giver's name and message\n\nGiver earns +2 points. Receiver earns +3 points.\n\nKudos history visible on recipient's profile\n\nThe Exonaut with the most kudos received in the cohort earns the Culture Carrier badge\n\nKUDOS FORM\n\nSelect recipient from cohort list (dropdown with photos)\n\nWrite a kudos message (max 200 characters, required)\n\nOptional: tag a pillar (Project / Client / Recruitment) that the kudos is for\n\nSubmit button ('Give Kudos') — Lime, prominent\n\n13. Weekly Rituals Tracker\n\nThe rituals tracker is a lightweight attendance and participation system that keeps Exonauts accountable to the weekly cadence.\n\nRitual\nHow It's Tracked\nPoints\nMonday Ignition\nAdmin marks attendance in-app after the session\n+5\nMid-Week Pulse\nExonaut posts their Pulse in the platform (replaces group chat)\n+3\nFriday Win Wall\nExonaut posts their Win in the platform (replaces group chat)\n+5\nIntern of the Week\nAuto-calculated from weekly points, Admin confirms\n+25\nTeach-Back Session\nMission Lead marks completion, uploads recording link\n+15\nMidpoint Fire Check\nAdmin marks completion after 1:1 meeting\n+10\nDemo Day\nAdmin marks all presenters at end of program\n+50\nPledge Signing\nAdmin marks at Day 1 onboarding\n+50 (one-time)\n\nThe Weekly Ritual Tracker on the dashboard shows the current week's completion status in real time. Past weeks are archived and visible in the Rituals History section of the profile.\n\n14. Announcements & Notifications\n\n14.1  Admin Announcements\n\nAdmins can post announcements visible to: All Exonauts / Specific Track / Single Exonaut\n\nAnnouncements appear at the top of the dashboard feed with a 'New' badge\n\nAnnouncement types: Info (blue) / Action Required (amber) / Celebration (lime) / Urgent (red)\n\nAnnouncements include a rich text body and optional attachment/link\n\nExonauts can react to announcements (emoji reactions: 🔥 ⚡ 🚀 💡)\n\n14.2  Notification System\n\nIN-APP NOTIFICATIONS (BELL ICON IN SIDEBAR)\n\nNew mission assigned\n\nMission deadline in 48 hours\n\nMission graded (with result)\n\nKudos received (with message preview)\n\nRank change (up or down)\n\nTier upgrade achieved (with animation trigger)\n\nBadge earned (with animation trigger)\n\nAdmin announcement posted\n\nIntern of the Week — you won\n\nEMAIL NOTIFICATIONS (USER CAN TOGGLE OFF IN SETTINGS)\n\nNew mission assigned\n\nMission deadline in 24 hours (reminder)\n\nWeekly summary email (sent Sunday evening): points earned, rank, top 3 wins, next week's missions\n\nBadge earned\n\nAdmin announcement (Action Required type only, always sent)"
+  },
+  "roles": {
+    "exonaut": "Active intern. Can view their own dashboard, submit missions, give kudos, view the leaderboard.",
+    "lead": "Mission Lead / Track Lead. Manages a track, grades submissions, awards kudos, views their cohort.",
+    "commander": "Mission Commander. Cohort-wide oversight, escalations, health checks, EOW awards.",
+    "admin": "Platform Admin. Full access — cohort management, user management, missions, badges, points, reports.",
+    "alumni": "Exonaut Corps. Read-only access to own profile, badges, mission history, alumni directory."
+  },
+  "tiers": [
+    {
+      "key": "entry",
+      "label": "Exonaut",
+      "short": "ENTRY",
+      "minPoints": 0,
+      "color": "#C9F24A"
+    },
+    {
+      "key": "builder",
+      "label": "Exonaut Builder",
+      "short": "BUILDER",
+      "minPoints": 100,
+      "color": "#E08A3C"
+    },
+    {
+      "key": "prime",
+      "label": "Exonaut Prime",
+      "short": "PRIME",
+      "minPoints": 300,
+      "color": "#B8C2CE"
+    },
+    {
+      "key": "elite",
+      "label": "Exonaut Elite",
+      "short": "ELITE",
+      "minPoints": 600,
+      "color": "#C9A000"
+    },
+    {
+      "key": "apex",
+      "label": "Exonaut Apex",
+      "short": "APEX",
+      "minPoints": 900,
+      "color": "#8BE8FF"
+    },
+    {
+      "key": "corps",
+      "label": "Exonaut Corps",
+      "short": "CORPS",
+      "minPoints": null,
+      "color": "#B095C5"
+    }
+  ],
+  "tracks": [
+    {
+      "code": "AIS",
+      "name": "AI Strategy & Advisory",
+      "short": "AI-STRAT",
+      "objective": "Deliver a comprehensive AI Readiness Assessment and Strategic Roadmap for a real enterprise client, culminating in a signed advisory engagement and a board-ready presentation.",
+      "clientType": "Philippine or ASEAN enterprise considering AI adoption",
+      "leadTitle": "Senior AI Advisor / Principal Consultant",
+      "trackBadge": "AI Strategist"
+    },
+    {
+      "code": "VB",
+      "name": "EBELI Venture Building",
+      "short": "VENTURE",
+      "objective": "Take a founder or startup client from a raw idea through the full EBELI methodology — from concept validation and TRL assessment to an investor-ready pitch deck and prototype plan.",
+      "clientType": "Early-stage founder or startup seeking to build an AI-powered company",
+      "leadTitle": "Venture Lead / Exoasia Partner",
+      "trackBadge": "Venture Builder"
+    },
+    {
+      "code": "LD",
+      "name": "Learning & Development",
+      "short": "L&D",
+      "objective": "Design and deliver an AI literacy or upskilling program for a real organizational client, from needs assessment through a live workshop pilot and full curriculum package.",
+      "clientType": "HR, L&D, or OD team at a corporation, government agency, or academic institution",
+      "leadTitle": "L&D Lead / Senior Program Designer",
+      "trackBadge": "L&D Champion"
+    },
+    {
+      "code": "XM",
+      "name": "Events & Experiences",
+      "short": "EVENTS",
+      "objective": "Design and deliver a real high-impact event or experiential activation for a client, from brief to run-of-show to live execution.",
+      "clientType": "Brand, institution, or organization planning an event or launch",
+      "leadTitle": "Events & Experience Lead",
+      "trackBadge": "Experience Maker"
+    },
+    {
+      "code": "AID",
+      "name": "AI-Native Software",
+      "short": "AI-DEV",
+      "objective": "Ship a working AI-powered software product for a real client — from spec through prototype to deployed, user-tested build.",
+      "clientType": "SME, startup, or internal team needing an AI-native tool or workflow",
+      "leadTitle": "Principal Engineer / AI Build Lead",
+      "trackBadge": "AI Dev Builder"
+    },
+    {
+      "code": "POL",
+      "name": "Research, Policy & Insight",
+      "short": "POLICY",
+      "objective": "Produce a rigorous research, policy, or industry-insight report for a real client — from brief through primary research to publication-ready document.",
+      "clientType": "Think tank, government agency, industry body, or enterprise research function",
+      "leadTitle": "Research Lead / Policy Director",
+      "trackBadge": "Policy Analyst"
+    },
+    {
+      "code": "CC",
+      "name": "Social Media Marketing",
+      "short": "SOCIAL",
+      "objective": "Build and execute a full AI-powered social media strategy for a real client, including brand audit, content system, platform growth, and measurable results.",
+      "clientType": "Brand, startup, or organization seeking to grow digital presence",
+      "leadTitle": "Content & Brand Lead",
+      "trackBadge": "Content Creator"
+    }
+  ],
+  "rituals": [
+    {
+      "id": "mon-ign",
+      "name": "Monday Ignition",
+      "points": 5
+    },
+    {
+      "id": "mid-pls",
+      "name": "Mid-Week Pulse",
+      "points": 3
+    },
+    {
+      "id": "fri-win",
+      "name": "Friday Win Wall",
+      "points": 5
+    },
+    {
+      "id": "iotw",
+      "name": "Intern of Week",
+      "points": 25
+    },
+    {
+      "id": "teach-bk",
+      "name": "Teach-Back",
+      "points": 15
+    }
+  ],
+  "pointsRubric": [
+    {
+      "group": "Onboarding",
+      "action": "Pledge signed (Day 1)",
+      "points": "+50",
+      "note": "One-time onboarding bonus"
+    },
+    {
+      "group": "Onboarding",
+      "action": "LinkedIn post published",
+      "points": "+20",
+      "note": "Verified by link"
+    },
+    {
+      "group": "Track submissions",
+      "action": "Track task submitted on time",
+      "points": "+10 to +50",
+      "note": "Set per track task by Track Lead"
+    },
+    {
+      "group": "Track submissions",
+      "action": "Track task graded Good",
+      "points": "+10",
+      "note": "Bonus on top"
+    },
+    {
+      "group": "Track submissions",
+      "action": "Track task graded Excellent",
+      "points": "+20",
+      "note": "Bonus on top"
+    },
+    {
+      "group": "Client",
+      "action": "Prospect pipeline (10 qualified)",
+      "points": "+20",
+      "note": "Wk 1 · in CRM"
+    },
+    {
+      "group": "Client",
+      "action": "Concept paper submitted (per paper)",
+      "points": "+30",
+      "note": "Wk 2 · 1 per prospect · 10 total"
+    },
+    {
+      "group": "Client",
+      "action": "Discovery meeting completed",
+      "points": "+25",
+      "note": "Per verified meeting"
+    },
+    {
+      "group": "Client",
+      "action": "Discovery tier · GOOD (3 meetings)",
+      "points": "+75",
+      "note": "Week 2 outcome bonus"
+    },
+    {
+      "group": "Client",
+      "action": "Discovery tier · GREAT (4–6 meetings)",
+      "points": "+150",
+      "note": "Week 2 outcome bonus"
+    },
+    {
+      "group": "Client",
+      "action": "Discovery tier · AWESOME (7+ meetings)",
+      "points": "+250",
+      "note": "Week 2 outcome bonus · IOW nom"
+    },
+    {
+      "group": "Client",
+      "action": "Client signs engagement / MOU",
+      "points": "+50",
+      "note": "Pipeline Bonus · stackable"
+    },
+    {
+      "group": "Client",
+      "action": "Client touchpoint logged",
+      "points": "+15",
+      "note": "Per verified touchpoint"
+    },
+    {
+      "group": "Client",
+      "action": "Client 4-star satisfaction",
+      "points": "+20",
+      "note": "Awarded by ML"
+    },
+    {
+      "group": "Client",
+      "action": "Client 5-star satisfaction",
+      "points": "+35",
+      "note": "Awarded by ML"
+    },
+    {
+      "group": "Client",
+      "action": "Client deliverable accepted",
+      "points": "+25",
+      "note": "Per accepted"
+    },
+    {
+      "group": "Recruitment",
+      "action": "Recruit candidate submitted",
+      "points": "+30",
+      "note": "Name + contact"
+    },
+    {
+      "group": "Recruitment",
+      "action": "Recruit accepts offer",
+      "points": "+50",
+      "note": "Placement confirmed"
+    },
+    {
+      "group": "Rituals",
+      "action": "Attend Monday Ignition",
+      "points": "+5",
+      "note": "Per session"
+    },
+    {
+      "group": "Rituals",
+      "action": "Post Mid-Week Pulse",
+      "points": "+3",
+      "note": "Per week"
+    },
+    {
+      "group": "Rituals",
+      "action": "Post Friday Win Wall",
+      "points": "+5",
+      "note": "Per week"
+    },
+    {
+      "group": "Culture",
+      "action": "Give peer kudos",
+      "points": "+0.5",
+      "note": "Max 4/week"
+    },
+    {
+      "group": "Culture",
+      "action": "Receive peer kudos",
+      "points": "+0.25",
+      "note": "Uncapped"
+    },
+    {
+      "group": "Culture",
+      "action": "Teach-Back session conducted",
+      "points": "+15",
+      "note": "Verified by ML"
+    },
+    {
+      "group": "Milestones",
+      "action": "Intern of the Week win",
+      "points": "+25",
+      "note": "Weekly award"
+    },
+    {
+      "group": "Milestones",
+      "action": "Midpoint Fire Check completed",
+      "points": "+10",
+      "note": "Week 6 1:1"
+    },
+    {
+      "group": "Milestones",
+      "action": "Demo Day presentation",
+      "points": "+50",
+      "note": "All presenters"
+    }
+  ],
+  "discoveryTiers": [
+    {
+      "tier": "GOOD",
+      "minMeetings": 3,
+      "points": 75,
+      "note": "Baseline — hit the floor"
+    },
+    {
+      "tier": "GREAT",
+      "minMeetings": 4,
+      "points": 150,
+      "note": "Strong week — most Exonauts target this"
+    },
+    {
+      "tier": "AWESOME",
+      "minMeetings": 7,
+      "points": 250,
+      "note": "Top performers — unlocks Intern of the Week nomination"
+    }
+  ],
+  "badges": [
+    {
+      "code": "MIL-BRZ",
+      "name": "Bronze Builder",
+      "subtitle": "100 points",
+      "category": "milestone"
+    },
+    {
+      "code": "MIL-SLV",
+      "name": "Silver Strategist",
+      "subtitle": "300 points",
+      "category": "milestone"
+    },
+    {
+      "code": "MIL-GLD",
+      "name": "Gold Innovator",
+      "subtitle": "600 points",
+      "category": "milestone"
+    },
+    {
+      "code": "MIL-PLT",
+      "name": "Platinum Disruptor",
+      "subtitle": "900 points",
+      "category": "milestone"
+    },
+    {
+      "code": "TRK-AIS",
+      "name": "AI Strategist",
+      "subtitle": "AI Strategy track",
+      "category": "track"
+    },
+    {
+      "code": "TRK-VB",
+      "name": "Venture Builder",
+      "subtitle": "Venture track",
+      "category": "track"
+    },
+    {
+      "code": "TRK-LD",
+      "name": "L&D Champion",
+      "subtitle": "L&D track",
+      "category": "track"
+    },
+    {
+      "code": "TRK-XM",
+      "name": "Experience Maker",
+      "subtitle": "Experience track",
+      "category": "track"
+    },
+    {
+      "code": "TRK-AID",
+      "name": "AI Dev Builder",
+      "subtitle": "AI Dev track",
+      "category": "track"
+    },
+    {
+      "code": "TRK-POL",
+      "name": "Policy Analyst",
+      "subtitle": "Policy track",
+      "category": "track"
+    },
+    {
+      "code": "TRK-CC",
+      "name": "Content Creator",
+      "subtitle": "Content track",
+      "category": "track"
+    },
+    {
+      "code": "PIL-DLV",
+      "name": "Delivery Machine",
+      "subtitle": "Max Project score",
+      "category": "pillar"
+    },
+    {
+      "code": "PIL-INN",
+      "name": "Innovation Catalyst",
+      "subtitle": "Breakthrough work",
+      "category": "pillar"
+    },
+    {
+      "code": "PIL-CLT",
+      "name": "Client Champion",
+      "subtitle": "Max Client score",
+      "category": "pillar"
+    },
+    {
+      "code": "PIL-TAL",
+      "name": "Talent Scout",
+      "subtitle": "Max Recruit score",
+      "category": "pillar"
+    },
+    {
+      "code": "SPL-TRI",
+      "name": "Perfect Trifecta",
+      "subtitle": "All three pillars maxed",
+      "category": "special"
+    },
+    {
+      "code": "SPL-MVP",
+      "name": "Track MVP",
+      "subtitle": "Top of your track",
+      "category": "special"
+    },
+    {
+      "code": "SPL-IOW",
+      "name": "Intern of Week",
+      "subtitle": "Weekly award",
+      "category": "special"
+    },
+    {
+      "code": "SPL-DIS",
+      "name": "Most Likely to Disrupt",
+      "subtitle": "Program-end award",
+      "category": "special"
+    },
+    {
+      "code": "SPL-CLT",
+      "name": "Culture Carrier",
+      "subtitle": "Most kudos received",
+      "category": "special"
+    },
+    {
+      "code": "SPL-FUL",
+      "name": "Full Cycle",
+      "subtitle": "All rituals attended",
+      "category": "special"
+    },
+    {
+      "code": "SPL-PIP",
+      "name": "Pipeline Builder",
+      "subtitle": "3+ recruits placed",
+      "category": "special"
+    }
+  ],
+  "universalWeeks": [
+    {
+      "week": 1,
+      "title": "Prospecting · Build Your Client Pipeline",
+      "pointsRange": "70–90",
+      "badgeEligible": null,
+      "missions": [
+        {
+          "number": 1,
+          "points": 50,
+          "task": "Pledge Signing Ceremony — attend Day 1, sign the Pledge, post group photo."
+        },
+        {
+          "number": 2,
+          "points": 10,
+          "task": "Complete platform onboarding wizard — photo, bio, track, client."
+        },
+        {
+          "number": 3,
+          "points": 20,
+          "task": "Post LinkedIn announcement within 48 hours using the approved template."
+        },
+        {
+          "number": 4,
+          "points": "20+20",
+          "task": "Prospecting Mission — identify and qualify 10 prospects relevant to your track. For each, document: company, industry, size, key contact + LinkedIn, pain point, proposed service hook. Log all in the Game Changer Funnel CRM."
+        },
+        {
+          "number": 5,
+          "points": 5,
+          "task": "Attend Monday Ignition — post your Week 1 goal."
+        },
+        {
+          "number": 6,
+          "points": 3,
+          "task": "Post Mid-Week Pulse on Wednesday."
+        },
+        {
+          "number": 7,
+          "points": 5,
+          "task": "Post Friday Win Wall — your #1 win from Week 1."
+        }
+      ]
+    },
+    {
+      "week": 2,
+      "title": "Concept Papers · 10 Prospects, 10 Papers",
+      "pointsRange": "120–180 (+50 Pipeline Bonus per client signed)",
+      "badgeEligible": "Bronze Builder (100 pts)",
+      "missions": [
+        {
+          "number": 8,
+          "points": "10 × 30",
+          "task": "10 Concept Papers — write a 1–2 page concept paper for EACH of your 10 prospects. Each must include: exec summary, problem statement, proposed solution, scope, timeline, expected outcomes, investment range. All 10 must be ML-approved before sending. (+30 per paper, up to +20 Excellent bonus each)"
+        },
+        {
+          "number": 9,
+          "points": "—",
+          "task": "Send concept papers to all 10 prospects and request a Discovery Meeting with each."
+        },
+        {
+          "number": 10,
+          "points": "25 × N",
+          "task": "Discovery Meetings — conduct structured 30–45 min discovery sessions. +25 per verified meeting. Outcome tiers scored on total meetings booked: 3 = GOOD (+75), 4–6 = GREAT (+150), 7+ = AWESOME (+250)."
+        },
+        {
+          "number": 11,
+          "points": "+50 each",
+          "task": "Client Sign-Off — any prospect that signs an engagement letter / MOU earns the Pipeline Bonus. Stack these — multiple signs, multiple bonuses."
+        },
+        {
+          "number": 12,
+          "points": 3,
+          "task": "Mid-Week Pulse — track your meeting count toward tier."
+        },
+        {
+          "number": 13,
+          "points": 5,
+          "task": "Friday Win Wall — share your tier hit (GOOD / GREAT / AWESOME)."
+        },
+        {
+          "number": 14,
+          "points": 5,
+          "task": "Attend Monday Ignition."
+        }
+      ]
+    }
+  ],
+  "trackBriefs": {
+    "AIS": [
+      {
+        "week": 3,
+        "title": "AI Readiness Assessment — Phase 1",
+        "pointsRange": "80–120",
+        "badgeEligible": "Silver targeting Wk 5",
+        "missions": [
+          "Client Sign-Off — engagement letter / MOU signed (+50 Pipeline Bonus)",
+          "Mission 1 · AI Readiness Diagnostic — Exoasia AI Readiness Framework across 6 dimensions: Data Maturity, Process Automation, AI Awareness, Leadership Buy-In, Technical Infra, Budget Readiness (+30, +20 bonus)"
+        ]
+      },
+      {
+        "week": 4,
+        "title": "Competitive & Landscape Analysis",
+        "pointsRange": "60–90",
+        "badgeEligible": null,
+        "missions": [
+          "Mission 2 · Industry AI Landscape Report — 4–6 pages on AI adoption trends, use cases, competitive intel for client's industry. 5+ real case studies (+35, +20)",
+          "Log client touchpoint with preliminary findings (+15)"
+        ]
+      },
+      {
+        "week": 5,
+        "title": "AI Use Case Prioritization",
+        "pointsRange": "65–95",
+        "badgeEligible": "Silver Builder (300 pts)",
+        "missions": [
+          "Mission 3 · Use Case Identification & Prioritization Matrix — 6–10 AI use cases scored on Business Impact, Feasibility, Data Availability, ROI. 2×2 matrix with top 3 (+35, +20)",
+          "Teach-Back Session — teach cohort one framework from your AI strategy work (+15)"
+        ]
+      },
+      {
+        "week": 6,
+        "title": "Midpoint Fire Check + Strategic Roadmap Draft",
+        "pointsRange": "55–85",
+        "badgeEligible": null,
+        "missions": [
+          "Midpoint Fire Check — 30-min 1:1 with ML (+10)",
+          "Mission 4 · AI Strategic Roadmap Draft — 3-year transformation roadmap: vision, 3 priorities, 90-day wins, 12-month milestones, 3-year goals, resources, risks (+40, +20)"
+        ]
+      },
+      {
+        "week": 7,
+        "title": "Client Roadmap Presentation Prep + Recruit",
+        "pointsRange": "70–100",
+        "badgeEligible": "Gold Innovator (600 pts)",
+        "missions": [
+          "Mission 5 · Client Roadmap Presentation — 10–15 slide board-ready PPT, client-branded (+40, +20)",
+          "Recruit Scout — submit 1 candidate for next cohort (+30)"
+        ]
+      },
+      {
+        "week": 8,
+        "title": "Client Presentation Delivery",
+        "pointsRange": "65–95",
+        "badgeEligible": null,
+        "missions": [
+          "Mission 6 · Present AI Strategic Roadmap to client — submit recording/notes, reactions, 1-page action memo (+40, +20 if next phase agreed)",
+          "Client Deliverable Accepted (+25)"
+        ]
+      },
+      {
+        "week": 9,
+        "title": "Capstone Scoped — AI Business Case",
+        "pointsRange": "60–90",
+        "badgeEligible": null,
+        "missions": [
+          "Mission 7 · AI Transformation Business Case — investment-grade: exec summary, problem, proposed solution, implementation plan, cost-benefit, risks, ROI projection (+50, +20)"
+        ]
+      },
+      {
+        "week": 10,
+        "title": "Capstone Build + Recruit Follow-up",
+        "pointsRange": "65–95",
+        "badgeEligible": "Platinum Disruptor (900 pts)",
+        "missions": [
+          "Capstone build sessions — refine business case with ML feedback",
+          "Recruit follow-up (+15 per touchpoint)"
+        ]
+      },
+      {
+        "week": 11,
+        "title": "Capstone Final + Peer Vote",
+        "pointsRange": "50–80",
+        "badgeEligible": null,
+        "missions": [
+          "Finalize business case for Demo Day",
+          "Peer voting opens"
+        ]
+      },
+      {
+        "week": 12,
+        "title": "Demo Day + Corps Induction",
+        "pointsRange": "60–80",
+        "badgeEligible": null,
+        "missions": [
+          "Demo Day · 8-min presentation: discovery → roadmap → business case (+50)",
+          "Exonaut Corps induction"
+        ]
+      }
+    ],
+    "VB": [
+      {
+        "week": 3,
+        "title": "Venture Sign + EBELI Baseline",
+        "pointsRange": "85–125",
+        "badgeEligible": null,
+        "missions": [
+          "Client Sign-Off (+50 Pipeline Bonus)",
+          "Mission 1 · EBELI Baseline Assessment — 5 dimensions: Problem Clarity, Solution Differentiation, Market Opportunity, Team Readiness, Business Model Viability (+35, +20)"
+        ]
+      },
+      {
+        "week": 4,
+        "title": "TRL Assessment + Problem-Solution Fit",
+        "pointsRange": "60–90",
+        "badgeEligible": null,
+        "missions": [
+          "Mission 2 · TRL Assessment — evaluate client AI tech on 9-level scale, gap to TRL 6, dev milestones (+35, +20)",
+          "Log client touchpoint (+15)"
+        ]
+      },
+      {
+        "week": 5,
+        "title": "Business Model Canvas + GTM",
+        "pointsRange": "65–95",
+        "badgeEligible": null,
+        "missions": [
+          "Mission 3 · AI-Native Business Model Canvas — with AI overlay on value props, cost, moats (+35, +20)",
+          "Teach-Back Session (+15)"
+        ]
+      },
+      {
+        "week": 6,
+        "title": "Midpoint Fire Check + Financial Model",
+        "pointsRange": "55–85",
+        "badgeEligible": null,
+        "missions": [
+          "Midpoint Fire Check (+10)",
+          "Mission 4 · 3-Year Financial Model — P&L, revenue, costs, funding, unit economics, bear/base/bull (+40, +20)"
+        ]
+      },
+      {
+        "week": 7,
+        "title": "Investor Pitch Deck + Recruit",
+        "pointsRange": "70–100",
+        "badgeEligible": null,
+        "missions": [
+          "Mission 5 · Investor Pitch Deck — 12–15 slides, Kawasaki structure, client-branded (+40, +20)",
+          "Recruit Scout (+30)"
+        ]
+      },
+      {
+        "week": 8,
+        "title": "Pitch Rehearsal + Feedback Integration",
+        "pointsRange": "65–95",
+        "badgeEligible": null,
+        "missions": [
+          "Mission 6 · Pitch Dry Run with founder — revise 3 slides, submit updated deck + revision notes (+35, +20)"
+        ]
+      },
+      {
+        "week": 9,
+        "title": "Capstone — Venture Investment Dossier",
+        "pointsRange": "65–95",
+        "badgeEligible": null,
+        "missions": [
+          "Mission 7 · Full investment-ready dossier: EBELI + TRL + BMC + Financials + Deck + 1-pg Investment Thesis (+50, +20)"
+        ]
+      },
+      {
+        "week": 10,
+        "title": "Capstone Build",
+        "pointsRange": "65–95",
+        "badgeEligible": null,
+        "missions": [
+          "Dossier refinement"
+        ]
+      },
+      {
+        "week": 11,
+        "title": "Peer Vote + Finalize",
+        "pointsRange": "50–80",
+        "badgeEligible": null,
+        "missions": [
+          "Finalize dossier"
+        ]
+      },
+      {
+        "week": 12,
+        "title": "Demo Day + Corps Induction",
+        "pointsRange": "60–80",
+        "badgeEligible": null,
+        "missions": [
+          "Demo Day · 8-min pitch of venture-building journey (+50)",
+          "Corps induction"
+        ]
+      }
+    ],
+    "LD": [
+      {
+        "week": 3,
+        "title": "Client Sign + L&D Needs Assessment",
+        "pointsRange": "85–125",
+        "badgeEligible": null,
+        "missions": [
+          "Client Sign-Off (+50)",
+          "Mission 1 · L&D Needs Assessment — stakeholder interviews, skills gap analysis, learner personas (+35, +20)"
+        ]
+      },
+      {
+        "week": 4,
+        "title": "Learning Architecture + Curriculum Outline",
+        "pointsRange": "60–90",
+        "badgeEligible": null,
+        "missions": [
+          "Mission 2 · Learning Architecture — modality mix, competency map, 8-week curriculum outline (+35, +20)"
+        ]
+      },
+      {
+        "week": 5,
+        "title": "Module 1 Build + Facilitator Guide",
+        "pointsRange": "65–95",
+        "badgeEligible": null,
+        "missions": [
+          "Mission 3 · First Module Build — slides, activities, facilitator guide, handouts (+35, +20)",
+          "Teach-Back (+15)"
+        ]
+      },
+      {
+        "week": 6,
+        "title": "Midpoint + Pilot Prep",
+        "pointsRange": "55–85",
+        "badgeEligible": null,
+        "missions": [
+          "Midpoint Fire Check (+10)",
+          "Mission 4 · Pilot Workshop Plan — run-of-show, participant workbook, assessment instrument (+40, +20)"
+        ]
+      },
+      {
+        "week": 7,
+        "title": "Live Pilot Workshop + Recruit",
+        "pointsRange": "70–100",
+        "badgeEligible": null,
+        "missions": [
+          "Mission 5 · Deliver Live Pilot Workshop to client cohort — submit recording + feedback scores (+40, +20)",
+          "Recruit Scout (+30)"
+        ]
+      },
+      {
+        "week": 8,
+        "title": "Iteration + Modules 2-4",
+        "pointsRange": "65–95",
+        "badgeEligible": null,
+        "missions": [
+          "Mission 6 · Iterate based on pilot + build Modules 2–4 (+40, +20)"
+        ]
+      },
+      {
+        "week": 9,
+        "title": "Capstone — Full Curriculum Package",
+        "pointsRange": "65–95",
+        "badgeEligible": null,
+        "missions": [
+          "Mission 7 · Complete curriculum: all modules, facilitator guides, LMS-ready assets, evaluation framework (+50, +20)"
+        ]
+      },
+      {
+        "week": 10,
+        "title": "Capstone Build",
+        "pointsRange": "65–95",
+        "badgeEligible": null,
+        "missions": [
+          "Package refinement"
+        ]
+      },
+      {
+        "week": 11,
+        "title": "Peer Vote",
+        "pointsRange": "50–80",
+        "badgeEligible": null,
+        "missions": [
+          "Finalize"
+        ]
+      },
+      {
+        "week": 12,
+        "title": "Demo Day",
+        "pointsRange": "60–80",
+        "badgeEligible": null,
+        "missions": [
+          "Demo Day · 8 min (+50)",
+          "Corps induction"
+        ]
+      }
+    ],
+    "XM": [
+      {
+        "week": 3,
+        "title": "Client Sign + Event Discovery",
+        "pointsRange": "85–125",
+        "badgeEligible": null,
+        "missions": [
+          "Client Sign-Off (+50)",
+          "Mission 1 · Event Strategy Brief — objective, audience, success metrics, concept direction (+35, +20)"
+        ]
+      },
+      {
+        "week": 4,
+        "title": "Creative Concept + Experience Map",
+        "pointsRange": "60–90",
+        "badgeEligible": null,
+        "missions": [
+          "Mission 2 · Creative Concept + Experience Map — full journey from invite to post-event (+35, +20)"
+        ]
+      },
+      {
+        "week": 5,
+        "title": "Production Plan + Run-of-Show",
+        "pointsRange": "65–95",
+        "badgeEligible": null,
+        "missions": [
+          "Mission 3 · Production Plan — vendors, budget, run-of-show, tech rider (+35, +20)",
+          "Teach-Back (+15)"
+        ]
+      },
+      {
+        "week": 6,
+        "title": "Midpoint + Content & Comms",
+        "pointsRange": "55–85",
+        "badgeEligible": null,
+        "missions": [
+          "Midpoint Fire Check (+10)",
+          "Mission 4 · Content & Comms Package — invitations, signage, scripts, social assets (+40, +20)"
+        ]
+      },
+      {
+        "week": 7,
+        "title": "Dry Run + Recruit",
+        "pointsRange": "70–100",
+        "badgeEligible": null,
+        "missions": [
+          "Mission 5 · Full Dry Run with client — submit recording + revision log (+40, +20)",
+          "Recruit Scout (+30)"
+        ]
+      },
+      {
+        "week": 8,
+        "title": "Live Event Delivery",
+        "pointsRange": "65–95",
+        "badgeEligible": null,
+        "missions": [
+          "Mission 6 · Execute Live Event — submit attendance, photos, client sign-off (+40, +20)"
+        ]
+      },
+      {
+        "week": 9,
+        "title": "Capstone — Event Impact Report",
+        "pointsRange": "65–95",
+        "badgeEligible": null,
+        "missions": [
+          "Mission 7 · Full Impact Report: attendance, NPS, media, ROI, highlight reel (+50, +20)"
+        ]
+      },
+      {
+        "week": 10,
+        "title": "Capstone Build",
+        "pointsRange": "65–95",
+        "badgeEligible": null,
+        "missions": [
+          "Report refinement"
+        ]
+      },
+      {
+        "week": 11,
+        "title": "Peer Vote",
+        "pointsRange": "50–80",
+        "badgeEligible": null,
+        "missions": [
+          "Finalize"
+        ]
+      },
+      {
+        "week": 12,
+        "title": "Demo Day",
+        "pointsRange": "60–80",
+        "badgeEligible": null,
+        "missions": [
+          "Demo Day · 8 min (+50)",
+          "Corps induction"
+        ]
+      }
+    ],
+    "AID": [
+      {
+        "week": 3,
+        "title": "Client Sign + Product Spec",
+        "pointsRange": "85–125",
+        "badgeEligible": null,
+        "missions": [
+          "Client Sign-Off (+50)",
+          "Mission 1 · Product Spec + User Stories — problem, users, core flows, acceptance criteria (+35, +20)"
+        ]
+      },
+      {
+        "week": 4,
+        "title": "Architecture + Model Selection",
+        "pointsRange": "60–90",
+        "badgeEligible": null,
+        "missions": [
+          "Mission 2 · Technical Architecture — stack, AI models, data flow, eval plan (+35, +20)"
+        ]
+      },
+      {
+        "week": 5,
+        "title": "MVP Prototype · v0.1",
+        "pointsRange": "65–95",
+        "badgeEligible": null,
+        "missions": [
+          "Mission 3 · Working Prototype v0.1 — demo video + repo (+35, +20)",
+          "Teach-Back (+15)"
+        ]
+      },
+      {
+        "week": 6,
+        "title": "Midpoint + User Testing",
+        "pointsRange": "55–85",
+        "badgeEligible": null,
+        "missions": [
+          "Midpoint Fire Check (+10)",
+          "Mission 4 · User Testing — 3+ sessions, feedback log, iteration plan (+40, +20)"
+        ]
+      },
+      {
+        "week": 7,
+        "title": "v1.0 Build + Recruit",
+        "pointsRange": "70–100",
+        "badgeEligible": null,
+        "missions": [
+          "Mission 5 · v1.0 Release — shipped, deployed, documented (+40, +20)",
+          "Recruit Scout (+30)"
+        ]
+      },
+      {
+        "week": 8,
+        "title": "Client Onboarding",
+        "pointsRange": "65–95",
+        "badgeEligible": null,
+        "missions": [
+          "Mission 6 · Deploy + Onboard Client — training docs, handover session, support plan (+40, +20)"
+        ]
+      },
+      {
+        "week": 9,
+        "title": "Capstone — Product Dossier",
+        "pointsRange": "65–95",
+        "badgeEligible": null,
+        "missions": [
+          "Mission 7 · Product Dossier: spec, architecture, evals, usage metrics, roadmap (+50, +20)"
+        ]
+      },
+      {
+        "week": 10,
+        "title": "Capstone Build",
+        "pointsRange": "65–95",
+        "badgeEligible": null,
+        "missions": [
+          "Dossier refinement"
+        ]
+      },
+      {
+        "week": 11,
+        "title": "Peer Vote",
+        "pointsRange": "50–80",
+        "badgeEligible": null,
+        "missions": [
+          "Finalize"
+        ]
+      },
+      {
+        "week": 12,
+        "title": "Demo Day",
+        "pointsRange": "60–80",
+        "badgeEligible": null,
+        "missions": [
+          "Demo Day · 8 min live demo (+50)",
+          "Corps induction"
+        ]
+      }
+    ],
+    "POL": [
+      {
+        "week": 3,
+        "title": "Client Sign + Research Brief",
+        "pointsRange": "85–125",
+        "badgeEligible": null,
+        "missions": [
+          "Client Sign-Off (+50)",
+          "Mission 1 · Research Brief + Hypotheses — scope, questions, methodology (+35, +20)"
+        ]
+      },
+      {
+        "week": 4,
+        "title": "Secondary Research + Lit Review",
+        "pointsRange": "60–90",
+        "badgeEligible": null,
+        "missions": [
+          "Mission 2 · Literature Review — 15+ sources, synthesis memo (+35, +20)"
+        ]
+      },
+      {
+        "week": 5,
+        "title": "Primary Research · Interviews",
+        "pointsRange": "65–95",
+        "badgeEligible": null,
+        "missions": [
+          "Mission 3 · 5+ Expert Interviews — transcripts, coded insights (+35, +20)",
+          "Teach-Back (+15)"
+        ]
+      },
+      {
+        "week": 6,
+        "title": "Midpoint + Data Analysis",
+        "pointsRange": "55–85",
+        "badgeEligible": null,
+        "missions": [
+          "Midpoint Fire Check (+10)",
+          "Mission 4 · Analysis + Findings Memo — key insights, implications (+40, +20)"
+        ]
+      },
+      {
+        "week": 7,
+        "title": "Draft Report + Recruit",
+        "pointsRange": "70–100",
+        "badgeEligible": null,
+        "missions": [
+          "Mission 5 · Full Report Draft — publication-ready draft (+40, +20)",
+          "Recruit Scout (+30)"
+        ]
+      },
+      {
+        "week": 8,
+        "title": "Client Review + Revision",
+        "pointsRange": "65–95",
+        "badgeEligible": null,
+        "missions": [
+          "Mission 6 · Client Review Session + Revisions — submit revision log (+40, +20)"
+        ]
+      },
+      {
+        "week": 9,
+        "title": "Capstone — Final Report + Brief",
+        "pointsRange": "65–95",
+        "badgeEligible": null,
+        "missions": [
+          "Mission 7 · Final Report + Executive Brief + Policy Recommendations (+50, +20)"
+        ]
+      },
+      {
+        "week": 10,
+        "title": "Capstone Build",
+        "pointsRange": "65–95",
+        "badgeEligible": null,
+        "missions": [
+          "Report finalization"
+        ]
+      },
+      {
+        "week": 11,
+        "title": "Peer Vote",
+        "pointsRange": "50–80",
+        "badgeEligible": null,
+        "missions": [
+          "Finalize"
+        ]
+      },
+      {
+        "week": 12,
+        "title": "Demo Day",
+        "pointsRange": "60–80",
+        "badgeEligible": null,
+        "missions": [
+          "Demo Day · 8-min findings presentation (+50)",
+          "Corps induction"
+        ]
+      }
+    ],
+    "CC": [
+      {
+        "week": 3,
+        "title": "Client Sign + Social Media Brand Audit",
+        "pointsRange": "85–125",
+        "badgeEligible": null,
+        "missions": [
+          "Client Sign-Off (+50)",
+          "Mission 1 · Full Brand Audit — all platforms: followers, engagement, posts, tone, competitors. Audit Report + Scorecard + 10 recs (+35, +20)"
+        ]
+      },
+      {
+        "week": 4,
+        "title": "Brand Voice Guide + Content Strategy",
+        "pointsRange": "60–90",
+        "badgeEligible": null,
+        "missions": [
+          "Mission 2 · Brand Voice + 90-Day Strategy — pillars, platforms, frequency, format mix, KPIs (+35, +20)",
+          "Client touchpoint (+15)"
+        ]
+      },
+      {
+        "week": 5,
+        "title": "AI Content System + Month 1 Batch",
+        "pointsRange": "65–95",
+        "badgeEligible": null,
+        "missions": [
+          "Mission 3 · AI Content Workflow + 12 posts designed and scheduled for Month 1 (+40, +20)",
+          "Teach-Back (+15)"
+        ]
+      },
+      {
+        "week": 6,
+        "title": "Midpoint + Community SOP + Month 2",
+        "pointsRange": "55–85",
+        "badgeEligible": null,
+        "missions": [
+          "Midpoint Fire Check (+10)",
+          "Mission 4 · Community Management SOP + Month 2 content batch (12 posts) (+40, +20)"
+        ]
+      },
+      {
+        "week": 7,
+        "title": "Campaign Design + Recruit",
+        "pointsRange": "70–100",
+        "badgeEligible": null,
+        "missions": [
+          "Mission 5 · AI-Powered Campaign — brief, concept, 5 pieces, measurement plan (+40, +20)",
+          "Recruit Scout (+30)"
+        ]
+      },
+      {
+        "week": 8,
+        "title": "Performance Report + Optimization",
+        "pointsRange": "65–95",
+        "badgeEligible": null,
+        "missions": [
+          "Mission 6 · Mid-Program Analytics Report — reach, engagement, growth, recs (+40, +20 if positive growth)"
+        ]
+      },
+      {
+        "week": 9,
+        "title": "Capstone — Full Playbook",
+        "pointsRange": "65–95",
+        "badgeEligible": null,
+        "missions": [
+          "Mission 7 · Complete Social Media Playbook — voice + strategy + archives + SOP + campaign + 90-day report (+50, +20)"
+        ]
+      },
+      {
+        "week": 10,
+        "title": "Capstone Build",
+        "pointsRange": "65–95",
+        "badgeEligible": null,
+        "missions": [
+          "Playbook finalization"
+        ]
+      },
+      {
+        "week": 11,
+        "title": "Peer Vote",
+        "pointsRange": "50–80",
+        "badgeEligible": null,
+        "missions": [
+          "Finalize"
+        ]
+      },
+      {
+        "week": 12,
+        "title": "Demo Day",
+        "pointsRange": "60–80",
+        "badgeEligible": null,
+        "missions": [
+          "Demo Day · 8-min presentation with growth numbers (+50)",
+          "Corps induction"
+        ]
+      }
+    ]
+  }
+}

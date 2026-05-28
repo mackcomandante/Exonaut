@@ -43,10 +43,20 @@ function RoleChip({ role }) {
 
 function RichText({ text, members }) {
   if (!text) return null;
-  const parts = String(text).split(/(@[a-z0-9._-]+)/gi);
+  const parts = String(text).split(/(https?:\/\/[^\s<>"')]+|@[a-z0-9._-]+)/gi);
   return (
     <React.Fragment>
       {parts.map((part, index) => {
+        if (/^https?:\/\//i.test(part)) {
+          const href = part.replace(/[.,;:!?]+$/, '');
+          const trailing = part.slice(href.length);
+          return (
+            <React.Fragment key={index}>
+              <a className="board-inline-link" href={href} target="_blank" rel="noopener noreferrer">{href}</a>
+              {trailing}
+            </React.Fragment>
+          );
+        }
         if (!part.startsWith('@')) return <React.Fragment key={index}>{part}</React.Fragment>;
         const exists = members.some(member => '@' + member.handle.toLowerCase() === part.toLowerCase());
         return exists

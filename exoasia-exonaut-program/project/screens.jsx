@@ -781,20 +781,23 @@ function RitualsPage() {
 }
 
 function RitualProofModal({ ritual, onClose, onSubmit }) {
+  const [title, setTitle] = React.useState('');
   const [description, setDescription] = React.useState('');
   const [link, setLink] = React.useState('');
   const [file, setFile] = React.useState(null);
   const [fileDataUrl, setFileDataUrl] = React.useState('');
   const [saving, setSaving] = React.useState(false);
   const isTeachBack = ritual.id === 'teach-bk';
+  const hasTitle = !!title.trim();
   const hasDescription = !!description.trim();
   const hasLink = !!link.trim();
   const hasFile = !!file;
   const hasThumbnail = hasFile && String(file.type || '').startsWith('image/');
+  const teachBackTitleError = isTeachBack && !hasTitle ? 'Teach-Back requires a title.' : '';
   const teachBackLinkError = isTeachBack && !hasLink ? 'Teach-Back requires a video link.' : '';
   const teachBackImageError = isTeachBack && !hasThumbnail ? 'Teach-Back requires a thumbnail image.' : '';
   const canSubmit = isTeachBack
-    ? hasLink && hasThumbnail
+    ? hasTitle && hasLink && hasThumbnail
     : (hasDescription || hasLink || hasFile);
 
   function attachFile(nextFile) {
@@ -811,6 +814,7 @@ function RitualProofModal({ ritual, onClose, onSubmit }) {
     setSaving(true);
     try {
       await onSubmit({
+        title: title.trim(),
         description: description.trim(),
         link: link.trim(),
         fileName: file?.name || '',
@@ -833,6 +837,13 @@ function RitualProofModal({ ritual, onClose, onSubmit }) {
           </div>
           <button className="btn btn-ghost btn-sm" onClick={onClose}><i className="fa-solid fa-xmark" /></button>
         </div>
+        {isTeachBack && (
+          <div className="task-section">
+            <label className="t-label-muted">TITLE REQUIRED</label>
+            <input className="input" value={title} onChange={e => setTitle(e.target.value)} placeholder="Name this Teach-Back." />
+            {teachBackTitleError && <div className="t-body" style={{ fontSize: 12, color: 'var(--red)', marginTop: 8 }}>{teachBackTitleError}</div>}
+          </div>
+        )}
         <div className="task-section">
           <label className="t-label-muted">{isTeachBack ? 'THUMBNAIL IMAGE REQUIRED' : 'ATTACHMENT OPTIONAL'}</label>
           <div className="t-body" style={{ fontSize: 12, color: 'var(--off-white-68)', marginBottom: 8 }}>
@@ -1448,6 +1459,203 @@ function getCommunityMembers(profiles, ledger = [], subs = [], projectState = {}
   return [...active, ...alumni];
 }
 
+function firstUrlFromText(text) {
+  const match = String(text || '').match(/https?:\/\/[^\s<>"')]+/i);
+  return match ? match[0].replace(/[.,;:!?]+$/, '') : '';
+}
+
+function isTeachBackPost(post) {
+  const source = String(post.sourceType || '').toLowerCase();
+  const sourceId = String(post.sourceId || '').toLowerCase();
+  const text = [post.title, post.body].join(' ').toLowerCase();
+  return (source === 'ritual' && sourceId.includes('teach-bk')) ||
+    text.includes('#teachback') ||
+    text.includes('teach-back') ||
+    text.includes('teach back');
+}
+
+function knowledgePostFromRows(row, mediaRows = []) {
+  return {
+    id: row.id,
+    channel: row.channel || 'general',
+    title: String(row.title || '').trim(),
+    body: String(row.body || '').trim(),
+    authorId: row.author_id || '',
+    authorName: row.author_name || 'Exonaut',
+    authorRole: row.author_role || 'exonaut',
+    sourceType: row.source_type || '',
+    sourceId: row.source_id || '',
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    media: mediaRows.filter(item => item.post_id === row.id).map(item => ({
+      id: item.id,
+      type: item.media_type === 'video' ? 'video' : 'image',
+      url: item.public_url || '',
+      name: item.file_name || 'Teach Back thumbnail',
+    })),
+  };
+}
+
+function KnowledgeBasePage() {
+  const { profile } = useCurrentUserProfile();
+  const board = useBoard(profile);
+  const [remote, setRemote] = React.useState({ loaded: false, loading: false, error: '', posts: [] });
+  const [query, setQuery] = React.useState('');
+
+  React.useEffect(() => {
+    if (!window.__db) return;
+    let active = true;
+
+    async function loadKnowledgeBase() {
+      setRemote(current => ({ ...current, loading: true, error: '' }));
+      const postsResult = await window.__db
+        .from('community_posts')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (!active) return;
+      if (postsResult.error) {
+        setRemote({
+          loaded: true,
+          loading: false,
+          error: postsResult.error.message || 'Could not load Knowledge Base posts.',
+          posts: [],
+        });
+        return;
+      }
+
+      const rows = postsResult.data || [];
+      const ids = rows.map(row => row.id);
+      const mediaResult = ids.length
+        ? await window.__db.from('community_post_media').select('*').in('post_id', ids)
+        : { data: [], error: null };
+
+      if (!active) return;
+      if (mediaResult.error) {
+        setRemote({
+          loaded: true,
+          loading: false,
+          error: mediaResult.error.message || 'Could not load Knowledge Base thumbnails.',
+          posts: [],
+        });
+        return;
+      }
+
+      setRemote({
+        loaded: true,
+        loading: false,
+        error: '',
+        posts: rows.map(row => knowledgePostFromRows(row, mediaResult.data || [])).filter(isTeachBackPost),
+      });
+    }
+
+    loadKnowledgeBase();
+    const channel = window.__db
+      .channel('knowledge-base-' + Math.random().toString(36).slice(2))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'community_posts' }, loadKnowledgeBase)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'community_post_media' }, loadKnowledgeBase)
+      .subscribe();
+
+    return () => {
+      active = false;
+      window.__db.removeChannel(channel);
+    };
+  }, []);
+
+  const teachBacks = React.useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const sourcePosts = remote.loaded ? remote.posts : (board.posts || []);
+    return sourcePosts
+      .filter(isTeachBackPost)
+      .map(post => {
+        const thumbnail = (post.media || []).find(item => item.type === 'image' && item.url) || null;
+        const channel = (window.BOARD_CHANNELS || []).find(item => item.id === post.channel);
+        return {
+          ...post,
+          thumbnailUrl: thumbnail?.url || '',
+          submittedLink: firstUrlFromText(post.body),
+          category: channel?.label || post.channel || 'Teach Back',
+        };
+      })
+      .filter(post => {
+        if (!q) return true;
+        return [post.title, post.body, post.authorName, post.category]
+          .some(value => String(value || '').toLowerCase().includes(q));
+      })
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  }, [board.posts, remote.loaded, remote.posts, query]);
+  const loading = remote.loaded ? remote.loading : board.loading;
+  const loaded = remote.loaded || board.loaded;
+  const error = remote.error || board.error;
+
+  return (
+    <div className="enter knowledge-page">
+      <div className="section-head community-header">
+        <div>
+          <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>Knowledge Base</h1>
+          <div className="t-body" style={{ marginTop: 6, color: 'var(--off-white-68)' }}>
+            Approved and submitted Teach Back recordings from the cohort.
+          </div>
+        </div>
+        <label className="board-search knowledge-search">
+          <i className="fa-solid fa-magnifying-glass" />
+          <input aria-label="Search Teach Backs" value={query} onChange={event => setQuery(event.target.value)} placeholder="Search Teach Backs..." />
+        </label>
+      </div>
+
+      {error && <div className="board-alert"><i className="fa-solid fa-circle-exclamation" />{error}</div>}
+      {loading && !loaded && <div className="board-empty">Loading Teach Backs...</div>}
+      {!loading && teachBacks.length === 0 && (
+        <div className="card-panel board-empty">
+          <i className="fa-solid fa-book-open" />
+          <div>No Teach Backs have been added to the Knowledge Base yet.</div>
+        </div>
+      )}
+      <div className="knowledge-grid">
+        {teachBacks.map(post => <KnowledgeBaseCard key={post.id} post={post} />)}
+      </div>
+    </div>
+  );
+}
+
+function KnowledgeBaseCard({ post }) {
+  const href = post.submittedLink || '#';
+  const hasLink = href !== '#';
+  const submittedAt = post.createdAt
+    ? new Date(post.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+    : '';
+  const thumbnail = post.thumbnailUrl;
+  const external = hasLink && /^https?:\/\//i.test(href) && !href.startsWith(window.location.origin);
+  return (
+    <article className="card-panel knowledge-card">
+      <a
+        className={'knowledge-thumb ' + (!thumbnail ? 'empty' : '')}
+        href={href}
+        target={external ? '_blank' : undefined}
+        rel={external ? 'noopener noreferrer' : undefined}
+        aria-label={'Open Teach Back: ' + (post.title || 'Teach Back')}
+        onClick={event => { if (!hasLink) event.preventDefault(); }}
+      >
+        {thumbnail
+          ? <img src={thumbnail} alt={post.title || 'Teach Back thumbnail'} loading="lazy" />
+          : <i className="fa-solid fa-play" />}
+        {hasLink && <span><i className="fa-solid fa-arrow-up-right-from-square" /></span>}
+      </a>
+      <div className="knowledge-card-body">
+        <div className="knowledge-meta">
+          <span>{post.category}</span>
+          {submittedAt && <time>{submittedAt}</time>}
+        </div>
+        <h2>{post.title || 'Teach Back'}</h2>
+        <div className="knowledge-author">
+          <i className="fa-solid fa-user-astronaut" />
+          {post.authorName || 'Exonaut'}
+        </div>
+      </div>
+    </article>
+  );
+}
+
 function CommunityPage() {
   const { profiles, loading } = useUserProfiles();
   const { ledger } = usePoints();
@@ -1949,4 +2157,4 @@ function CommunityProfileSheet({ m, onClose }) {
   );
 }
 
-Object.assign(window, { MissionsList: WeeklyMissionsList, KudosFeed, RitualsPage, AnnouncementsPage, NotificationsPage, AdminPanel, AlumniPage, SettingsPage, CommunityPage });
+Object.assign(window, { MissionsList: WeeklyMissionsList, KudosFeed, RitualsPage, AnnouncementsPage, NotificationsPage, AdminPanel, AlumniPage, SettingsPage, CommunityPage, KnowledgeBasePage });
