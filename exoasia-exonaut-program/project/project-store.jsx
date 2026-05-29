@@ -425,6 +425,13 @@
       const addedBy = await actorId();
       const project = state.projects.find(item => item.id === projectId);
       const memberIds = [...new Set([project?.firstOfficerId, ...(userIds || [])].filter(Boolean))];
+      const removeIds = state.members
+        .filter(member => member.projectId === projectId && !memberIds.includes(member.userId))
+        .map(member => member.userId);
+      if (removeIds.length) {
+        const { error } = await window.__db.from('project_members').delete().eq('project_id', projectId).in('user_id', removeIds);
+        if (error) throw error;
+      }
       const rows = memberIds.map(userId => ({
         project_id: projectId,
         user_id: userId,
@@ -437,18 +444,39 @@
       }
       await refresh();
     },
+    async updateProject(projectId, data) {
+      const existing = state.projects.find(project => project.id === projectId);
+      if (!existing) throw new Error('Project not found.');
+      await upsertProject({
+        ...existing,
+        ...data,
+        id: projectId,
+        title: data.title ?? existing.title,
+        description: data.description ?? existing.description,
+        cohortId: data.cohortId ?? existing.cohortId,
+        trackCodes: data.trackCodes ?? existing.trackCodes,
+        firstOfficerId: data.firstOfficerId ?? existing.firstOfficerId,
+        status: data.status ?? existing.status,
+        startDate: data.startDate ?? existing.startDate,
+        dueDate: data.dueDate ?? existing.dueDate,
+      });
+      await this.setProjectMembers(projectId, data.memberIds ?? projectRoster(projectId));
+    },
     async archiveProject(projectId) {
       const { error } = await window.__db.from('projects').update({ status: 'archived' }).eq('id', projectId);
       if (error) throw error;
       await refresh();
     },
     async deleteProject(projectId) {
-      await Promise.all([
-        window.__db.from('project_task_activity').delete().in('task_id', state.tasks.filter(t => t.projectId === projectId).map(t => t.id)),
-        window.__db.from('project_task_comments').delete().in('task_id', state.tasks.filter(t => t.projectId === projectId).map(t => t.id)),
-        window.__db.from('project_task_submissions').delete().in('task_id', state.tasks.filter(t => t.projectId === projectId).map(t => t.id)),
-        window.__db.from('project_task_assignees').delete().in('task_id', state.tasks.filter(t => t.projectId === projectId).map(t => t.id)),
-      ]);
+      const taskIds = state.tasks.filter(t => t.projectId === projectId).map(t => t.id);
+      if (taskIds.length) {
+        await Promise.all([
+          window.__db.from('project_task_activity').delete().in('task_id', taskIds),
+          window.__db.from('project_task_comments').delete().in('task_id', taskIds),
+          window.__db.from('project_task_submissions').delete().in('task_id', taskIds),
+          window.__db.from('project_task_assignees').delete().in('task_id', taskIds),
+        ]);
+      }
       await Promise.all([
         window.__db.from('project_tasks').delete().eq('project_id', projectId),
         window.__db.from('project_members').delete().eq('project_id', projectId),
@@ -696,7 +724,7 @@
 
 function ProjectBuilderPage({ roleLabel = 'PLATFORM ADMIN' } = {}) {
   const { profiles } = useUserProfiles();
-  const { projects, tasks, loaded, error } = useProjects();
+  const { error } = useProjects();
   useCrownState();
   const tracks = typeof useAdminTracks === 'function' ? useAdminTracks() : TRACKS;
   const [draft, setDraft] = React.useState({ title: '', description: '', trackCodes: [], firstOfficerId: '', memberIds: [], startDate: '', dueDate: '' });
@@ -829,46 +857,7 @@ function ProjectBuilderPage({ roleLabel = 'PLATFORM ADMIN' } = {}) {
           </button>
         </div>
 
-        <div>
-          {!loaded && <div className="card-panel">Loading projects...</div>}
-          {projects.map(project => {
-            const projectTasks = tasks.filter(t => t.projectId === project.id);
-            const roster = window.__projectStore.projectRoster(project.id);
-            return (
-              <div key={project.id} className="card-panel project-summary-card">
-                <div className="project-summary-main">
-                  <div>
-                    <div className="t-label" style={{ color: 'var(--sky)', marginBottom: 6 }}>{project.trackCodes.join(' Â· ')} Â· {project.status}</div>
-                    <h2 className="t-heading project-title">{project.title}</h2>
-                    <div className="t-body">{project.description || 'No description yet.'}</div>
-                  </div>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button className="btn btn-ghost btn-sm" onClick={() => window.__projectStore.archiveProject(project.id)}>Archive</button>
-                    <button className="btn btn-ghost btn-sm" style={{ color: 'var(--red)' }} onClick={() => { if (window.confirm(`Delete "${project.title}"? This will permanently remove all tasks, members, and activity. This cannot be undone.`)) window.__projectStore.deleteProject(project.id); }}>Delete</button>
-                  </div>
-                </div>
-                <div className="project-stat-grid">
-                  <ProjectStat label="Project Lead" value={nameOf(project.firstOfficerId)} />
-                  <ProjectStat label="Exonauts" value={roster.length} />
-                  <ProjectStat label="First Officers" value={[project.firstOfficerId, ...project.trackCodes.map(code => window.__crownStore?.getActiveCrownForTrack(code)?.userId)].filter(Boolean).length} />
-                  <ProjectStat label="Tasks" value={projectTasks.length} />
-                  <ProjectStat label="Done" value={projectTasks.filter(t => t.status === 'submitted').length} />
-                  <ProjectStat label="Approved" value={projectTasks.filter(t => t.status === 'approved').length} />
-                </div>
-              </div>
-            );
-          })}
-        </div>
       </div>
-    </div>
-  );
-}
-
-function ProjectStat({ label, value }) {
-  return (
-    <div className="project-stat">
-      <div className="t-mono">{label}</div>
-      <strong>{value}</strong>
     </div>
   );
 }
@@ -1904,8 +1893,12 @@ function ProjectsPage() {
   const { profiles } = useUserProfiles();
   const { tasks, loaded, error } = useProjects();
   const [selectedId, setSelectedId] = React.useState('');
+  const [menuProjectId, setMenuProjectId] = React.useState('');
+  const [editingProject, setEditingProject] = React.useState(null);
+  const [deletingProject, setDeletingProject] = React.useState(null);
   const projects = window.__projectStore.visibleProjects(profile).filter(project => project.status !== 'archived');
   const selected = projects.find(project => project.id === selectedId);
+  const canManageProjects = ['admin', 'commander'].includes(profile.role);
   const nameOf = id => profiles.find(person => person.id === id)?.fullName || profiles.find(person => person.id === id)?.email || 'Unassigned';
 
   if (selected) {
@@ -1930,10 +1923,35 @@ function ProjectsPage() {
           const done = actions.filter(action => action.status === 'done').length;
           const blocked = actions.filter(action => action.status === 'blocked').length;
           return (
-            <button key={project.id} className="project-card-button project-register-card" onClick={() => setSelectedId(project.id)}>
+            <div key={project.id} className="project-card-button project-register-card" role="button" tabIndex={0} onClick={() => setSelectedId(project.id)} onKeyDown={e => { if (e.key === 'Enter') setSelectedId(project.id); }}>
               <div className="project-card-head">
                 <ProjectState status={project.status} />
-                <span className="project-card-progress">{actions.length ? Math.round(done / actions.length * 100) : 0}% complete</span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, position: 'relative' }}>
+                  <span className="project-card-progress">{actions.length ? Math.round(done / actions.length * 100) : 0}% complete</span>
+                  {canManageProjects && (
+                    <button
+                      type="button"
+                      className="project-card-menu-button"
+                      title="Project actions"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setMenuProjectId(current => current === project.id ? '' : project.id);
+                      }}
+                    >
+                      <i className="fa-solid fa-ellipsis-vertical" />
+                    </button>
+                  )}
+                  {menuProjectId === project.id && (
+                    <div className="project-card-menu" onClick={e => e.stopPropagation()}>
+                      <button type="button" onClick={() => { setEditingProject(project); setMenuProjectId(''); }}>
+                        <i className="fa-solid fa-pen" /> Edit Project
+                      </button>
+                      <button type="button" className="danger" onClick={() => { setDeletingProject(project); setMenuProjectId(''); }}>
+                        <i className="fa-solid fa-trash" /> Delete
+                      </button>
+                    </div>
+                  )}
+                </span>
               </div>
               <h2>{project.title}</h2>
               <p>{project.description || 'Open the project Action Register.'}</p>
@@ -1946,9 +1964,191 @@ function ProjectsPage() {
                 <span><strong>{done}</strong> Done</span>
                 <span className={blocked ? 'has-blocked' : ''}><strong>{blocked}</strong> Blocked</span>
               </div>
-            </button>
+            </div>
           );
         })}
+      </div>
+      {editingProject && (
+        <AdminProjectEditModal
+          project={editingProject}
+          profiles={profiles}
+          onClose={() => setEditingProject(null)}
+        />
+      )}
+      {deletingProject && (
+        <AdminProjectDeleteModal
+          project={deletingProject}
+          onClose={() => setDeletingProject(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function AdminProjectEditModal({ project, profiles, onClose }) {
+  const tracks = typeof useAdminTracks === 'function' ? useAdminTracks() : TRACKS;
+  const initialRoster = window.__projectStore.projectRoster(project.id);
+  const [draft, setDraft] = React.useState({
+    title: project.title || '',
+    description: project.description || '',
+    status: project.status || 'active',
+    trackCodes: project.trackCodes || [],
+    firstOfficerId: project.firstOfficerId || '',
+    memberIds: initialRoster.filter(id => id !== project.firstOfficerId),
+    startDate: project.startDate || '',
+    dueDate: project.dueDate || '',
+  });
+  const [saving, setSaving] = React.useState(false);
+  const [error, setError] = React.useState('');
+  const selectedTrackSet = new Set(draft.trackCodes);
+  const candidateProfiles = profiles.filter(p => ['exonaut', 'lead', 'commander', 'admin'].includes(p.role || 'exonaut'));
+  const leadOptions = candidateProfiles.filter(p => !draft.trackCodes.length || selectedTrackSet.has(p.trackCode || 'AIS') || (p.role || 'exonaut') !== 'exonaut');
+  const memberOptions = profiles.filter(p => (p.role || 'exonaut') === 'exonaut' && (!draft.trackCodes.length || selectedTrackSet.has(p.trackCode || 'AIS')));
+  const trackLabel = code => tracks.find(t => t.code === code)?.short || code;
+  const nameOf = id => profiles.find(p => p.id === id)?.fullName || profiles.find(p => p.id === id)?.email || 'Unassigned';
+
+  function toggleTrack(code) {
+    setDraft(d => {
+      const trackCodes = d.trackCodes.includes(code) ? d.trackCodes.filter(item => item !== code) : [...d.trackCodes, code];
+      const allowedMembers = new Set(profiles.filter(p => trackCodes.includes(p.trackCode || 'AIS')).map(p => p.id));
+      return {
+        ...d,
+        trackCodes,
+        memberIds: d.memberIds.filter(id => allowedMembers.has(id)),
+      };
+    });
+  }
+
+  async function saveProject() {
+    if (!draft.title.trim() || !draft.firstOfficerId) {
+      setError('Project name and lead are required.');
+      return;
+    }
+    setSaving(true);
+    setError('');
+    try {
+      await window.__projectStore.updateProject(project.id, {
+        ...draft,
+        title: draft.title.trim(),
+        description: draft.description.trim(),
+        memberIds: [...new Set([draft.firstOfficerId, ...draft.memberIds])],
+      });
+      onClose();
+    } catch (err) {
+      setError(err?.message || 'Could not update project.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="card-panel admin-project-modal" onClick={e => e.stopPropagation()}>
+        <div className="admin-project-modal-head">
+          <div>
+            <div className="t-label" style={{ color: 'var(--sky)', marginBottom: 6 }}>PROJECT MANAGEMENT</div>
+            <h2 className="t-heading" style={{ fontSize: 24, margin: 0 }}>Edit Project</h2>
+          </div>
+          <button className="icon-btn" type="button" onClick={onClose} title="Close">
+            <i className="fa-solid fa-xmark" />
+          </button>
+        </div>
+        <label className="t-label-muted">PROJECT NAME</label>
+        <input className="input" value={draft.title} onChange={e => setDraft(d => ({ ...d, title: e.target.value }))} />
+        <label className="t-label-muted">DESCRIPTION</label>
+        <textarea className="textarea" rows={3} value={draft.description} onChange={e => setDraft(d => ({ ...d, description: e.target.value }))} />
+        <div className="project-date-grid">
+          <label>
+            <div className="t-label-muted">STATUS</div>
+            <select className="select" value={draft.status} onChange={e => setDraft(d => ({ ...d, status: e.target.value }))}>
+              {['draft', 'active', 'paused', 'completed', 'archived'].map(status => <option key={status} value={status}>{status.toUpperCase()}</option>)}
+            </select>
+          </label>
+          <label>
+            <div className="t-label-muted">PROJECT LEAD</div>
+            <select className="select" value={draft.firstOfficerId} onChange={e => setDraft(d => ({ ...d, firstOfficerId: e.target.value }))}>
+              <option value="">Select lead</option>
+              {leadOptions.map(p => <option key={p.id} value={p.id}>{p.fullName || p.email} · {trackLabel(p.trackCode || 'AIS')}</option>)}
+            </select>
+          </label>
+        </div>
+        <label className="t-label-muted">TRACKS</label>
+        <div className="track-chip-row">
+          {tracks.map(t => (
+            <button key={t.code} type="button" className={'lb-filter' + (draft.trackCodes.includes(t.code) ? ' active' : '')} onClick={() => toggleTrack(t.code)}>
+              {t.short || t.code}
+            </button>
+          ))}
+        </div>
+        <label className="t-label-muted">PROJECT MEMBERS</label>
+        <select
+          multiple
+          className="select assignee-select"
+          value={draft.memberIds}
+          onChange={e => setDraft(d => ({ ...d, memberIds: Array.from(e.target.selectedOptions).map(o => o.value) }))}
+        >
+          {memberOptions.map(p => <option key={p.id} value={p.id}>{p.fullName || p.email} · {trackLabel(p.trackCode || 'AIS')}</option>)}
+        </select>
+        <div className="selected-member-list">
+          {[draft.firstOfficerId, ...draft.memberIds].filter(Boolean).map(id => (
+            <span key={id} className="selected-member-pill">
+              {nameOf(id)} <span>{id === draft.firstOfficerId ? 'LEAD' : trackLabel(profiles.find(p => p.id === id)?.trackCode || '')}</span>
+            </span>
+          ))}
+        </div>
+        <div className="project-date-grid">
+          <label>
+            <div className="t-label-muted">START DATE</div>
+            <input className="input" type="date" value={draft.startDate} onChange={e => setDraft(d => ({ ...d, startDate: e.target.value }))} />
+          </label>
+          <label>
+            <div className="t-label-muted">DUE DATE</div>
+            <input className="input" type="date" value={draft.dueDate} onChange={e => setDraft(d => ({ ...d, dueDate: e.target.value }))} />
+          </label>
+        </div>
+        {error && <div className="t-body" style={{ color: 'var(--red)', fontSize: 12 }}>{error}</div>}
+        <div className="admin-project-modal-actions">
+          <button className="btn btn-ghost btn-sm" type="button" onClick={onClose} disabled={saving}>Cancel</button>
+          <button className="btn btn-primary" type="button" onClick={saveProject} disabled={saving}>
+            <i className="fa-solid fa-check" /> {saving ? 'Saving...' : 'Save Project'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AdminProjectDeleteModal({ project, onClose }) {
+  const [deleting, setDeleting] = React.useState(false);
+  const [error, setError] = React.useState('');
+
+  async function confirmDelete() {
+    setDeleting(true);
+    setError('');
+    try {
+      await window.__projectStore.deleteProject(project.id);
+      onClose();
+    } catch (err) {
+      setError(err?.message || 'Could not delete project.');
+      setDeleting(false);
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="card-panel admin-project-delete-modal" onClick={e => e.stopPropagation()}>
+        <div className="t-label" style={{ color: 'var(--red)', marginBottom: 8 }}>DELETE PROJECT</div>
+        <h2 className="t-heading" style={{ fontSize: 22, margin: '0 0 8px' }}>Delete {project.title}?</h2>
+        <div className="t-body" style={{ fontSize: 13, color: 'var(--off-white-68)', lineHeight: 1.5 }}>
+          This will permanently remove the project, members, tasks, submissions, comments, resources, and activity.
+        </div>
+        {error && <div className="t-body" style={{ color: 'var(--red)', fontSize: 12, marginTop: 12 }}>{error}</div>}
+        <div className="admin-project-modal-actions">
+          <button className="btn btn-ghost btn-sm" type="button" onClick={onClose} disabled={deleting}>Cancel</button>
+          <button className="btn btn-primary" type="button" onClick={confirmDelete} disabled={deleting} style={{ background: 'var(--red)' }}>
+            <i className="fa-solid fa-trash" /> {deleting ? 'Deleting...' : 'Yes, Delete'}
+          </button>
+        </div>
       </div>
     </div>
   );

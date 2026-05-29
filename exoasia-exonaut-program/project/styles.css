@@ -1070,15 +1070,15 @@ img, svg { display: block; max-width: 100%; }
    PROJECT MANAGEMENT
    ============================================================ */
 .project-admin-layout {
-  display: grid;
-  grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
-  gap: 18px;
+  display: block;
 }
 .project-form {
   display: flex;
   flex-direction: column;
   gap: 10px;
   align-self: start;
+  width: 100%;
+  max-width: none;
 }
 .track-chip-row {
   display: flex;
@@ -1155,6 +1155,53 @@ img, svg { display: block; max-width: 100%; }
   border-color: var(--ink);
   box-shadow: var(--shadow-card-hover);
 }
+.project-card-menu-button {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  background: var(--bg-darkest);
+  color: var(--ink-muted);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: border-color 140ms ease, color 140ms ease, background 140ms ease;
+}
+.project-card-menu-button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-wash);
+}
+.project-card-menu {
+  position: absolute;
+  top: 34px;
+  right: 0;
+  z-index: 12;
+  min-width: 150px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  background: var(--bg-dark);
+  box-shadow: var(--shadow-card-hover);
+  padding: 6px;
+}
+.project-card-menu button {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: left;
+}
+.project-card-menu button:hover { background: var(--off-white-07); }
+.project-card-menu button.danger { color: var(--red); }
 .project-card-button h2,
 .delegation-card h2 {
   color: var(--ink);
@@ -1423,6 +1470,45 @@ img, svg { display: block; max-width: 100%; }
   width: min(560px, 100%);
   max-height: min(760px, calc(100vh - 40px));
   overflow: auto;
+}
+.icon-btn {
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  background: var(--bg-darkest);
+  color: var(--ink-muted);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+.icon-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.admin-project-modal {
+  width: min(720px, 100%);
+  max-height: min(860px, calc(100vh - 40px));
+  overflow: auto;
+  padding: 22px;
+  display: grid;
+  gap: 12px;
+}
+.admin-project-delete-modal {
+  width: min(460px, 100%);
+  padding: 22px;
+}
+.admin-project-modal-head,
+.admin-project-modal-actions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.admin-project-modal-actions {
+  align-items: center;
+  justify-content: flex-end;
+  margin-top: 4px;
 }
 .task-modal-head {
   display: flex;
