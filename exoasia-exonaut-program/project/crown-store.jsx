@@ -114,6 +114,24 @@
     getUserCrown(userId) {
       return activeCrownForUser(userId);
     },
+    renameTrackCode(oldCode, newCode) {
+      return (async () => {
+        if (!oldCode || !newCode || oldCode === newCode) return;
+        state = {
+          crowns: state.crowns.map(c => c.trackCode === oldCode ? { ...c, trackCode: newCode } : c),
+          requests: state.requests.map(r => r.trackCode === oldCode ? { ...r, trackCode: newCode } : r),
+        };
+        notify();
+        if (!window.__db) return;
+        const [crownsResult, requestsResult] = await Promise.all([
+          window.__db.from('crown_assignments').update({ track_code: newCode }).eq('track_code', oldCode),
+          window.__db.from('crown_transfer_requests').update({ track_code: newCode }).eq('track_code', oldCode),
+        ]);
+        if (crownsResult.error) throw crownsResult.error;
+        if (requestsResult.error) throw requestsResult.error;
+        await refresh();
+      })();
+    },
     assignInitialCrown({ trackCode, userId, cohortId, assignedBy = 'admin', note = '' }) {
       return (async () => {
         const actorId = await currentUserId(assignedBy);

@@ -266,6 +266,7 @@
 
   window.__ritualStore = {
     subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
+    logs() { return state.logs; },
     all() { return historyFor(); },
     recordsFor,
     historyFor,

@@ -36,13 +36,23 @@
   const loadedTracks = load();
   let createdTracks = Array.isArray(loadedTracks) ? loadedTracks : (loadedTracks.createdTracks || []);
   let hiddenTrackCodes = Array.isArray(loadedTracks.hiddenTrackCodes) ? loadedTracks.hiddenTrackCodes : [];
+  let trackPatches = loadedTracks.trackPatches && typeof loadedTracks.trackPatches === 'object' ? loadedTracks.trackPatches : {};
   function persist() {
-    try { localStorage.setItem(KEY, JSON.stringify({ createdTracks, hiddenTrackCodes })); } catch (e) {}
+    try { localStorage.setItem(KEY, JSON.stringify({ createdTracks, hiddenTrackCodes, trackPatches })); } catch (e) {}
+  }
+  function applyTrackPatch(track) {
+    return { ...track, ...(trackPatches[track.code] || {}) };
   }
   function syncGlobalTracks() {
     if (typeof TRACKS === 'undefined') return;
     createdTracks.forEach(track => {
-      if (!TRACKS.some(t => t.code === track.code)) TRACKS.push(track);
+      const patchedTrack = applyTrackPatch(track);
+      const existing = TRACKS.find(t => t.code === track.code);
+      if (existing) Object.assign(existing, patchedTrack);
+      else TRACKS.push(patchedTrack);
+    });
+    TRACKS.forEach(track => {
+      if (trackPatches[track.code]) Object.assign(track, trackPatches[track.code]);
     });
   }
   function notify() {
@@ -79,7 +89,6 @@
       return;
     }
     createdTracks = (data || []).map(fromRow);
-    hiddenTrackCodes = [];
     persist();
     notify();
   }
@@ -88,7 +97,7 @@
     all() {
       syncGlobalTracks();
       const hidden = new Set(hiddenTrackCodes);
-      return (typeof TRACKS !== 'undefined' ? TRACKS : createdTracks).filter(t => !hidden.has(t.code));
+      return (typeof TRACKS !== 'undefined' ? TRACKS : createdTracks).filter(t => !hidden.has(t.code)).map(applyTrackPatch);
     },
     custom() { return createdTracks; },
     create(data) {
@@ -130,6 +139,63 @@
         }));
       }
       return track;
+    },
+    update(code, patch) {
+      const current = this.all().find(t => t.code === code);
+      if (!current) throw new Error('Track not found.');
+      const nextCode = (patch.code || code)
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, '')
+        .slice(0, 6);
+      if (!nextCode) throw new Error('Track code is required.');
+      if (nextCode !== code && this.all().some(t => t.code === nextCode)) throw new Error('Track code already exists.');
+      const cleanPatch = {
+        code: nextCode,
+        ...(Object.prototype.hasOwnProperty.call(patch, 'name') ? { name: patch.name || current.name } : {}),
+        ...(Object.prototype.hasOwnProperty.call(patch, 'short') ? { short: patch.short || nextCode } : {}),
+      };
+      const updated = { ...current, ...cleanPatch, short: cleanPatch.short || current.short || nextCode };
+      if (nextCode !== code) {
+        hiddenTrackCodes = [...new Set([...hiddenTrackCodes.filter(hiddenCode => hiddenCode !== nextCode), code])];
+        delete trackPatches[code];
+        trackPatches[nextCode] = { ...(trackPatches[nextCode] || {}), name: updated.name, short: updated.short };
+        createdTracks = createdTracks.filter(t => t.code !== code && t.code !== nextCode);
+        createdTracks.push({ ...updated, custom: true });
+      } else {
+        trackPatches[code] = { ...(trackPatches[code] || {}), ...cleanPatch };
+        createdTracks = createdTracks.map(t => t.code === code ? { ...t, ...cleanPatch } : t);
+      }
+      if (typeof TRACKS !== 'undefined') {
+        const idx = TRACKS.findIndex(t => t.code === code);
+        if (idx !== -1) TRACKS[idx] = { ...TRACKS[idx], ...updated };
+        if (nextCode !== code && !TRACKS.some(t => t.code === nextCode)) TRACKS.push({ ...updated });
+      }
+      persist();
+      notify();
+      if (window.__db) {
+        currentUserId().then(createdBy => window.__db.from('tracks').upsert({
+          code: updated.code,
+          name: updated.name,
+          short: updated.short,
+          emoji: updated.emoji || null,
+          objective: updated.objective || null,
+          client_type: updated.clientType || null,
+          lead_title: updated.leadTitle || null,
+          track_badge: updated.trackBadge || updated.name || updated.code,
+          status: 'active',
+          custom: updated.custom !== false,
+          created_by: createdBy,
+        }, { onConflict: 'code' }).then(({ error }) => {
+          if (error) console.warn('Could not update track:', error.message || error);
+          else if (nextCode !== code) {
+            window.__db.from('tracks').update({ status: 'archived' }).eq('code', code).then(({ error: archiveError }) => {
+              if (archiveError) console.warn('Could not archive renamed track:', archiveError.message || archiveError);
+              refreshRemote();
+            });
+          } else refreshRemote();
+        }));
+      }
+      return updated;
     },
     delete(code) {
       createdTracks = createdTracks.filter(t => t.code !== code);
@@ -297,20 +363,45 @@ function PlatformAdminSidebar({ current, onNavigate, onSignOut, mobileOpen = fal
     { id: 'messages',    label: 'Messages',           icon: 'fa-envelope', count: messageUnread },
     { id: 'community',   label: 'Community',          icon: 'fa-users-rectangle' },
   ];
-  const links = [
-    { id: 'pa-cohorts',  label: 'Cohort Management',  icon: 'fa-layer-group' },
-    { id: 'pa-missions', label: 'Track Creation',      icon: 'fa-bullseye' },
-    { id: 'pa-assign',   label: 'Exonaut Assignment', icon: 'fa-user-gear' },
-    { id: 'pa-managers', label: 'Track Management',   icon: 'fa-route' },
-    { id: 'pa-projects', label: 'Project Builder',     icon: 'fa-diagram-project' },
-    { id: 'pa-action-register', label: 'Projects', icon: 'fa-diagram-project' },
-    { id: 'pa-users',    label: 'User Directory',     icon: 'fa-address-book' },
-    { id: 'pa-console',  label: 'System Console',     icon: 'fa-shield-halved' },
-    { id: 'pa-manual-credit', label: 'Manual Credit', icon: 'fa-clipboard-check' },
-    { id: 'pa-removals', label: 'Removals',           icon: 'fa-user-slash' },
-    { id: 'pa-announce', label: 'Announcements',      icon: 'fa-bullhorn' },
-    { id: 'knowledge-base', label: 'Knowledge Base',  icon: 'fa-book-open' },
-    { id: 'kudos',       label: 'Kudos',              icon: 'fa-hand-sparkles' },
+  const linkSections = [
+    {
+      label: 'Program Structure',
+      links: [
+        { id: 'pa-cohorts',  label: 'Cohort Management',  icon: 'fa-layer-group' },
+        { id: 'pa-missions', label: 'Track Creation',      icon: 'fa-bullseye' },
+        { id: 'pa-assign',   label: 'Exonaut Assignment', icon: 'fa-user-gear' },
+        { id: 'pa-managers', label: 'Track Management',   icon: 'fa-route' },
+      ],
+    },
+    {
+      label: 'Project Workflow',
+      links: [
+        { id: 'pa-projects', label: 'Project Builder',     icon: 'fa-diagram-project' },
+        { id: 'pa-action-register', label: 'Projects', icon: 'fa-diagram-project' },
+      ],
+    },
+    {
+      label: 'People & Recognition',
+      links: [
+        { id: 'pa-users',    label: 'User Directory',     icon: 'fa-address-book' },
+        { id: 'pa-manual-credit', label: 'Manual Credit', icon: 'fa-clipboard-check' },
+        { id: 'kudos',       label: 'Kudos',              icon: 'fa-hand-sparkles' },
+      ],
+    },
+    {
+      label: 'Communication',
+      links: [
+        { id: 'pa-announce', label: 'Announcements',      icon: 'fa-bullhorn' },
+        { id: 'knowledge-base', label: 'Knowledge Base',  icon: 'fa-book-open' },
+      ],
+    },
+    {
+      label: 'Administration',
+      links: [
+        { id: 'pa-removals', label: 'Removals',           icon: 'fa-user-slash' },
+        { id: 'pa-console',  label: 'System Console',     icon: 'fa-shield-halved' },
+      ],
+    },
   ];
   return (
     <aside id="application-navigation" className={'sidebar' + (mobileOpen ? ' mobile-open' : '')} aria-label="Application navigation">
@@ -344,11 +435,16 @@ function PlatformAdminSidebar({ current, onNavigate, onSignOut, mobileOpen = fal
 
       <nav className="sidebar-nav">
         <div className="sidebar-nav-section" style={{ color: 'var(--sky)' }}>Platform</div>
-        {links.map(l => (
-          <button type="button" key={l.id} className={'sidebar-link' + (current === l.id ? ' active' : '')} onClick={() => onNavigate(l.id)}>
-            <i className={'fa-solid ' + l.icon} />
-            <span>{l.label}</span>
-          </button>
+        {linkSections.map(section => (
+          <React.Fragment key={section.label}>
+            <div className="sidebar-nav-section" style={{ marginTop: 12 }}>{section.label}</div>
+            {section.links.map(l => (
+              <button type="button" key={l.id} className={'sidebar-link' + (current === l.id ? ' active' : '')} onClick={() => onNavigate(l.id)}>
+                <i className={'fa-solid ' + l.icon} />
+                <span>{l.label}</span>
+              </button>
+            ))}
+          </React.Fragment>
         ))}
       </nav>
 
@@ -435,6 +531,36 @@ function AdminCohorts() {
     setTick(t => t + 1);
   }
 
+  async function handleDeleteCohort(cohort) {
+    if (!cohort || all.length <= 1) {
+      alert('At least one cohort must remain on the platform.');
+      return;
+    }
+    const users = rows.filter(row => rowCohort(row) === cohort.id);
+    const message = users.length
+      ? `Delete cohort "${cohort.name}"?\n\n${users.length} assigned user${users.length === 1 ? '' : 's'} will be moved to Unassigned.`
+      : `Delete cohort "${cohort.name}"?`;
+    if (!confirm(message)) return;
+
+    for (const row of users) {
+      unassignUserFromCohort(row.id);
+      if (row.supabaseProfile) {
+        try { await updateProfile(row.id, { cohortId: null }); } catch (err) { console.warn('Could not clear deleted cohort profile:', err); }
+      }
+    }
+
+    const fallback = all.find(c => c.id !== cohort.id);
+    deleteCohort(cohort.id);
+    if (fallback) {
+      setSelected(fallback.id);
+      setTargetCohort(t => t === cohort.id ? fallback.id : t);
+    }
+    if (window.__adminScope?.get() === cohort.id) window.__adminScope.set('all');
+    setEditingCohort(null);
+    setSelectedUsers([]);
+    setTick(t => t + 1);
+  }
+
   return (
     <div className="enter">
       <div className="section-head">
@@ -472,12 +598,10 @@ function AdminCohorts() {
                     style={{ background: 'transparent', border: 'none', color: 'var(--off-white-40)', cursor: 'pointer', fontSize: 11 }}>
                     <i className="fa-solid fa-calendar-days" />
                   </button>
-                  {c.custom && (
-                    <button onClick={(e) => { e.stopPropagation(); if (confirm(`Delete cohort "${c.name}"?`)) deleteCohort(c.id); }}
-                      style={{ background: 'transparent', border: 'none', color: 'var(--off-white-40)', cursor: 'pointer', fontSize: 11 }}>
-                      <i className="fa-solid fa-trash" />
-                    </button>
-                  )}
+                  <button title="Delete cohort" onClick={(e) => { e.stopPropagation(); handleDeleteCohort(c); }}
+                    style={{ background: 'transparent', border: 'none', color: 'var(--off-white-40)', cursor: 'pointer', fontSize: 11 }}>
+                    <i className="fa-solid fa-trash" />
+                  </button>
                 </div>
               </div>
               <h2 className="t-heading" style={{ fontSize: 18, margin: '0 0 4px 0', textTransform: 'none', letterSpacing: 0, color: 'var(--off-white)' }}>
@@ -516,6 +640,9 @@ function AdminCohorts() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <button className="btn btn-ghost btn-sm" onClick={() => setEditingCohort(selectedCohort)}>
                   <i className="fa-solid fa-pen-to-square" /> Edit Cohort
+                </button>
+                <button className="btn btn-ghost btn-sm" onClick={() => handleDeleteCohort(selectedCohort)}>
+                  <i className="fa-solid fa-trash" /> Delete Cohort
                 </button>
                 <span className="section-meta">{assignedRows.length} USERS</span>
               </div>
@@ -609,10 +736,10 @@ function AdminCohorts() {
 }
 
 // -------- Exonaut Assignment --------
-// Admin sets Cohort + Track + Manager (Lead) for any Exonaut.
+// Admin sets Cohort + Track + role for any Exonaut.
 // Respects the sidebar Cohort Filter ("All Cohorts" or specific cohort).
 function AdminAssign() {
-  const { all, assignUserToCohort, unassignUserFromCohort, isUserUnassigned, getAssignments, assignUserToTrack, assignUserToLead } = useCohort();
+  const { all, assignUserToCohort, unassignUserFromCohort, isUserUnassigned, getAssignments, assignUserToTrack } = useCohort();
   const { profiles, updateProfile } = useUserProfiles();
   const { ledger } = usePoints();
   const manualCredits = useManualCredits();
@@ -621,13 +748,6 @@ function AdminAssign() {
   const [, setTick] = React.useState(0);
   const [search, setSearch] = React.useState('');
   const [cohortFilter, setCohortFilter] = React.useState(scope || 'all');
-
-  // Leads bucketed by track — lets admin pick a plausible manager.
-  const leadsByTrack = React.useMemo(() => {
-    const map = {};
-    LEADS.forEach(l => { (map[l.track] = map[l.track] || []).push(l); });
-    return map;
-  }, []);
 
   const pointsForUser = React.useCallback((userId) => {
     const entries = ledger || [];
@@ -703,21 +823,18 @@ function AdminAssign() {
       </div>
 
       <div className="lb-table admin-assignment-table">
-        <div className="lb-header admin-assignment-header" style={{ gridTemplateColumns: '48px 1.4fr 80px 130px 150px 150px 180px' }}>
+        <div className="lb-header admin-assignment-header" style={{ gridTemplateColumns: '48px 1.4fr 80px 130px 150px 150px' }}>
           <div></div>
           <div>USER</div>
           <div>POINTS</div>
           <div>ROLE</div>
           <div>COHORT</div>
           <div>TRACK</div>
-          <div>MANAGER</div>
         </div>
         {filtered.slice(0, 50).map(u => {
           const assignments = getAssignments();
           const curCohort = isUserUnassigned(u.id) ? '' : (assignments[u.id] || u.cohort || getUserCohort(u.id));
           const curTrack = u.supabaseProfile ? u.track : getUserTrack(u.id);
-          const curLead = getUserLead(u.id);
-          const leadOptions = leadsByTrack[curTrack] || LEADS;
           const selectStyle = {
             padding: '6px 8px', background: 'var(--deep-black)', color: 'var(--off-white)',
             border: '1px solid var(--off-white-15)', borderRadius: 2,
@@ -725,7 +842,7 @@ function AdminAssign() {
             cursor: 'pointer', outline: 'none', width: '100%',
           };
           return (
-            <div key={u.id} className="lb-row admin-assignment-row" style={{ gridTemplateColumns: '48px 1.4fr 80px 130px 150px 150px 180px' }}>
+            <div key={u.id} className="lb-row admin-assignment-row" style={{ gridTemplateColumns: '48px 1.4fr 80px 130px 150px 150px' }}>
               <AvatarWithRing name={u.name} avatarUrl={u.avatarUrl} size={34} tier={u.tier} />
               <div className="lb-name admin-assignment-name">{u.name}</div>
               <div className="lb-points admin-assignment-points">{u.points}</div>
@@ -756,21 +873,6 @@ function AdminAssign() {
                 <span className="admin-assignment-field-label">Track</span>
                 <select className="admin-assignment-select" aria-label={`Set track for ${u.name}`} value={curTrack} onChange={async (e) => { u.supabaseProfile ? await updateProfile(u.id, { trackCode: e.target.value }) : assignUserToTrack(u.id, e.target.value); setTick(t => t + 1); }} style={selectStyle}>
                   {tracks.map(t => (<option key={t.code} value={t.code}>{t.short} - {t.name}</option>))}
-                </select>
-              </label>
-              <label className="admin-assignment-field">
-                <span className="admin-assignment-field-label">Manager</span>
-                <select className="admin-assignment-select" aria-label={`Set manager for ${u.name}`} value={curLead?.id || ''} onChange={(e) => { assignUserToLead(u.id, e.target.value); setTick(t => t + 1); }} style={selectStyle}>
-                  <option value="">— Unassigned —</option>
-                  <optgroup label={'In ' + (TRACKS.find(t => t.code === curTrack)?.short || curTrack)}>
-                    {leadOptions.map(l => (<option key={l.id} value={l.id}>{l.name}</option>))}
-                  </optgroup>
-                  <optgroup label="Other tracks">
-                    {LEADS.filter(l => l.track !== curTrack).map(l => {
-                      const tr = TRACKS.find(t => t.code === l.track);
-                      return (<option key={l.id} value={l.id}>{l.name} ({tr?.short})</option>);
-                    })}
-                  </optgroup>
                 </select>
               </label>
             </div>
@@ -1162,7 +1264,7 @@ function AdminLabeledInput({ label, value, onChange, placeholder, autoFocus, typ
 // Respects the sidebar cohort scope for the assign-roster column.
 // ============================================================================
 function AdminTrackControl() {
-  const { all } = useCohort();
+  const { all, assignUserToTrack } = useCohort();
   const tracks = useAdminTracks();
   const { profiles, loading: profilesLoading, error: profilesError, updateProfile } = useUserProfiles();
   const { crowns, requests, loaded: crownsLoaded } = useCrownState();
@@ -1170,6 +1272,8 @@ function AdminTrackControl() {
   const [expanded, setExpanded] = React.useState({});
   const [leadDraft, setLeadDraft] = React.useState({});
   const [savingTrack, setSavingTrack] = React.useState('');
+  const [openTrackMenu, setOpenTrackMenu] = React.useState('');
+  const [editingTrack, setEditingTrack] = React.useState(null);
   const [error, setError] = React.useState('');
 
   const scopeLabel = scope === 'all' ? 'All Cohorts' : (all.find(c => c.id === scope)?.name || 'Selected Cohort');
@@ -1264,14 +1368,77 @@ function AdminTrackControl() {
 
   function deleteTrack(trackCode) {
     const track = tracks.find(t => t.code === trackCode);
-    const ok = confirm(`Delete ${track?.short || trackCode} from Track Management and admin track lists? Existing tasks and profiles keep their saved track code.`);
+    const ok = confirm(`Are you sure you want to delete "${track?.name || track?.short || trackCode}"?\n\nExisting tasks and profiles will keep their saved track code.`);
     if (!ok) return;
     window.__adminTrackStore.delete(trackCode);
+    setOpenTrackMenu('');
     setExpanded(prev => {
       const next = { ...prev };
       delete next[trackCode];
       return next;
     });
+  }
+
+  async function saveTrackDetails(trackCode, data) {
+    const cleanName = String(data?.name || '').trim();
+    const cleanCode = String(data?.code || '')
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, '')
+      .slice(0, 6);
+    if (!cleanName) {
+      setError('Track name is required.');
+      return;
+    }
+    if (!cleanCode) {
+      setError('Track code is required.');
+      return;
+    }
+    try {
+      const updated = window.__adminTrackStore.update(trackCode, { name: cleanName, code: cleanCode, short: cleanCode });
+      if (updated.code !== trackCode) {
+        for (const profile of profiles.filter(p => (p.trackCode || 'AIS') === trackCode)) {
+          await updateProfile(profile.id, { trackCode: updated.code });
+        }
+        if (typeof USERS !== 'undefined') {
+          USERS.forEach(u => {
+            if ((getUserTrack(u.id) || u.track || 'AIS') === trackCode) {
+              assignUserToTrack(u.id, updated.code);
+              u.track = updated.code;
+            }
+          });
+        }
+        const missions = window.__missionStore?.all?.() || [];
+        for (const mission of window.__missionStore?.update ? missions.filter(m => m.track === trackCode) : []) {
+          await window.__missionStore.update(mission.id, { track: updated.code });
+        }
+        if (typeof LEADS !== 'undefined') {
+          LEADS.forEach(lead => {
+            if (lead.track === trackCode) lead.track = updated.code;
+          });
+        }
+        if (window.__managerStore?.all && window.__managerStore?.update) {
+          window.__managerStore.all()
+            .filter(manager => manager.track === trackCode)
+            .forEach(manager => window.__managerStore.update(manager.id, { track: updated.code }));
+        }
+        if (window.__crownStore?.renameTrackCode) await window.__crownStore.renameTrackCode(trackCode, updated.code);
+        setExpanded(prev => {
+          const next = { ...prev, [updated.code]: prev[trackCode] };
+          delete next[trackCode];
+          return next;
+        });
+        setLeadDraft(prev => {
+          const next = { ...prev, [updated.code]: prev[trackCode] || '' };
+          delete next[trackCode];
+          return next;
+        });
+      }
+      setEditingTrack(null);
+      setOpenTrackMenu('');
+      setError('');
+    } catch (err) {
+      setError((err && err.message) || 'Could not update track.');
+    }
   }
 
   async function updateMember(userId, patch) {
@@ -1321,7 +1488,7 @@ function AdminTrackControl() {
           const isSaving = savingTrack === track.code;
 
           return (
-            <div key={track.code} className="card-panel" style={{ padding: 20 }}>
+            <div key={track.code} className="card-panel" style={{ padding: 20, position: 'relative' }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 14 }}>
                 <div>
                   <div className="t-mono" style={{ fontSize: 9, color: 'var(--sky)', letterSpacing: '0.12em', fontWeight: 700, marginBottom: 5 }}>
@@ -1331,20 +1498,38 @@ function AdminTrackControl() {
                     {track.name}
                   </h2>
                 </div>
-                <button
-                  title={isOpen ? 'Collapse roster' : 'Expand roster'}
-                  onClick={() => setExpanded(prev => ({ ...prev, [track.code]: !isOpen }))}
-                  style={{ background: 'transparent', border: '1px solid var(--off-white-15)', borderRadius: 2, color: 'var(--off-white-68)', cursor: 'pointer', padding: '6px 8px', fontSize: 10 }}
-                >
-                  <i className={`fa-solid fa-chevron-${isOpen ? 'up' : 'down'}`} />
-                </button>
-                <button
-                  title="Delete track"
-                  onClick={() => deleteTrack(track.code)}
-                  style={{ background: 'transparent', border: '1px solid var(--off-white-15)', borderRadius: 2, color: 'var(--red)', cursor: 'pointer', padding: '6px 8px', fontSize: 10 }}
-                >
-                  <i className="fa-solid fa-trash" />
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <button
+                    title={isOpen ? 'Collapse roster' : 'Expand roster'}
+                    onClick={() => setExpanded(prev => ({ ...prev, [track.code]: !isOpen }))}
+                    style={{ background: 'transparent', border: '1px solid var(--off-white-15)', borderRadius: 2, color: 'var(--off-white-68)', cursor: 'pointer', padding: '6px 8px', fontSize: 10 }}
+                  >
+                    <i className={`fa-solid fa-chevron-${isOpen ? 'up' : 'down'}`} />
+                  </button>
+                  <button
+                    title="Track actions"
+                    onClick={(e) => { e.stopPropagation(); setOpenTrackMenu(openTrackMenu === track.code ? '' : track.code); }}
+                    style={{ background: 'transparent', border: '1px solid var(--off-white-15)', borderRadius: 2, color: 'var(--off-white-68)', cursor: 'pointer', padding: '6px 9px', fontSize: 10 }}
+                  >
+                    <i className="fa-solid fa-ellipsis-vertical" />
+                  </button>
+                </div>
+                {openTrackMenu === track.code && (
+                  <div style={{
+                    position: 'absolute', top: 48, right: 20, zIndex: 5, minWidth: 150,
+                    background: 'var(--deep-black)', border: '1px solid var(--off-white-15)', borderRadius: 4,
+                    boxShadow: '0 12px 30px rgba(0,0,0,0.35)', padding: 4,
+                  }}>
+                    <button onClick={() => { setEditingTrack(track); setOpenTrackMenu(''); }}
+                      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: 'transparent', border: 'none', color: 'var(--off-white)', cursor: 'pointer', textAlign: 'left', fontFamily: 'var(--font-display)', fontSize: 12 }}>
+                      <i className="fa-solid fa-pen-to-square" style={{ width: 14, color: 'var(--sky)' }} /> Edit Track
+                    </button>
+                    <button onClick={() => deleteTrack(track.code)}
+                      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: 'transparent', border: 'none', color: 'var(--red)', cursor: 'pointer', textAlign: 'left', fontFamily: 'var(--font-display)', fontSize: 12 }}>
+                      <i className="fa-solid fa-trash" style={{ width: 14 }} /> Delete
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div style={{ padding: 12, background: 'var(--off-white-07)', border: '1px solid var(--off-white-15)', borderRadius: 4, marginBottom: 12 }}>
@@ -1426,7 +1611,7 @@ function AdminTrackControl() {
                           {all.map(c => <option key={c.id} value={c.id}>{c.code || c.name}</option>)}
                         </select>
                         <select value={p.trackCode || 'AIS'} onChange={(e) => updateMember(p.id, { trackCode: e.target.value })} style={selectStyle}>
-                          {TRACKS.map(t => <option key={t.code} value={t.code}>{t.short}</option>)}
+                          {tracks.map(t => <option key={t.code} value={t.code}>{t.short}</option>)}
                         </select>
                       </div>
                     );
@@ -1443,6 +1628,94 @@ function AdminTrackControl() {
             </div>
           );
         })}
+      </div>
+
+      {editingTrack && (
+        <AdminEditTrackModal
+          track={editingTrack}
+          onClose={() => setEditingTrack(null)}
+          onSave={(data) => saveTrackDetails(editingTrack.code, data)}
+        />
+      )}
+    </div>
+  );
+}
+
+function AdminEditTrackModal({ track, onClose, onSave }) {
+  const [name, setName] = React.useState(track?.name || '');
+  const [code, setCode] = React.useState(track?.code || '');
+  const cleanCode = code.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+  const canSave = name.trim().length > 0 && cleanCode.length > 0
+    && (name.trim() !== (track?.name || '') || cleanCode !== (track?.code || ''));
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} style={{
+        width: 'min(440px, calc(100vw - 32px))',
+        background: 'var(--card-base)',
+        border: '1px solid var(--off-white-15)',
+        borderRadius: 8,
+        boxShadow: 'var(--shadow-lg)',
+        overflow: 'hidden',
+      }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'flex-start',
+          justifyContent: 'space-between',
+          gap: 16,
+          padding: '20px 22px 16px',
+          borderBottom: '1px solid var(--off-white-07)',
+        }}>
+          <div>
+            <div className="t-label" style={{ color: 'var(--sky)', marginBottom: 6, letterSpacing: '0.1em' }}>TRACK MANAGEMENT</div>
+            <h2 className="t-heading" style={{ margin: 0, fontSize: 22, textTransform: 'none', letterSpacing: 0, color: 'var(--off-white)' }}>Edit Track</h2>
+          </div>
+          <button onClick={onClose} aria-label="Close edit track dialog" style={{
+            width: 32,
+            height: 32,
+            display: 'grid',
+            placeItems: 'center',
+            background: 'var(--deep-black)',
+            border: '1px solid var(--off-white-15)',
+            borderRadius: 4,
+            color: 'var(--off-white-68)',
+            cursor: 'pointer',
+            flexShrink: 0,
+          }}>
+            <i className="fa-solid fa-xmark" />
+          </button>
+        </div>
+
+        <div style={{ padding: '18px 22px 22px', display: 'grid', gap: 14 }}>
+          <AdminLabeledInput
+            label="TRACK NAME"
+            value={name}
+            onChange={setName}
+            placeholder="Track name"
+            autoFocus
+          />
+          <AdminLabeledInput
+            label="TRACK CODE"
+            value={code}
+            onChange={(value) => setCode(value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6))}
+            placeholder="CODE"
+          />
+        </div>
+
+        <div style={{
+          padding: '14px 22px',
+          display: 'flex',
+          justifyContent: 'flex-end',
+          alignItems: 'center',
+          gap: 10,
+          borderTop: '1px solid var(--off-white-07)',
+          background: 'var(--bg-darkest)',
+        }}>
+          <button onClick={onClose} className="btn btn-ghost btn-sm">Cancel</button>
+          <button onClick={() => onSave({ name, code: cleanCode })} disabled={!canSave} className="btn btn-primary btn-sm" style={{ opacity: canSave ? 1 : 0.45 }}>
+            Save Track
+          </button>
+        </div>
       </div>
     </div>
   );

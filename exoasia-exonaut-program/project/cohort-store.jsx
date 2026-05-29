@@ -210,11 +210,24 @@
       return cohort;
     },
     deleteCohort(id) {
+      const cohort = store.getAll().find(c => c.id === id);
       const idx = state.createdCohorts.findIndex(c => c.id === id);
       if (idx !== -1) state.createdCohorts.splice(idx, 1);
       state.remoteCohorts = (state.remoteCohorts || []).filter(c => c.id !== id);
-      if (state.cohortPatches) delete state.cohortPatches[id];
-      if (state.selectedId === id) state.selectedId = 'c2627';
+      if (!state.cohortPatches) state.cohortPatches = {};
+      if (cohort && idx === -1) state.cohortPatches[id] = { ...(state.cohortPatches[id] || {}), hidden: true };
+      else delete state.cohortPatches[id];
+      if (!state.unassignedUsers) state.unassignedUsers = [];
+      Object.keys(state.assignments || {}).forEach(userId => {
+        if (state.assignments[userId] === id) {
+          delete state.assignments[userId];
+          if (!state.unassignedUsers.includes(userId)) state.unassignedUsers.push(userId);
+        }
+      });
+      if (state.selectedId === id) {
+        const fallback = store.getAll().find(c => c.id !== id);
+        state.selectedId = fallback?.id || '';
+      }
       persist(state);
       notify();
       deleteCohortRemote(id);

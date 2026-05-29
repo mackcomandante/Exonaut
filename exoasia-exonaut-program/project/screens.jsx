@@ -993,24 +993,154 @@ function NotificationsPage() {
 function AdminPanel() {
   const missions = useMissions();
   const { profile } = useCurrentUserProfile();
-  const activeCohort = window.getActiveCohort?.(profile) || COHORT;
-  const cohortUsers = window.getUsersForCohort?.(activeCohort?.id || profile.cohortId || ME.cohort) || [];
+  const { profiles } = useUserProfiles();
+  const { all: cohorts } = useCohort();
+  const tracks = window.useAdminTracks ? window.useAdminTracks() : TRACKS;
+  const pointsState = usePoints();
+  const manualCredits = useManualCredits();
+  useRitualState(profile.id);
   const [tab, setTab] = React.useState('users');
+  const [badgeAwards, setBadgeAwards] = React.useState({});
+  const [badgeAwarding, setBadgeAwarding] = React.useState(null);
+  const [ritualRecording, setRitualRecording] = React.useState(null);
+
+  const roster = React.useMemo(() => {
+    const profileRows = profiles.map(p => ({
+      id: p.id,
+      name: p.fullName || p.email || 'Exonaut',
+      email: p.email || '',
+      role: p.role || 'exonaut',
+      cohortId: p.cohortId || 'c2627',
+      trackCode: p.trackCode || 'AIS',
+      avatarUrl: p.avatarUrl || '',
+    }));
+    return profileRows.length ? profileRows : USERS.map(u => ({
+      id: u.id,
+      name: u.name,
+      email: u.email || '',
+      role: 'exonaut',
+      cohortId: window.getUserCohort?.(u.id) || u.cohort || 'c2627',
+      trackCode: window.getUserTrack?.(u.id) || u.track || 'AIS',
+      avatarUrl: u.avatarUrl || '',
+    }));
+  }, [profiles]);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    async function loadBadges() {
+      if (window.refreshBadgeCatalog) await window.refreshBadgeCatalog();
+      const entries = await Promise.all(roster.map(async row => {
+        const badges = window.refreshUserBadges ? await window.refreshUserBadges(row.id) : [];
+        return [row.id, badges || []];
+      }));
+      if (!cancelled) setBadgeAwards(Object.fromEntries(entries));
+    }
+    loadBadges();
+    return () => { cancelled = true; };
+  }, [roster.map(r => r.id).join('|')]);
+
+  function cohortLabel(cohortId) {
+    const cohort = cohorts.find(c => c.id === cohortId);
+    return cohort?.code || cohort?.name || cohortId || '-';
+  }
+
+  function trackLabel(trackCode) {
+    return tracks.find(t => t.code === trackCode)?.short || trackCode || '-';
+  }
+
+  function pointsForUser(userId) {
+    const ledgerTotal = (pointsState.ledger || [])
+      .filter(e => e.userId === userId)
+      .reduce((sum, e) => sum + Number(e.points || 0), 0);
+    const unsyncedManualTotal = (manualCredits.credits || [])
+      .filter(c => c.userId === userId)
+      .filter(c => !(pointsState.ledger || []).some(e => e.id === c.pointLedgerId || (e.sourceType === 'manual' && e.sourceId === c.id)))
+      .reduce((sum, c) => sum + Number(c.points || 0), 0);
+    return ledgerTotal + unsyncedManualTotal;
+  }
+
+  function lastPointActivity(userId) {
+    const entries = (pointsState.ledger || []).filter(e => e.userId === userId && e.awardedAt);
+    if (!entries.length) return '-';
+    return new Date([...entries].sort((a, b) => new Date(b.awardedAt) - new Date(a.awardedAt))[0].awardedAt).toLocaleDateString();
+  }
+
+  function badgeThreshold(badge) {
+    return Number(badge.threshold || (badge.subtitle || '').match(/\d+/)?.[0] || 0);
+  }
+
+  const rows = React.useMemo(() => roster.map(row => {
+    const points = pointsForUser(row.id);
+    const remoteBadges = badgeAwards[row.id] || [];
+    const remoteCodes = new Set(remoteBadges.map(b => b.code));
+    const automaticBadges = BADGES
+      .filter(b => (b.category === 'milestone' || b.triggerType === 'automatic') && badgeThreshold(b) && points >= badgeThreshold(b))
+      .filter(b => !remoteCodes.has(b.code))
+      .map(b => ({ ...b, earned: true, source: 'system', date: 'EARNED' }));
+    return {
+      ...row,
+      points,
+      badges: [...remoteBadges, ...automaticBadges],
+    };
+  }).sort((a, b) => a.name.localeCompare(b.name)), [roster, badgeAwards, pointsState.ledger, manualCredits.credits]);
+
+  const totalPoints = rows.reduce((sum, row) => sum + row.points, 0);
+  const ritualLogs = window.__ritualStore?.logs?.() || [];
+  const currentWeek = window.getCohortTimeline?.(window.getActiveCohort?.(profile))?.currentWeek || COHORT.week;
+  const currentWeekRitualLogs = ritualLogs.filter(log => Number(log.week) === Number(currentWeek));
+  const awardedBadgeCount = Object.values(badgeAwards).reduce((sum, badges) => sum + (badges || []).length, 0);
+  const usersGrid = '48px minmax(220px, 1.5fr) minmax(220px, 1fr) 110px 120px 120px 110px';
+  const pointsGrid = '48px minmax(260px, 1.7fr) 130px 130px 110px 110px 140px';
+
+  async function awardBadge(badge, userIds) {
+    if (!badge || !userIds.length) return;
+    if (!confirm(`Award "${badge.name}" to ${userIds.length} user${userIds.length === 1 ? '' : 's'}?`)) return;
+    for (const userId of userIds) {
+      await window.persistUserBadge?.(userId, badge, 'admin-manual', { awardedFrom: 'system-console' });
+    }
+    const entries = await Promise.all(userIds.map(async userId => [userId, await window.refreshUserBadges?.(userId)]));
+    setBadgeAwards(prev => {
+      const next = { ...prev };
+      entries.forEach(([userId, badges]) => { next[userId] = badges || next[userId] || []; });
+      return next;
+    });
+    setBadgeAwarding(null);
+  }
+
+  async function recordRitual({ ritualId, userIds, week }) {
+    const ritual = RITUALS.find(r => r.id === ritualId);
+    if (!ritual || !userIds.length) return;
+    if (!confirm(`Record "${ritual.name}" for ${userIds.length} user${userIds.length === 1 ? '' : 's'} in week ${week}?`)) return;
+    for (const userId of userIds) {
+      const row = roster.find(u => u.id === userId);
+      await window.__ritualStore?.completeRitual(ritualId, {
+        description: 'Recorded by Platform Admin from System Console.',
+      }, {
+        userId,
+        cohortId: row?.cohortId || 'c2627',
+        week,
+        source: 'admin-console',
+        profile: row,
+      });
+    }
+    setRitualRecording(null);
+  }
 
   return (
     <div className="enter">
       <div className="section-head">
         <div>
-          <div className="t-label" style={{ marginBottom: 8, color: 'var(--amber)' }}>SUPER ADMIN · MACK COMANDANTE</div>
-          <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>Admin Console</h1>
+          <div className="t-label" style={{ marginBottom: 8, color: 'var(--amber)' }}>PLATFORM ADMIN · SYSTEM CONSOLE</div>
+          <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>System Console</h1>
+          <div className="t-body" style={{ marginTop: 6 }}>Live roster, points, badges, and ritual operations from platform data.</div>
         </div>
         <div className="t-mono" style={{ fontSize: 11, color: 'var(--off-white-40)' }}>
-          {cohortUsers.length || COHORT.size} EXONAUTS · 7 MISSION LEADS · {activeCohort?.code || COHORT.code}
+          {roster.length} USERS · {tracks.length} TRACKS · {cohorts.length} COHORTS
         </div>
       </div>
 
       <div className="leaderboard-tabs">
-        {['users','missions','points','badges','rituals','reports','announce'].map(t => (
+        {['users','points','badges','rituals','missions','reports','announce'].map(t => (
           <div key={t} className={'lb-tab' + (tab === t ? ' active' : '')} onClick={() => setTab(t)}>
             {t.charAt(0).toUpperCase() + t.slice(1)}
           </div>
@@ -1019,44 +1149,51 @@ function AdminPanel() {
 
       {tab === 'reports' && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
-          <div className="card-flat"><div className="t-label-muted">AVG POINTS</div><div className="t-mono" style={{ fontSize: 28, color: 'var(--ink)', fontWeight: 700, marginTop: 8 }}>298</div><div className="t-mono" style={{ fontSize: 10, color: 'var(--green)', marginTop: 4 }}>▲ 42 vs LAST WK</div></div>
-          <div className="card-flat"><div className="t-label-muted">SUBMISSION RATE</div><div className="t-mono" style={{ fontSize: 28, color: 'var(--off-white)', fontWeight: 700, marginTop: 8 }}>87%</div><div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)', marginTop: 4 }}>ON TIME</div></div>
-          <div className="card-flat"><div className="t-label-muted">RITUAL ATTEND</div><div className="t-mono" style={{ fontSize: 28, color: 'var(--off-white)', fontWeight: 700, marginTop: 8 }}>93%</div><div className="t-mono" style={{ fontSize: 10, color: 'var(--green)', marginTop: 4 }}>▲ 5% vs LAST WK</div></div>
-          <div className="card-flat" style={{ borderColor: 'rgba(239,68,68,0.3)' }}><div className="t-label-muted" style={{ color: 'var(--red)' }}>AT-RISK</div><div className="t-mono" style={{ fontSize: 28, color: 'var(--red)', fontWeight: 700, marginTop: 8 }}>2</div><div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)', marginTop: 4 }}>NO SUB IN 7+D</div></div>
+          <div className="card-flat"><div className="t-label-muted">AVG POINTS</div><div className="t-mono" style={{ fontSize: 28, color: 'var(--ink)', fontWeight: 700, marginTop: 8 }}>{roster.length ? Math.round(totalPoints / roster.length) : 0}</div><div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)', marginTop: 4 }}>{totalPoints} TOTAL</div></div>
+          <div className="card-flat"><div className="t-label-muted">USERS</div><div className="t-mono" style={{ fontSize: 28, color: 'var(--off-white)', fontWeight: 700, marginTop: 8 }}>{roster.length}</div><div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)', marginTop: 4 }}>FULL ROSTER</div></div>
+          <div className="card-flat"><div className="t-label-muted">RITUAL LOGS</div><div className="t-mono" style={{ fontSize: 28, color: 'var(--off-white)', fontWeight: 700, marginTop: 8 }}>{currentWeekRitualLogs.length}</div><div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)', marginTop: 4 }}>WEEK {currentWeek}</div></div>
+          <div className="card-flat"><div className="t-label-muted">BADGES AWARDED</div><div className="t-mono" style={{ fontSize: 28, color: 'var(--off-white)', fontWeight: 700, marginTop: 8 }}>{awardedBadgeCount}</div><div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)', marginTop: 4 }}>LIVE + MANUAL</div></div>
         </div>
       )}
 
-      {(tab === 'users' || tab === 'points' || tab === 'reports') && (
-        <div className="lb-table">
-          <div className="lb-header" style={{ gridTemplateColumns: '48px 1fr 140px 100px 100px 80px 120px' }}>
-            <div></div><div>EXONAUT</div><div>TRACK</div><div>POINTS</div><div>MISSIONS</div><div>BADGES</div><div>ACTIONS</div>
+      {(tab === 'users' || tab === 'points') && (
+        <div className="lb-table" style={{ overflowX: 'auto' }}>
+          <div className="lb-header" style={{ gridTemplateColumns: tab === 'users' ? usersGrid : pointsGrid, minWidth: tab === 'users' ? 960 : 900 }}>
+            {tab === 'users'
+              ? <><div></div><div>USER</div><div>EMAIL</div><div>ROLE</div><div>COHORT</div><div>TRACK</div><div>STATUS</div></>
+              : <><div></div><div>USER</div><div>COHORT</div><div>TRACK</div><div style={{ textAlign: 'center' }}>POINTS</div><div style={{ textAlign: 'center' }}>BADGES</div><div>LAST ACTIVITY</div></>}
           </div>
-          {USERS.slice(0, 10).map(u => {
-            const track = TRACKS.find(t => t.code === u.track);
-            return (
-              <div key={u.id} className="lb-row" style={{ gridTemplateColumns: '48px 1fr 140px 100px 100px 80px 120px' }}>
-                <AvatarWithRing name={u.name} size={34} tier={u.tier} />
-                <div className="lb-name">{u.name}<TierCrest tier={u.tier} /></div>
-                <div className="lb-track">{track?.short}</div>
-                <div className="lb-points">{u.points}</div>
-                <div className="t-mono" style={{ fontSize: 12, color: 'var(--off-white-68)' }}>3 / 7</div>
-                <div className="lb-badges">{u.badges}</div>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <button className="btn btn-ghost btn-sm" style={{ padding: '4px 8px' }}><i className="fa-solid fa-bolt" /></button>
-                  <button className="btn btn-ghost btn-sm" style={{ padding: '4px 8px' }}><i className="fa-solid fa-pen" /></button>
-                </div>
-              </div>
-            );
-          })}
+          {rows.map(u => (
+            <div key={u.id} className="lb-row" style={{ gridTemplateColumns: tab === 'users' ? usersGrid : pointsGrid, minWidth: tab === 'users' ? 960 : 900 }}>
+              <AvatarWithRing name={u.name} avatarUrl={u.avatarUrl} size={34} tier={u.role === 'exonaut' ? 'entry' : 'corps'} />
+              <div className="lb-name">{u.name}</div>
+              {tab === 'users' ? (
+                <>
+                  <div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-68)', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.email || '-'}</div>
+                  <div className="status-pill status-not-started">{u.role.toUpperCase()}</div>
+                  <div className="lb-track">{cohortLabel(u.cohortId)}</div>
+                  <div className="lb-track">{trackLabel(u.trackCode)}</div>
+                  <div className="status-pill status-approved">ACTIVE</div>
+                </>
+              ) : (
+                <>
+                  <div className="lb-track">{cohortLabel(u.cohortId)}</div>
+                  <div className="lb-track">{trackLabel(u.trackCode)}</div>
+                  <div className="lb-points" style={{ textAlign: 'center', justifySelf: 'center', width: '100%' }}>{u.points}</div>
+                  <div className="lb-badges" style={{ textAlign: 'center', justifySelf: 'center', width: '100%' }}>{u.badges.length}</div>
+                  <div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-68)' }}>{lastPointActivity(u.id)}</div>
+                </>
+              )}
+            </div>
+          ))}
+          {rows.length === 0 && <div className="empty-line">No users found.</div>}
         </div>
       )}
 
       {tab === 'missions' && (
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 14 }}>
-            <div className="t-mono" style={{ fontSize: 11, color: 'var(--off-white-40)' }}>
-              REVIEW QUEUE · 4 AWAITING GRADE
-            </div>
+            <div className="t-mono" style={{ fontSize: 11, color: 'var(--off-white-40)' }}>{missions.length} TRACK TASK{missions.length === 1 ? '' : 'S'}</div>
             <span className="section-meta">CREATE MISSIONS IN PLATFORM ADMIN · MISSION BUILDER</span>
           </div>
           {missions.map(m => (
@@ -1064,66 +1201,182 @@ function AdminPanel() {
               <div className="mission-meta">
                 <div className="mission-id">{m.id}</div>
                 <div className="mission-title">{m.title}</div>
-                <div className="mission-sub">CREATED BY MACK · {m.status.toUpperCase()} · {Math.floor(Math.random() * 20) + 5} ASSIGNED</div>
+                <div className="mission-sub">{m.track ? trackLabel(m.track) : 'ALL COHORT'} · {(m.status || 'not-started').toUpperCase()} · {cohortLabel(m.cohortId || 'c2627')}</div>
               </div>
               <div className="mission-points"><span className="plus">+</span>{m.points}</div>
-              <button className="btn btn-ghost btn-sm">REVIEW</button>
-              <button className="btn btn-ghost btn-sm"><i className="fa-solid fa-pen" /></button>
             </div>
           ))}
+          {missions.length === 0 && <div className="empty-line">No track tasks have been created yet.</div>}
         </div>
       )}
 
-      {tab === 'announce' && (
-        <div>
-          <div className="card-panel" style={{ marginBottom: 16 }}>
-            <div className="t-label" style={{ marginBottom: 12 }}>COMPOSE ANNOUNCEMENT</div>
-            <input className="input" placeholder="Title…" style={{ marginBottom: 12 }} />
-            <textarea className="textarea" rows={4} placeholder="Body — rich text supported" style={{ marginBottom: 12 }} />
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', gap: 8 }}>
-                {['info','action','celebration','urgent'].map(t => (
-                  <div key={t} className="lb-filter">{t.toUpperCase()}</div>
-                ))}
-              </div>
-              <button className="btn btn-primary"><i className="fa-solid fa-paper-plane" /> PUBLISH</button>
-            </div>
-          </div>
-          <AnnouncementsPage />
-        </div>
-      )}
+      {tab === 'announce' && <AnnouncementsPage />}
 
       {tab === 'badges' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12 }}>
-          {BADGES.map(b => (
-            <div key={b.code} className="card-flat" style={{ textAlign: 'center', padding: 20 }}>
-              <BadgeMedallion badge={b} size={50} />
-              <div style={{ marginTop: 10 }} className="t-heading" >{b.name}</div>
-              <div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)', marginTop: 6 }}>
-                {Math.floor(Math.random() * 8)} / 30 AWARDED
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 14, alignItems: 'stretch' }}>
+          {BADGES.map(b => {
+            const awarded = rows.filter(row => row.badges.some(earned => earned.code === b.code));
+            return (
+              <div key={b.code} className="card-flat" style={{
+                minHeight: 235,
+                display: 'grid',
+                gridTemplateRows: '64px minmax(52px, auto) 24px auto',
+                justifyItems: 'center',
+                alignItems: 'center',
+                textAlign: 'center',
+                padding: '22px 18px 18px',
+              }}>
+                <div style={{ width: 64, height: 64, display: 'grid', placeItems: 'center' }}>
+                  <BadgeMedallion badge={b} size={54} />
+                </div>
+                <div className="t-heading" style={{
+                  fontSize: 15,
+                  lineHeight: 1.25,
+                  textTransform: 'none',
+                  letterSpacing: 0,
+                  color: 'var(--off-white)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  maxWidth: 140,
+                }}>{b.name}</div>
+                <div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)', letterSpacing: '0.08em', textAlign: 'center', width: '100%' }}>
+                  {awarded.length} / {rows.length} AWARDED
+                </div>
+                <button className="btn btn-ghost btn-sm" onClick={() => setBadgeAwarding(b)} style={{ width: '100%', justifyContent: 'center', alignSelf: 'end' }}>AWARD MANUALLY</button>
               </div>
-              <button className="btn btn-ghost btn-sm" style={{ marginTop: 10, width: '100%', justifyContent: 'center' }}>
-                AWARD MANUALLY
-              </button>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
       {tab === 'rituals' && (
-        <div className="ritual-row">
-          {RITUALS.map(r => (
-            <div key={r.id} className="ritual-cell pending" style={{ cursor: 'pointer' }}>
-              <div className="ritual-head">
-                <div className="ritual-name">{r.name}</div>
-                <i className="fa-solid fa-gavel ritual-icon pend-c" />
-              </div>
-              <div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)' }}>AWAITING MARK</div>
-              <button className="btn btn-primary btn-sm" style={{ width: '100%', justifyContent: 'center', marginTop: 'auto' }}>BULK MARK</button>
-            </div>
-          ))}
+        <div>
+          <div className="card-panel" style={{ padding: 16, marginBottom: 16 }}>
+            <div className="t-body" style={{ color: 'var(--off-white-68)' }}>Rituals are weekly completion logs. Recording a completion creates a ritual log and awards that ritual's points once for that user/week.</div>
+          </div>
+          <div className="ritual-row">
+            {RITUALS.map(r => {
+              const completed = currentWeekRitualLogs.filter(log => log.ritualId === r.id);
+              return (
+                <div key={r.id} className="ritual-cell pending">
+                  <div className="ritual-head">
+                    <div className="ritual-name">{r.name}</div>
+                    <i className="fa-solid fa-calendar-check ritual-icon pend-c" />
+                  </div>
+                  <div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)' }}>{completed.length} / {rows.length} RECORDED · WEEK {currentWeek}</div>
+                  <button onClick={() => setRitualRecording(r)} className="btn btn-primary btn-sm" style={{ width: '100%', justifyContent: 'center', marginTop: 'auto' }}>RECORD COMPLETION</button>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
+
+      {badgeAwarding && <AdminBadgeAwardModal badge={badgeAwarding} roster={rows} onClose={() => setBadgeAwarding(null)} onAward={awardBadge} />}
+      {ritualRecording && <AdminRitualRecordModal ritual={ritualRecording} roster={rows} currentWeek={currentWeek} logs={ritualLogs} onClose={() => setRitualRecording(null)} onRecord={recordRitual} />}
+    </div>
+  );
+}
+
+function AdminBadgeAwardModal({ badge, roster, onClose, onAward }) {
+  const candidates = roster.filter(row => !(row.badges || []).some(b => b.code === badge.code));
+  const [selected, setSelected] = React.useState([]);
+
+  function toggle(userId) {
+    setSelected(prev => prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]);
+  }
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="card-panel" onClick={e => e.stopPropagation()} style={{ width: 'min(620px, calc(100vw - 32px))', maxHeight: 'calc(100vh - 48px)', overflow: 'auto' }}>
+        <div className="section-head" style={{ marginBottom: 14 }}>
+          <div>
+            <div className="t-label" style={{ color: 'var(--amber)', marginBottom: 6 }}>BADGE AWARD</div>
+            <h2 style={{ fontSize: 20 }}>{badge.name}</h2>
+          </div>
+          <button className="btn btn-ghost btn-sm" onClick={onClose}><i className="fa-solid fa-xmark" /></button>
+        </div>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 16 }}>
+          <BadgeMedallion badge={badge} size={58} />
+          <div className="t-body" style={{ color: 'var(--off-white-68)' }}>
+            Select one or more roster members who have not earned this badge yet. Existing awards are excluded.
+          </div>
+        </div>
+        <div style={{ display: 'grid', gap: 8, maxHeight: 360, overflow: 'auto', marginBottom: 16 }}>
+          {candidates.map(row => (
+            <label key={row.id} className="card-flat" style={{ display: 'grid', gridTemplateColumns: 'auto 32px 1fr auto', gap: 10, alignItems: 'center', cursor: 'pointer' }}>
+              <input type="checkbox" checked={selected.includes(row.id)} onChange={() => toggle(row.id)} />
+              <AvatarWithRing name={row.name} avatarUrl={row.avatarUrl} size={30} tier={row.role === 'exonaut' ? 'entry' : 'corps'} />
+              <div>
+                <div className="t-heading" style={{ fontSize: 13, textTransform: 'none', letterSpacing: 0 }}>{row.name}</div>
+                <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)' }}>{row.email || row.id}</div>
+              </div>
+              <div className="lb-points">{row.points}</div>
+            </label>
+          ))}
+          {candidates.length === 0 && <div className="empty-line">Everyone on the roster already has this badge.</div>}
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+          <button className="btn btn-ghost btn-sm" onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary btn-sm" disabled={!selected.length} onClick={() => onAward(badge, selected)} style={{ opacity: selected.length ? 1 : 0.45 }}>
+            Award {selected.length || ''}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AdminRitualRecordModal({ ritual, roster, currentWeek, logs, onClose, onRecord }) {
+  const [week, setWeek] = React.useState(currentWeek);
+  const [selected, setSelected] = React.useState([]);
+  const candidates = roster.filter(row => !logs.some(log => log.userId === row.id && log.ritualId === ritual.id && Number(log.week) === Number(week)));
+
+  React.useEffect(() => { setSelected([]); }, [ritual.id, week]);
+
+  function toggle(userId) {
+    setSelected(prev => prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]);
+  }
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="card-panel" onClick={e => e.stopPropagation()} style={{ width: 'min(640px, calc(100vw - 32px))', maxHeight: 'calc(100vh - 48px)', overflow: 'auto' }}>
+        <div className="section-head" style={{ marginBottom: 14 }}>
+          <div>
+            <div className="t-label" style={{ color: 'var(--sky)', marginBottom: 6 }}>RITUAL COMPLETION</div>
+            <h2 style={{ fontSize: 20 }}>{ritual.name}</h2>
+          </div>
+          <button className="btn btn-ghost btn-sm" onClick={onClose}><i className="fa-solid fa-xmark" /></button>
+        </div>
+        <div className="card-flat" style={{ marginBottom: 14 }}>
+          <div className="t-body" style={{ color: 'var(--off-white-68)' }}>
+            This records completion for the selected week and awards +{ritual.points} points once per selected user.
+          </div>
+        </div>
+        <label className="t-label-muted" style={{ display: 'block', marginBottom: 6 }}>WEEK</label>
+        <input className="input" type="number" min="1" value={week} onChange={e => setWeek(Number(e.target.value) || currentWeek)} style={{ marginBottom: 14, maxWidth: 160 }} />
+        <div style={{ display: 'grid', gap: 8, maxHeight: 340, overflow: 'auto', marginBottom: 16 }}>
+          {candidates.map(row => (
+            <label key={row.id} className="card-flat" style={{ display: 'grid', gridTemplateColumns: 'auto 32px 1fr auto', gap: 10, alignItems: 'center', cursor: 'pointer' }}>
+              <input type="checkbox" checked={selected.includes(row.id)} onChange={() => toggle(row.id)} />
+              <AvatarWithRing name={row.name} avatarUrl={row.avatarUrl} size={30} tier={row.role === 'exonaut' ? 'entry' : 'corps'} />
+              <div>
+                <div className="t-heading" style={{ fontSize: 13, textTransform: 'none', letterSpacing: 0 }}>{row.name}</div>
+                <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)' }}>{row.email || row.id}</div>
+              </div>
+              <div className="status-pill status-not-started">NOT RECORDED</div>
+            </label>
+          ))}
+          {candidates.length === 0 && <div className="empty-line">All roster members already have this ritual recorded for week {week}.</div>}
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+          <button className="btn btn-ghost btn-sm" onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary btn-sm" disabled={!selected.length} onClick={() => onRecord({ ritualId: ritual.id, userIds: selected, week })} style={{ opacity: selected.length ? 1 : 0.45 }}>
+            Record {selected.length || ''}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

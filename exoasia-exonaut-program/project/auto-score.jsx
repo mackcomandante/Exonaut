@@ -70,7 +70,8 @@
   }
 
   async function refreshUserBadges(userId = ME_ID) {
-    if (!userId || !window.__db) return [];
+    if (!userId) return [];
+    if (!window.__db) return badgeState.byUser[userId] || [];
     const { data, error } = await window.__db
       .from('user_badges')
       .select('*')
@@ -111,7 +112,22 @@
   }
 
   async function persistUserBadge(userId, badge, source = 'system', metadata = {}) {
-    if (!userId || !badge || !window.__db) return;
+    if (!userId || !badge) return;
+    const localBadge = {
+      code: badge.code,
+      name: badge.name,
+      category: badge.category || 'milestone',
+      source,
+      earned: true,
+      date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toUpperCase(),
+      earnedAt: new Date().toISOString(),
+      metadata,
+    };
+    const existing = badgeState.byUser[userId] || [];
+    badgeState.byUser[userId] = [localBadge, ...existing.filter(b => b.code !== badge.code)];
+    badgeState.loadedUsers.add(userId);
+    notifyBadges();
+    if (!window.__db) return;
     const awardedBy = source === 'system' ? null : await currentUserId();
     const row = {
       user_id: userId,
