@@ -493,7 +493,27 @@
     async deleteDelegation() {},
     async acknowledgeDelegation() {},
     async deleteTask(taskId) {
+      await Promise.all([
+        window.__db.from('project_task_activity').delete().eq('task_id', taskId),
+        window.__db.from('project_task_comments').delete().eq('task_id', taskId),
+        window.__db.from('project_task_submissions').delete().eq('task_id', taskId),
+        window.__db.from('project_task_assignees').delete().eq('task_id', taskId),
+      ]);
       const { error } = await window.__db.from('project_tasks').delete().eq('id', taskId);
+      if (error) throw error;
+      await refresh();
+    },
+    async clearProjectActions(projectId) {
+      const taskIds = state.tasks.filter(t => t.projectId === projectId).map(t => t.id);
+      if (taskIds.length) {
+        await Promise.all([
+          window.__db.from('project_task_activity').delete().in('task_id', taskIds),
+          window.__db.from('project_task_comments').delete().in('task_id', taskIds),
+          window.__db.from('project_task_submissions').delete().in('task_id', taskIds),
+          window.__db.from('project_task_assignees').delete().in('task_id', taskIds),
+        ]);
+      }
+      const { error } = await window.__db.from('project_tasks').delete().eq('project_id', projectId);
       if (error) throw error;
       await refresh();
     },
@@ -1039,27 +1059,268 @@ function actionOverdue(action) {
   return !!action.dueDate && action.dueDate < new Date().toISOString().slice(0, 10) && !['done', 'cancelled'].includes(action.status);
 }
 
+function normalizeImportHeader(value) {
+  return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+}
+
+function parseCsvRows(text) {
+  const rows = [];
+  let row = [];
+  let cell = '';
+  let quoted = false;
+  const source = String(text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  for (let i = 0; i < source.length; i++) {
+    const char = source[i];
+    const next = source[i + 1];
+    if (quoted) {
+      if (char === '"' && next === '"') {
+        cell += '"';
+        i++;
+      } else if (char === '"') {
+        quoted = false;
+      } else {
+        cell += char;
+      }
+    } else if (char === '"') {
+      quoted = true;
+    } else if (char === ',') {
+      row.push(cell);
+      cell = '';
+    } else if (char === '\n') {
+      row.push(cell);
+      if (row.some(value => String(value || '').trim())) rows.push(row);
+      row = [];
+      cell = '';
+    } else {
+      cell += char;
+    }
+  }
+  row.push(cell);
+  if (row.some(value => String(value || '').trim())) rows.push(row);
+  return rows;
+}
+
+async function inflateZipEntry(bytes, method) {
+  if (method === 0) return bytes;
+  if (method !== 8) throw new Error('Unsupported Excel compression method.');
+  if (!window.DecompressionStream) throw new Error('This browser cannot read .xlsx files. Export the sheet as CSV and import that file.');
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+
+async function readZipEntries(buffer) {
+  const view = new DataView(buffer);
+  const bytes = new Uint8Array(buffer);
+  let eocd = -1;
+  for (let i = bytes.length - 22; i >= Math.max(0, bytes.length - 66000); i--) {
+    if (view.getUint32(i, true) === 0x06054b50) {
+      eocd = i;
+      break;
+    }
+  }
+  if (eocd < 0) throw new Error('Could not read this Excel file.');
+  const count = view.getUint16(eocd + 10, true);
+  const centralOffset = view.getUint32(eocd + 16, true);
+  const entries = {};
+  let offset = centralOffset;
+  for (let i = 0; i < count; i++) {
+    if (view.getUint32(offset, true) !== 0x02014b50) break;
+    const method = view.getUint16(offset + 10, true);
+    const compressedSize = view.getUint32(offset + 20, true);
+    const nameLength = view.getUint16(offset + 28, true);
+    const extraLength = view.getUint16(offset + 30, true);
+    const commentLength = view.getUint16(offset + 32, true);
+    const localOffset = view.getUint32(offset + 42, true);
+    const name = new TextDecoder().decode(bytes.slice(offset + 46, offset + 46 + nameLength));
+    if (view.getUint32(localOffset, true) === 0x04034b50) {
+      const localNameLength = view.getUint16(localOffset + 26, true);
+      const localExtraLength = view.getUint16(localOffset + 28, true);
+      const dataStart = localOffset + 30 + localNameLength + localExtraLength;
+      const compressed = bytes.slice(dataStart, dataStart + compressedSize);
+      entries[name] = { method, compressed };
+    }
+    offset += 46 + nameLength + extraLength + commentLength;
+  }
+  return entries;
+}
+
+function xmlText(value) {
+  const doc = new DOMParser().parseFromString(value, 'application/xml');
+  return doc;
+}
+
+function colIndexFromCellRef(ref) {
+  const letters = String(ref || '').match(/[A-Z]+/i)?.[0] || 'A';
+  return letters.toUpperCase().split('').reduce((sum, char) => sum * 26 + char.charCodeAt(0) - 64, 0) - 1;
+}
+
+async function parseXlsxRows(file) {
+  const entries = await readZipEntries(await file.arrayBuffer());
+  const decoder = new TextDecoder();
+  const readEntry = async (name) => {
+    const entry = entries[name];
+    if (!entry) return '';
+    return decoder.decode(await inflateZipEntry(entry.compressed, entry.method));
+  };
+  const sharedXml = await readEntry('xl/sharedStrings.xml');
+  const sharedStrings = sharedXml
+    ? Array.from(xmlText(sharedXml).getElementsByTagName('si')).map(si =>
+        Array.from(si.getElementsByTagName('t')).map(t => t.textContent || '').join('')
+      )
+    : [];
+  const parseSheetRows = (sheetXml) => {
+    const doc = xmlText(sheetXml);
+    return Array.from(doc.getElementsByTagName('row')).map(rowNode => {
+      const cells = [];
+      Array.from(rowNode.getElementsByTagName('c')).forEach(cellNode => {
+        const index = colIndexFromCellRef(cellNode.getAttribute('r'));
+        const type = cellNode.getAttribute('t');
+        const raw = cellNode.getElementsByTagName('v')[0]?.textContent || '';
+        const inline = cellNode.getElementsByTagName('t')[0]?.textContent || '';
+        cells[index] = type === 's' ? (sharedStrings[Number(raw)] || '') : (type === 'inlineStr' ? inline : raw);
+      });
+      return cells.map(value => value || '');
+    }).filter(row => row.some(value => String(value || '').trim()));
+  };
+  const hasActionRegisterHeader = (rows) => rows.some(row => {
+    const keys = row.map(normalizeImportHeader);
+    return keys.includes('topic') && (keys.includes('particulars') || keys.includes('action') || keys.includes('actionparticulars'));
+  });
+  const workbookXml = await readEntry('xl/workbook.xml');
+  const relsXml = await readEntry('xl/_rels/workbook.xml.rels');
+  let sheetPaths = ['xl/worksheets/sheet1.xml'];
+  if (workbookXml && relsXml) {
+    const workbook = xmlText(workbookXml);
+    const rels = xmlText(relsXml);
+    sheetPaths = Array.from(workbook.getElementsByTagName('sheet')).map(sheet => {
+      const relId = sheet.getAttribute('r:id') || sheet.getAttribute('id');
+      const rel = Array.from(rels.getElementsByTagName('Relationship')).find(item => item.getAttribute('Id') === relId);
+      const target = rel?.getAttribute('Target');
+      return target ? 'xl/' + target.replace(/^\/?xl\//, '') : '';
+    }).filter(Boolean);
+  }
+  let firstRows = null;
+  for (const sheetPath of sheetPaths) {
+    const sheetXml = await readEntry(sheetPath);
+    if (!sheetXml) continue;
+    const rows = parseSheetRows(sheetXml);
+    if (!firstRows) firstRows = rows;
+    if (hasActionRegisterHeader(rows)) return rows;
+  }
+  if (firstRows) return firstRows;
+  throw new Error('No worksheet found in this Excel file.');
+}
+
+function excelDateToIso(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(raw)) return raw.replace(/-(\d)(?=-|$)/g, '-0$1');
+  if (/^\d+(\.\d+)?$/.test(raw)) {
+    const serial = Number(raw);
+    if (serial > 20000 && serial < 90000) {
+      const date = new Date(Date.UTC(1899, 11, 30) + serial * 86400000);
+      return date.toISOString().slice(0, 10);
+    }
+  }
+  const parsed = new Date(raw);
+  return Number.isNaN(parsed.getTime()) ? '' : parsed.toISOString().slice(0, 10);
+}
+
+function normalizeImportedStatus(value) {
+  const key = normalizeImportHeader(value);
+  if (!key) return 'not_started';
+  if (['done', 'complete', 'completed'].includes(key)) return 'done';
+  if (['inprogress', 'ongoing', 'working'].includes(key)) return 'in_progress';
+  if (['omitted', 'cancelled', 'canceled'].includes(key)) return 'cancelled';
+  if (['blocked', 'stuck'].includes(key)) return 'blocked';
+  if (['forreview', 'review', 'submitted'].includes(key)) return 'for_review';
+  return 'not_started';
+}
+
+function linkListFromCell(value) {
+  return String(value || '').split(/\n|,/).map(item => item.trim()).filter(Boolean);
+}
+
+function importedRowsToActions(rows, profiles, project) {
+  const headerIndex = rows.findIndex(row => {
+    const keys = row.map(normalizeImportHeader);
+    return keys.includes('topic') && (keys.includes('particulars') || keys.includes('action') || keys.includes('actionparticulars'));
+  });
+  if (headerIndex < 0) throw new Error('Could not find a header row with Topic and Particulars columns.');
+  const headers = rows[headerIndex].map(normalizeImportHeader);
+  const findCol = (...names) => names.map(normalizeImportHeader).map(name => headers.indexOf(name)).find(index => index >= 0);
+  const cols = {
+    item: findCol('item', '#', 'no'),
+    topic: findCol('topic'),
+    title: findCol('particulars', 'actionparticulars', 'action', 'title'),
+    status: findCol('status'),
+    nextStep: findCol('nextsteps', 'nextstep'),
+    dueDate: findCol('when', 'due', 'duedate'),
+    responsible: findCol('responsible', 'owner', 'assignedto'),
+    notes: findCol('notes', 'note'),
+    links: findCol('links', 'link', 'references'),
+  };
+  const matchPerson = (name) => {
+    const needle = String(name || '').trim().toLowerCase();
+    if (!needle) return '';
+    const clean = needle.replace(/\s+/g, ' ');
+    return profiles.find(p => [p.fullName, p.email].some(value => String(value || '').trim().toLowerCase() === clean))?.id
+      || profiles.find(p => String(p.fullName || '').toLowerCase().includes(clean) || clean.includes(String(p.fullName || '').toLowerCase()))?.id
+      || '';
+  };
+  return rows.slice(headerIndex + 1).map((row, index) => {
+    const title = String(row[cols.title] || '').trim();
+    if (!title) return null;
+    return {
+      displayOrder: Number(row[cols.item]) || index + 1,
+      topic: String(row[cols.topic] || '').trim(),
+      title,
+      brief: String(row[cols.notes] || '').trim(),
+      status: normalizeImportedStatus(row[cols.status]),
+      nextStep: String(row[cols.nextStep] || '').trim(),
+      dueDate: excelDateToIso(row[cols.dueDate]),
+      responsibleName: String(row[cols.responsible] || '').trim(),
+      responsibleId: matchPerson(row[cols.responsible]),
+      blockers: normalizeImportedStatus(row[cols.status]) === 'blocked' ? 'Imported as blocked' : '',
+      referenceLinks: linkListFromCell(row[cols.links]),
+      trackCode: project.trackCodes[0] || 'GENERAL',
+      progressNote: String(row[cols.notes] || '').trim(),
+    };
+  }).filter(Boolean);
+}
+
 function ActionRegister({ project, actions, members, assignees, profiles, canManage, canEditActions, onOpen }) {
   const [search, setSearch] = React.useState('');
   const [status, setStatus] = React.useState('all');
   const [responsible, setResponsible] = React.useState('all');
   const [creating, setCreating] = React.useState(false);
+  const [importing, setImporting] = React.useState(false);
+  const [clearing, setClearing] = React.useState(false);
   const nameOf = id => profiles.find(person => person.id === id)?.fullName || profiles.find(person => person.id === id)?.email || 'Unassigned';
   const filtered = actions.filter(action => {
     const owners = assignees.filter(item => item.taskId === action.id).map(item => item.userId);
     const searchable = [action.topic, action.title, action.brief, action.nextStep, action.blockers].join(' ').toLowerCase();
     return (!search || searchable.includes(search.toLowerCase())) && (status === 'all' || action.status === status) && (responsible === 'all' || owners.includes(responsible));
   }).sort((a, b) => (a.displayOrder - b.displayOrder) || String(a.dueDate || '').localeCompare(String(b.dueDate || '')));
+
   return (
     <section className="card-panel action-register-panel">
       <div className="action-toolbar">
         <label className="action-search"><i className="fa-solid fa-magnifying-glass" /><input placeholder="Search actions..." value={search} onChange={event => setSearch(event.target.value)} /></label>
         <select className="select" value={status} onChange={event => setStatus(event.target.value)}><option value="all">All statuses</option>{window.__projectStore.ACTION_STATUSES.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select>
         <select className="select" value={responsible} onChange={event => setResponsible(event.target.value)}><option value="all">All responsible users</option>{members.map(member => <option key={member.userId} value={member.userId}>{nameOf(member.userId)}</option>)}</select>
+        {canEditActions && <button className="btn btn-ghost" onClick={() => setImporting(true)}><i className="fa-solid fa-file-import" /> Import Excel</button>}
         {canEditActions && <button className="btn btn-primary" onClick={() => setCreating(value => !value)}><i className="fa-solid fa-plus" /> New Action</button>}
       </div>
+      {importing && <ActionImportModal project={project} profiles={profiles} onClose={() => setImporting(false)} />}
       {creating && <NewActionForm project={project} members={members} profiles={profiles} canManage={canManage} onClose={() => setCreating(false)} />}
       <div className="action-table-wrap">
+        <div className="action-selection-bar">
+          <button className="action-clear-all" type="button" onClick={() => setClearing(true)} disabled={!actions.length || !canEditActions}>
+            <i className="fa-solid fa-trash" /> Clear All Actions
+          </button>
+          <span className="action-selection-count">{actions.length} actions in this project</span>
+        </div>
         <table className="action-table">
           <thead><tr><th>#</th><th>Topic</th><th>Action / Particulars</th><th>Status</th><th>Next Step</th><th>Due</th><th>Responsible</th><th>Blockers</th><th>Links</th><th>Updated</th></tr></thead>
           <tbody>
@@ -1082,7 +1343,44 @@ function ActionRegister({ project, actions, members, assignees, profiles, canMan
         </table>
         {!filtered.length && <div className="action-empty">No actions match this view.</div>}
       </div>
+      {clearing && <ClearActionsModal project={project} actions={actions} onClose={() => setClearing(false)} />}
     </section>
+  );
+}
+
+function ClearActionsModal({ project, actions, onClose }) {
+  const [saving, setSaving] = React.useState(false);
+  const [error, setError] = React.useState('');
+
+  async function confirmClear() {
+    setSaving(true);
+    setError('');
+    try {
+      await window.__projectStore.clearProjectActions(project.id);
+      onClose();
+    } catch (err) {
+      setError(err?.message || 'Could not delete all actions.');
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="card-panel admin-project-delete-modal" onClick={event => event.stopPropagation()}>
+        <div className="t-label" style={{ color: 'var(--red)', marginBottom: 8 }}>CLEAR ACTION REGISTER</div>
+        <h2 className="t-heading" style={{ fontSize: 22, margin: '0 0 8px' }}>Delete all actions?</h2>
+        <div className="t-body" style={{ fontSize: 13, color: 'var(--off-white-68)', lineHeight: 1.5 }}>
+          This will delete all {actions.length} actions from {project.title}. This cannot be undone.
+        </div>
+        {error && <div className="t-body" style={{ color: 'var(--red)', fontSize: 12, marginTop: 12 }}>{error}</div>}
+        <div className="admin-project-modal-actions">
+          <button className="btn btn-ghost btn-sm" type="button" onClick={onClose} disabled={saving}>Cancel</button>
+          <button className="btn btn-primary" type="button" onClick={confirmClear} disabled={saving} style={{ background: 'var(--red)' }}>
+            <i className="fa-solid fa-trash" /> {saving ? 'Deleting...' : 'Yes, Delete All'}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -1133,6 +1431,141 @@ function NewActionForm({ project, members, profiles, canManage, onClose }) {
   );
 }
 
+function ActionImportModal({ project, profiles, onClose }) {
+  const [fileName, setFileName] = React.useState('');
+  const [rows, setRows] = React.useState([]);
+  const [error, setError] = React.useState('');
+  const [saving, setSaving] = React.useState(false);
+  const [loading, setLoading] = React.useState(false);
+  const previewRows = rows.slice(0, 8);
+  const matched = rows.filter(row => row.responsibleId).length;
+
+  async function readImportFile(file) {
+    setFileName(file?.name || '');
+    setRows([]);
+    setError('');
+    if (!file) return;
+    setLoading(true);
+    try {
+      const name = String(file.name || '').toLowerCase();
+      let parsedRows;
+      if (name.endsWith('.csv')) {
+        parsedRows = parseCsvRows(await file.text());
+      } else if (name.endsWith('.xlsx')) {
+        parsedRows = await parseXlsxRows(file);
+      } else if (name.endsWith('.xls')) {
+        throw new Error('Old .xls files are not supported. Export from Google Sheets as .xlsx or CSV.');
+      } else {
+        throw new Error('Please upload a .xlsx or .csv file.');
+      }
+      const actions = importedRowsToActions(parsedRows, profiles, project);
+      if (!actions.length) throw new Error('No action rows found after the header row.');
+      setRows(actions);
+    } catch (err) {
+      setError(err?.message || 'Could not read this file.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function confirmImport() {
+    if (!rows.length) return;
+    setSaving(true);
+    setError('');
+    try {
+      for (const row of rows) {
+        const taskId = await window.__projectStore.saveTask({
+          projectId: project.id,
+          trackCode: row.trackCode,
+          accountableId: project.firstOfficerId,
+          topic: row.topic,
+          title: row.title,
+          brief: row.brief,
+          status: row.status,
+          nextStep: row.nextStep,
+          blockers: row.blockers,
+          dueDate: row.dueDate,
+          displayOrder: row.displayOrder,
+          referenceLinks: row.referenceLinks,
+          progressNote: row.progressNote,
+        });
+        if (row.responsibleId) await window.__projectStore.assignTaskTeam(taskId, [row.responsibleId]);
+      }
+      onClose();
+    } catch (err) {
+      setError(err?.message || 'Could not import these actions.');
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <section className="card-panel action-import-modal" role="dialog" aria-modal="true" aria-label="Import action register" onClick={event => event.stopPropagation()}>
+        <div className="admin-project-modal-head">
+          <div>
+            <div className="t-label project-register-label">ACTION REGISTER IMPORT</div>
+            <h2 className="t-heading" style={{ fontSize: 24, margin: 0 }}>Import Excel</h2>
+            <p className="t-body" style={{ margin: '6px 0 0', fontSize: 13 }}>
+              Upload the exported action register. Headers should include Topic, Particulars, Status, Next Steps, When, Responsible, Notes, and Links.
+            </p>
+          </div>
+          <button className="icon-btn" type="button" onClick={onClose} title="Close">
+            <i className="fa-solid fa-xmark" />
+          </button>
+        </div>
+
+        <label className="action-import-drop">
+          <i className="fa-solid fa-file-excel" />
+          <span>
+            <strong>{fileName || 'Choose .xlsx or .csv file'}</strong>
+            <small>{loading ? 'Reading file...' : 'Google Sheets: File -> Download -> Microsoft Excel or CSV'}</small>
+          </span>
+          <input type="file" accept=".xlsx,.csv" onChange={event => readImportFile(event.target.files?.[0])} />
+        </label>
+
+        {error && <div className="action-form-error"><i className="fa-solid fa-circle-exclamation" /> {error}</div>}
+
+        {!!rows.length && (
+          <>
+            <div className="action-import-summary">
+              <span><strong>{rows.length}</strong> actions ready</span>
+              <span><strong>{matched}</strong> responsible users matched</span>
+              <span><strong>{rows.length - matched}</strong> unassigned</span>
+            </div>
+            <div className="action-import-preview">
+              <table>
+                <thead>
+                  <tr><th>#</th><th>Topic</th><th>Action</th><th>Status</th><th>Due</th><th>Responsible</th></tr>
+                </thead>
+                <tbody>
+                  {previewRows.map((row, index) => (
+                    <tr key={index}>
+                      <td>{row.displayOrder}</td>
+                      <td>{row.topic || '-'}</td>
+                      <td>{row.title}</td>
+                      <td><ActionStatus status={row.status} /></td>
+                      <td>{row.dueDate || '-'}</td>
+                      <td>{row.responsibleId ? profiles.find(p => p.id === row.responsibleId)?.fullName || row.responsibleName : row.responsibleName || 'Unassigned'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {rows.length > previewRows.length && <div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)', marginTop: 8 }}>Showing first {previewRows.length} of {rows.length} rows.</div>}
+            </div>
+          </>
+        )}
+
+        <div className="admin-project-modal-actions">
+          <button className="btn btn-ghost btn-sm" type="button" onClick={onClose} disabled={saving}>Cancel</button>
+          <button className="btn btn-primary" type="button" onClick={confirmImport} disabled={saving || loading || !rows.length}>
+            <i className="fa-solid fa-file-import" /> {saving ? 'Importing...' : `Import ${rows.length || ''} Actions`}
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function ProjectOverview({ actions, assignees, profiles, onOpen }) {
   const done = actions.filter(action => action.status === 'done').length;
   const forReview = actions.filter(action => action.status === 'for_review');
@@ -1149,9 +1582,9 @@ function ProjectOverview({ actions, assignees, profiles, onOpen }) {
       <div className="overview-columns">
         <OverviewActionCard title="For Review" empty="No actions waiting for review." actions={forReview} assignees={assignees} profiles={profiles} onOpen={onOpen} />
         <OverviewActionCard title="Done" empty="No completed actions yet." actions={completed} assignees={assignees} profiles={profiles} onOpen={onOpen} />
-        <div className="card-panel overview-panel"><h2>Attention Needed</h2>{!attention.length && <p className="empty-line">No blocked or overdue actions.</p>}{attention.map(action => <button key={action.id} className="attention-row" onClick={() => onOpen(action.id)}><strong>{action.title}</strong><span>{action.status === 'blocked' ? 'Blocked' : 'Overdue'} - {action.topic || 'General'}</span></button>)}</div>
-        <div className="card-panel overview-panel"><h2>Team Workload</h2>{!workload.length && <p className="empty-line">No active assigned actions.</p>}{workload.map(item => <div key={item.person.id} className="workload-row"><span>{item.person.fullName || item.person.email}</span><strong>{item.count} active</strong></div>)}</div>
-        <div className="card-panel overview-panel"><h2>Upcoming Deadlines</h2>{!deadlines.length && <p className="empty-line">No upcoming deadlines.</p>}{deadlines.map(action => <button key={action.id} className="deadline-row" onClick={() => onOpen(action.id)}><span>{prettyDate(action.dueDate)}</span><strong>{action.title}</strong></button>)}</div>
+        <div className="card-panel overview-panel"><h2>Attention Needed</h2><div className="overview-panel-body">{!attention.length && <p className="empty-line">No blocked or overdue actions.</p>}{attention.map(action => <button key={action.id} className="attention-row" onClick={() => onOpen(action.id)}><strong>{action.title}</strong><span>{action.status === 'blocked' ? 'Blocked' : 'Overdue'} - {action.topic || 'General'}</span></button>)}</div></div>
+        <div className="card-panel overview-panel"><h2>Team Workload</h2><div className="overview-panel-body">{!workload.length && <p className="empty-line">No active assigned actions.</p>}{workload.map(item => <div key={item.person.id} className="workload-row"><span>{item.person.fullName || item.person.email}</span><strong>{item.count} active</strong></div>)}</div></div>
+        <div className="card-panel overview-panel"><h2>Upcoming Deadlines</h2><div className="overview-panel-body">{!deadlines.length && <p className="empty-line">No upcoming deadlines.</p>}{deadlines.map(action => <button key={action.id} className="deadline-row" onClick={() => onOpen(action.id)}><span>{prettyDate(action.dueDate)}</span><strong>{action.title}</strong></button>)}</div></div>
       </div>
     </section>
   );
@@ -1162,17 +1595,19 @@ function OverviewActionCard({ title, empty, actions, assignees, profiles, onOpen
   return (
     <div className="card-panel overview-panel workflow-panel">
       <h2>{title} <span className="workflow-count">{actions.length}</span></h2>
-      {!actions.length && <p className="empty-line">{empty}</p>}
-      {actions.map(action => {
-        const owners = assignees.filter(assignment => assignment.taskId === action.id).map(assignment => nameOf(assignment.userId)).join(', ') || 'Unassigned';
-        return (
-          <button key={action.id} className="overview-action-row" onClick={() => onOpen(action.id)}>
-            <strong>{action.title}</strong>
-            <span>{owners}{action.dueDate ? ' - ' + prettyDate(action.dueDate) : ''}</span>
-            <ActionStatus status={action.status} />
-          </button>
-        );
-      })}
+      <div className="overview-panel-body">
+        {!actions.length && <p className="empty-line">{empty}</p>}
+        {actions.map(action => {
+          const owners = assignees.filter(assignment => assignment.taskId === action.id).map(assignment => nameOf(assignment.userId)).join(', ') || 'Unassigned';
+          return (
+            <button key={action.id} className="overview-action-row" onClick={() => onOpen(action.id)}>
+              <strong>{action.title}</strong>
+              <span>{owners}{action.dueDate ? ' - ' + prettyDate(action.dueDate) : ''}</span>
+              <ActionStatus status={action.status} />
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
