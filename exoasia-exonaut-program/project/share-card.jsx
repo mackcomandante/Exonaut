@@ -142,6 +142,7 @@
 
   // ---- Default LinkedIn caption per-kind ----
   function defaultCaption({ kind, payload }) {
+    if (payload?.caption) return payload.caption;
     const me  = ME?.name || 'an Exonaut';
     const cohort = COHORT?.name || 'Exoasia Fellowship';
     if (kind === 'badge') {

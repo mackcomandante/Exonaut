@@ -12,6 +12,7 @@ function profileToClient(row, user) {
     trackCode: (row && row.track_code) || ME.track || 'AIS',
     bio: (row && row.bio) || '',
     linkedinUrl: (row && row.linkedin_url) || '',
+    dataRoomUrl: (row && row.data_room_url) || '',
     school: (row && row.school) || '',
     expertise: (row && row.expertise) || '',
     avatarUrl: (row && row.avatar_url) || '',
@@ -32,6 +33,7 @@ function useCurrentUserProfile() {
     trackCode: ME.track || 'AIS',
     bio: '',
     linkedinUrl: '',
+    dataRoomUrl: '',
     school: '',
     expertise: '',
     avatarUrl: '',
@@ -50,7 +52,7 @@ function useCurrentUserProfile() {
 
       const { data, error: profileError } = await window.__db
         .from('user_profiles')
-        .select('id, email, full_name, role, cohort_id, track_code, bio, linkedin_url, school, expertise, avatar_url')
+        .select('id, email, full_name, role, cohort_id, track_code, bio, linkedin_url, data_room_url, school, expertise, avatar_url')
         .eq('id', user.id)
         .maybeSingle();
       if (profileError) throw profileError;
@@ -94,6 +96,7 @@ function useCurrentUserProfile() {
     if (Object.prototype.hasOwnProperty.call(patch, 'cohortId')) update.cohort_id = patch.cohortId;
     if (Object.prototype.hasOwnProperty.call(patch, 'bio')) update.bio = patch.bio;
     if (Object.prototype.hasOwnProperty.call(patch, 'linkedinUrl')) update.linkedin_url = patch.linkedinUrl;
+    if (Object.prototype.hasOwnProperty.call(patch, 'dataRoomUrl')) update.data_room_url = patch.dataRoomUrl;
     if (Object.prototype.hasOwnProperty.call(patch, 'school')) update.school = patch.school;
     if (Object.prototype.hasOwnProperty.call(patch, 'expertise')) update.expertise = patch.expertise;
     if (Object.prototype.hasOwnProperty.call(patch, 'avatarUrl')) update.avatar_url = patch.avatarUrl;
@@ -102,7 +105,7 @@ function useCurrentUserProfile() {
       .from('user_profiles')
       .update(update)
       .eq('id', user.id)
-      .select('id, email, full_name, role, cohort_id, track_code, bio, linkedin_url, school, expertise, avatar_url')
+      .select('id, email, full_name, role, cohort_id, track_code, bio, linkedin_url, data_room_url, school, expertise, avatar_url')
       .single();
     if (updateError) throw updateError;
 
@@ -152,7 +155,7 @@ function useUserProfiles() {
     try {
       const { data, error: profilesError } = await window.__db
         .from('user_profiles')
-        .select('id, email, full_name, role, cohort_id, track_code, bio, linkedin_url, school, expertise, avatar_url, created_at, updated_at')
+        .select('id, email, full_name, role, cohort_id, track_code, bio, linkedin_url, data_room_url, school, expertise, avatar_url, created_at, updated_at')
         .order('created_at', { ascending: true });
       if (profilesError) throw profilesError;
       const nextProfiles = (data || []).map(row => profileToClient(row, null));
@@ -177,6 +180,7 @@ function useUserProfiles() {
     if (Object.prototype.hasOwnProperty.call(patch, 'trackCode')) update.track_code = patch.trackCode;
     if (Object.prototype.hasOwnProperty.call(patch, 'bio')) update.bio = patch.bio;
     if (Object.prototype.hasOwnProperty.call(patch, 'linkedinUrl')) update.linkedin_url = patch.linkedinUrl;
+    if (Object.prototype.hasOwnProperty.call(patch, 'dataRoomUrl')) update.data_room_url = patch.dataRoomUrl;
     if (Object.prototype.hasOwnProperty.call(patch, 'school')) update.school = patch.school;
     if (Object.prototype.hasOwnProperty.call(patch, 'expertise')) update.expertise = patch.expertise;
     if (Object.prototype.hasOwnProperty.call(patch, 'avatarUrl')) update.avatar_url = patch.avatarUrl;
@@ -185,7 +189,7 @@ function useUserProfiles() {
       .from('user_profiles')
       .update(update)
       .eq('id', id)
-      .select('id, email, full_name, role, cohort_id, track_code, bio, linkedin_url, school, expertise, avatar_url, created_at, updated_at')
+      .select('id, email, full_name, role, cohort_id, track_code, bio, linkedin_url, data_room_url, school, expertise, avatar_url, created_at, updated_at')
       .single();
     if (updateError) throw updateError;
 

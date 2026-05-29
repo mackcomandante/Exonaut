@@ -678,6 +678,7 @@ function RitualsPage() {
   const { profile } = useCurrentUserProfile();
   const rowsFromProfiles = useSupabaseExonautRows();
   const [proofRitual, setProofRitual] = React.useState(null);
+  const [iotwShare, setIotwShare] = React.useState(null);
   const activeCohort = window.getActiveCohort?.(profile) || COHORT;
   const timeline = window.getCohortTimeline?.(activeCohort);
   const currentWeek = timeline?.valid ? timeline.currentWeek : COHORT.week;
@@ -687,16 +688,52 @@ function RitualsPage() {
   const weeks = Object.keys(history).length
     ? Object.keys(history).map(k => Number(k.replace('w', ''))).filter(Boolean)
     : [];
+  const myRosterRow = React.useMemo(() => {
+    return rowsFromProfiles.find(r => r.id === profile.id) || {
+      id: profile.id,
+      name: profile.fullName || profile.email || ME.name,
+      cohort: profile.cohortId || activeCohort.id || 'c2627',
+      track: profile.trackCode || 'AIS',
+      points: profile.points || 0,
+      avatarUrl: profile.avatarUrl || '',
+    };
+  }, [rowsFromProfiles, profile.id, profile.fullName, profile.email, profile.cohortId, profile.trackCode, profile.points, profile.avatarUrl, activeCohort.id]);
+  const iotwLeader = React.useMemo(() => {
+    return window.EOW?.topOfWeek?.(profile.cohortId || activeCohort.id || 'c2627', currentWeek, 1)?.[0] || null;
+  }, [profile.cohortId, activeCohort.id, currentWeek, rowsFromProfiles]);
+  const myWeekPoints = React.useMemo(() => {
+    return window.EOW?.weeklyPoints?.(myRosterRow, currentWeek, activeCohort) || 0;
+  }, [myRosterRow, currentWeek, activeCohort]);
+  const isInternOfWeek = iotwLeader?.user?.id === profile.id;
 
   React.useEffect(() => {
     const manilaDay = new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'Asia/Manila' }).format(new Date());
     if (manilaDay !== 'Fri') return;
-    const sorted = [...rowsFromProfiles].sort((a, b) => b.points - a.points);
-    if (sorted[0]?.id === profile.id) completeRitual('iotw', { description: 'Auto logged from Friday leaderboard rank' }, { userId: profile.id, cohortId: profile.cohortId || 'c2627', source: 'intern-of-week', profile, week: currentWeek });
-  }, [rowsFromProfiles, profile.id, currentWeek]);
+    if (isInternOfWeek && records.iotw?.state !== 'done') {
+      completeRitual('iotw', { description: 'Auto logged from weekly points rank' }, { userId: profile.id, cohortId: profile.cohortId || activeCohort.id || 'c2627', source: 'intern-of-week', profile, week: currentWeek });
+    }
+  }, [isInternOfWeek, records.iotw?.state, profile.id, profile.cohortId, activeCohort.id, currentWeek]);
 
-  function submitProof(ritual) {
-    if (ritual.id === 'iotw') return;
+  async function submitProof(ritual) {
+    if (ritual.id === 'iotw') {
+      if (!isInternOfWeek && records.iotw?.state !== 'done') return;
+      if (isInternOfWeek && records.iotw?.state !== 'done') {
+        await completeRitual('iotw', { description: 'Intern of the Week certificate generated' }, { userId: profile.id, cohortId: profile.cohortId || activeCohort.id || 'c2627', source: 'intern-of-week', profile, week: currentWeek });
+      }
+      const pointsText = `${Number(myWeekPoints || iotwLeader?.weekPoints || 0).toLocaleString()} points`;
+      setIotwShare({
+        id: `iotw-w${currentWeek}-${profile.id}`,
+        code: 'IOTW',
+        name: 'Intern of the Week',
+        title: 'Intern of the Week',
+        subtitle: `Week ${currentWeek} · ${pointsText} accumulated this week`,
+        category: 'weekly-recognition',
+        recipient: profile.fullName || profile.email || ME.name,
+        color: '#FFB020',
+        caption: `Honored to be named Intern of the Week for Week ${currentWeek}. I accumulated ${pointsText} this week through my Exonaut work and rituals.\n\n#ExoasiaFellowship #Exonaut #InternOfTheWeek`,
+      });
+      return;
+    }
     setProofRitual(ritual);
   }
 
@@ -720,8 +757,16 @@ function RitualsPage() {
             const state = records[r.id]?.state || 'not-started';
             const iconCls = state === 'done' ? 'fa-circle-check' : state === 'missed' ? 'fa-circle-xmark' : 'fa-circle-dot';
             const cCls = state === 'done' ? 'done-c' : state === 'missed' ? 'miss-c' : 'pend-c';
+            const canOpenIotw = r.id === 'iotw' && (isInternOfWeek || state === 'done');
+            const clickable = r.id !== 'iotw' || canOpenIotw;
             return (
-              <div key={r.id} className={'ritual-cell ' + state} onClick={() => submitProof(r)} style={{ cursor: r.id === 'iotw' ? 'default' : 'pointer' }}>
+              <div
+                key={r.id}
+                className={'ritual-cell ' + state}
+                onClick={() => submitProof(r)}
+                title={r.id === 'iotw' ? (canOpenIotw ? 'Open Intern of the Week certificate' : 'Awarded to the weekly points leader') : ''}
+                style={{ cursor: clickable ? 'pointer' : 'default' }}
+              >
                 <div className="ritual-head">
                   <div className="ritual-name">{r.name}</div>
                   <i className={'fa-solid ' + iconCls + ' ritual-icon ' + cCls} />
@@ -774,6 +819,13 @@ function RitualsPage() {
             await completeRitual(proofRitual.id, proof, { userId: profile.id, cohortId: profile.cohortId || 'c2627', profile, week: currentWeek });
             setProofRitual(null);
           }}
+        />
+      )}
+      {iotwShare && (
+        <ShareModal
+          kind="award"
+          payload={iotwShare}
+          onClose={() => setIotwShare(null)}
         />
       )}
     </div>
@@ -1656,6 +1708,7 @@ function getCommunityMembers(profiles, ledger = [], subs = [], projectState = {}
       name: p.fullName || p.email || roleLabel(p.role),
       email: p.email,
       avatarUrl: p.avatarUrl || '',
+      dataRoomUrl: p.dataRoomUrl || '',
       roleKey: p.role || 'exonaut',
       role: roleLabel(p.role),
       track: trackCode,
@@ -2321,6 +2374,36 @@ function CommunityProfileSheet({ m, onClose }) {
               </div>
             ))}
           </div>
+        </div>
+
+        {/* Data Room */}
+        <div style={{ padding: '20px 32px', borderBottom: '1px solid var(--off-white-07)' }}>
+          <div className="t-label" style={{ marginBottom: 14 }}>DATA ROOM</div>
+          {m.dataRoomUrl ? (
+            <a href={m.dataRoomUrl} target="_blank" rel="noopener noreferrer"
+              style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: '12px 14px', border: '1px solid var(--off-white-15)', borderRadius: 2,
+                background: 'var(--off-white-07)', color: 'var(--off-white)', textDecoration: 'none',
+              }}>
+              <div style={{
+                width: 34, height: 34, borderRadius: 2, background: 'rgba(126,220,245,0.14)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                color: 'var(--accent)',
+              }}>
+                <i className="fa-brands fa-google-drive" />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.08em' }}>GOOGLE DRIVE FOLDER</div>
+                <div className="t-body" style={{ fontSize: 12, color: 'var(--off-white)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {m.dataRoomUrl}
+                </div>
+              </div>
+              <i className="fa-solid fa-arrow-up-right-from-square" style={{ color: 'var(--off-white-40)', fontSize: 10 }} />
+            </a>
+          ) : (
+            <div className="empty-line">No data room linked yet.</div>
+          )}
         </div>
 
         {/* Socials */}

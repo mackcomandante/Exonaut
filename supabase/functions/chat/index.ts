@@ -140,7 +140,16 @@ ${formattedKnowledge}
 
 ${realtimeContext ? `--- LIVE DATA ---\n${realtimeContext}\n--- END LIVE DATA ---\n` : ''}
 
-Answer clearly and helpfully. Use bullet points for lists. When asked about progress, rankings, or announcements, refer to the live data above. Keep responses under 300 words unless the question requires more detail.`;
+FORMATTING RULES (NO MARKDOWN):
+• Use bullet points (•) for lists of items
+• Use ALL CAPS for section headers (e.g., TRACKS, BADGES, etc.)
+• Add blank lines between sections
+• For long descriptions, break into short bullet points
+• Use numbered lists (1. 2. 3.) for sequences
+• Keep sentences short and scannable
+• Never use markdown syntax (**bold**, *italic*, etc.)
+
+Answer clearly and helpfully. Prioritize readability over length. When asked about progress, rankings, or announcements, refer to the live data above. Keep responses under 300 words unless the question requires more detail.`;
 }
 
 // ─── Main handler ─────────────────────────────────────────────────────────────
@@ -258,7 +267,7 @@ serve(async (req) => {
         model: 'llama-3.3-70b-versatile',
         messages,
         temperature: 0.4,
-        max_tokens: 1024,
+        max_tokens: 800,
       }),
     });
 

@@ -8,6 +8,7 @@ function Profile({ onOpenMission, onTriggerBadge }) {
     fullName: '',
     bio: '',
     linkedinUrl: '',
+    dataRoomUrl: '',
     school: '',
     expertise: '',
     avatarUrl: '',
@@ -37,6 +38,11 @@ function Profile({ onOpenMission, onTriggerBadge }) {
   useManualCredits();
 
   const byCategory = (cat) => liveBadges.filter(b => b.category === cat);
+  const openExternalUrl = (url) => {
+    const trimmed = String(url || '').trim();
+    if (!trimmed) return;
+    window.open(/^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`, '_blank', 'noopener,noreferrer');
+  };
 
   const missionSubmission = (mission) => window.getSubmissionForMission?.(mission, profile.id, cohort.id || profile.cohortId || ME.cohort);
   const approvedMissions = missions
@@ -53,6 +59,7 @@ function Profile({ onOpenMission, onTriggerBadge }) {
       fullName: displayName,
       bio: profile.bio || '',
       linkedinUrl: profile.linkedinUrl || '',
+      dataRoomUrl: profile.dataRoomUrl || '',
       school: profile.school || '',
       expertise: profile.expertise || '',
       avatarUrl: profile.avatarUrl || '',
@@ -79,6 +86,7 @@ function Profile({ onOpenMission, onTriggerBadge }) {
         fullName,
         bio: draft.bio.trim(),
         linkedinUrl: draft.linkedinUrl.trim(),
+        dataRoomUrl: draft.dataRoomUrl.trim(),
         school: draft.school.trim(),
         expertise: draft.expertise.trim(),
         avatarUrl,
@@ -112,8 +120,11 @@ function Profile({ onOpenMission, onTriggerBadge }) {
           </div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
-          <button className="btn btn-primary" disabled={!profile.linkedinUrl} onClick={() => profile.linkedinUrl && window.open(profile.linkedinUrl, '_blank', 'noopener,noreferrer')}>
+          <button className="btn btn-primary" disabled={!profile.linkedinUrl} onClick={() => openExternalUrl(profile.linkedinUrl)}>
             <i className="fa-brands fa-linkedin" /> LINKEDIN
+          </button>
+          <button className="btn btn-ghost btn-sm" disabled={!profile.dataRoomUrl} onClick={() => openExternalUrl(profile.dataRoomUrl)}>
+            <i className="fa-brands fa-google-drive" /> DATA ROOM
           </button>
           <button className="btn btn-ghost btn-sm" onClick={openEdit}>
             <i className="fa-solid fa-pen" /> EDIT
@@ -137,6 +148,10 @@ function Profile({ onOpenMission, onTriggerBadge }) {
           <label>
             <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.12em', marginBottom: 6, fontWeight: 700 }}>LINKEDIN URL</div>
             <input className="input" value={draft.linkedinUrl} onChange={(e) => setDraft(d => ({ ...d, linkedinUrl: e.target.value }))} />
+          </label>
+          <label>
+            <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.12em', marginBottom: 6, fontWeight: 700 }}>DATA ROOM URL</div>
+            <input className="input" placeholder="https://drive.google.com/drive/folders/..." value={draft.dataRoomUrl} onChange={(e) => setDraft(d => ({ ...d, dataRoomUrl: e.target.value }))} />
           </label>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <label>

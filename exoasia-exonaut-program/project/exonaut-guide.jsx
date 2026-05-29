@@ -12,6 +12,7 @@ const EXONAUT_GUIDE_SECTIONS = [
       { id: 'action-register', title: 'Access the Action Register', detail: 'Open the Google Sheet once Admin gives access.', href: 'https://docs.google.com/spreadsheets/d/14aw34EL7OZA3vqMMiFY1eEQx3X7x5_3gx9ZY8iAwT2o/edit?usp=sharing', action: 'OPEN SHEET' },
       { id: 'exonauts-sheet', title: 'Fill out the Exonauts sheet', detail: 'Enter your details on the bottom row.', href: 'https://docs.google.com/spreadsheets/d/14aw34EL7OZA3vqMMiFY1eEQx3X7x5_3gx9ZY8iAwT2o/edit?usp=sharing', action: 'OPEN SHEET' },
       { id: 'personal-tab', title: 'Create your personal tab', detail: 'Name the tab after yourself and copy the Exonaut Platform template.', href: 'https://docs.google.com/spreadsheets/d/14aw34EL7OZA3vqMMiFY1eEQx3X7x5_3gx9ZY8iAwT2o/edit?usp=sharing', action: 'OPEN SHEET' },
+      { id: 'data-room', title: 'Create Personal Data Room', detail: 'Create a personal Google Drive folder for internship files, outputs, references, and submitted work. Paste the folder link in My Profile -> Data Room URL.', href: 'https://drive.google.com/drive/my-drive', action: 'OPEN DRIVE' },
       { id: 'track-project', title: 'Wait for track and project assignment', detail: 'Admin usually assigns these after 2-3 days.', status: 'admin' },
       { id: 'teams', title: 'Install Exoasia Teams', detail: 'Coordinate with Feone for Windows or Anya for Mac account details.', href: 'https://drive.google.com/drive/folders/1IJdLMs7cv9_TPszP5B9dxfFCpoMKfikO', action: 'OPEN DRIVE' },
       { id: 'linkedin', title: 'Post your LinkedIn announcement', detail: 'Publish your new internship position announcement.', href: 'https://www.canva.com/design/DAHHWgxGNYQ/olIReujkiRcV3MvRok8cSg/edit', action: 'OPEN CANVA' },
@@ -68,7 +69,11 @@ function ExonautGuidePage() {
     try { localStorage.setItem(storageKey, JSON.stringify(checked)); } catch (e) {}
   }, [checked, storageKey]);
 
-  const doneCount = allTaskIds.filter(id => checked[id]).length;
+  const checkedWithProfile = React.useMemo(() => ({
+    ...checked,
+    ...(String(profile.dataRoomUrl || '').trim() ? { 'data-room': true } : {}),
+  }), [checked, profile.dataRoomUrl]);
+  const doneCount = allTaskIds.filter(id => checkedWithProfile[id]).length;
   const progress = allTaskIds.length ? Math.round((doneCount / allTaskIds.length) * 100) : 0;
   const toggleTask = (id) => setChecked(prev => ({ ...prev, [id]: !prev[id] }));
 
@@ -99,7 +104,7 @@ function ExonautGuidePage() {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, marginBottom: 22 }}>
         {EXONAUT_GUIDE_SECTIONS.map(section => (
-          <GuideSection key={section.id} section={section} checked={checked} onToggle={toggleTask} />
+          <GuideSection key={section.id} section={section} checked={checkedWithProfile} onToggle={toggleTask} />
         ))}
       </div>
 
