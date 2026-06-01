@@ -981,13 +981,15 @@ function ProjectWorkspacePage({ selectedProjectId = '', onBack }) {
   const projectResources = resources.filter(resource => resource.projectId === project?.id);
   const selectedAction = actions.find(task => task.id === selectedId);
   const access = project ? window.__projectStore.projectAccess(profile.id, project.id) : 'none';
-  const canManage = profile.role === 'admin' || access === 'first' || access === 'lead';
+  const canManage = profile.role === 'admin' || profile.role === 'commander' || access === 'first' || access === 'lead';
   const canEditActions = canManage || projectMembers.some(member => member.userId === profile.id);
   const nameOf = id => profiles.find(person => person.id === id)?.fullName || profiles.find(person => person.id === id)?.email || 'Unassigned';
   const complete = actions.filter(task => task.status === 'done').length;
   const blocked = actions.filter(task => task.status === 'blocked').length;
+  const launchpadEntries = useLaunchpadEntries();
+  const projectLaunchpadEntry = project ? launchpadEntries.find(entry => entry.projectId === project.id) : null;
 
-  if (!project) return <div className="enter"><div className="card-panel project-empty">No assigned projects available.</div></div>;
+  if (!project) return <div className="enter"><div className="card-panel project-empty">You are not assigned to any project yet.</div></div>;
   return (
     <div className="enter project-workspace">
       <header className="card-panel project-register-header">
@@ -1013,7 +1015,7 @@ function ProjectWorkspacePage({ selectedProjectId = '', onBack }) {
       </header>
       {error && <div className="card-panel project-error">{error}</div>}
       <nav className="project-tabs">
-        {[['register', 'Action Register'], ['overview', 'Overview'], ['resources', 'Resources'], ['activity', 'Activity']].map(([id, label]) => (
+        {[['register', 'Action Register'], ['overview', 'Overview'], ['resources', 'Resources'], ['activity', 'Activity'], ...(canManage ? [['deploy', 'Deploy']] : [])].map(([id, label]) => (
           <button key={id} className={tab === id ? 'active' : ''} onClick={() => setTab(id)}>{label}</button>
         ))}
       </nav>
@@ -1021,6 +1023,7 @@ function ProjectWorkspacePage({ selectedProjectId = '', onBack }) {
       {tab === 'overview' && <ProjectOverview actions={actions} assignees={assignees} profiles={profiles} onOpen={setSelectedId} />}
       {tab === 'resources' && <ProjectResources project={project} actions={actions} resources={projectResources} submissions={submissions.filter(item => actions.some(action => action.id === item.taskId))} profiles={profiles} canManage={canManage} />}
       {tab === 'activity' && <ProjectActivity actions={actions} activity={activity.filter(item => actions.some(action => action.id === item.taskId))} profiles={profiles} />}
+      {tab === 'deploy' && canManage && <LaunchpadDeployModal project={project} profile={profile} existingEntry={projectLaunchpadEntry} embedded />}
       {selectedAction && <ActionModal key={selectedAction.id} action={selectedAction} project={project} members={projectMembers} profiles={profiles} assignees={assignees.filter(item => item.taskId === selectedAction.id)} comments={comments.filter(item => item.taskId === selectedAction.id)} activity={activity.filter(item => item.taskId === selectedAction.id)} canManage={canManage} canEditActions={canEditActions} onClose={() => setSelectedId(null)} />}
     </div>
   );
@@ -2341,7 +2344,7 @@ function ProjectsPage() {
       </div>
       {error && <div className="card-panel project-error">{error}</div>}
       {!loaded && <div className="card-panel project-empty">Loading projects...</div>}
-      {loaded && !projects.length && <div className="card-panel project-empty">No assigned projects available.</div>}
+      {loaded && !projects.length && <div className="card-panel project-empty">You are not assigned to any project yet.</div>}
       <div className="project-card-grid">
         {projects.map(project => {
           const actions = tasks.filter(task => task.projectId === project.id);
@@ -2585,6 +2588,616 @@ function ProjectTasksPage() {
   return <ProjectWorkspacePage mode={isFirstOfficer ? 'project-lead' : 'first-officer'} />;
 }
 
+const LAUNCHPAD_KEY = 'exo:launchpad:entries';
+const LAUNCHPAD_EVENT = 'exo:launchpad:changed';
+const LAUNCHPAD_BUCKET = 'launchpad-thumbnails';
+
+function readLaunchpadEntries() {
+  try { return JSON.parse(localStorage.getItem(LAUNCHPAD_KEY) || '[]'); } catch (e) { return []; }
+}
+
+function writeLaunchpadEntries(entries) {
+  localStorage.setItem(LAUNCHPAD_KEY, JSON.stringify(entries));
+  window.dispatchEvent(new CustomEvent(LAUNCHPAD_EVENT));
+}
+
+function launchpadFromRow(row) {
+  return {
+    id: row.id,
+    title: row.title || '',
+    description: row.description || '',
+    url: row.url || '',
+    label: row.label || '',
+    thumbnail: row.thumbnail_url || '',
+    projectId: row.project_id || '',
+    projectTitle: row.project_title || '',
+    authorId: row.created_by || '',
+    authorName: row.author_name || '',
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function launchpadToRow(entry) {
+  return {
+    id: entry.id,
+    title: entry.title,
+    description: entry.description,
+    url: entry.url,
+    label: entry.label || '',
+    thumbnail_url: entry.thumbnail || '',
+    project_id: entry.projectId || '',
+    project_title: entry.projectTitle || '',
+    created_by: entry.authorId || null,
+    author_name: entry.authorName || '',
+  };
+}
+
+async function getLaunchpadAuthUserId() {
+  if (!window.__db?.auth) return '';
+  const sessionResult = await window.__db.auth.getSession();
+  return sessionResult?.data?.session?.user?.id || '';
+}
+
+async function uploadLaunchpadThumbnail(file, entryId, ownerId) {
+  if (!window.__db || !file) return '';
+  const safeName = (file.name || 'thumbnail.png').replace(/[^a-z0-9._-]/gi, '-').toLowerCase();
+  const folder = ownerId || 'anonymous';
+  const path = `${folder}/${entryId}-${Date.now()}-${safeName}`;
+  const { error } = await window.__db.storage.from(LAUNCHPAD_BUCKET).upload(path, file, {
+    cacheControl: '3600',
+    upsert: true,
+  });
+  if (error) throw error;
+  const { data } = window.__db.storage.from(LAUNCHPAD_BUCKET).getPublicUrl(path);
+  return data?.publicUrl || '';
+}
+
+function useLaunchpadEntries() {
+  const [entries, setEntries] = React.useState(readLaunchpadEntries);
+  React.useEffect(() => {
+    let active = true;
+    let channel = null;
+    async function sync() {
+      if (!window.__db) {
+        if (active) setEntries(readLaunchpadEntries());
+        return;
+      }
+      const { data, error } = await window.__db
+        .from('launchpad_links')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (!active) return;
+      if (error) {
+        console.warn('Could not load Launchpad links:', error.message || error);
+        setEntries(readLaunchpadEntries());
+        return;
+      }
+      const next = (data || []).map(launchpadFromRow);
+      localStorage.setItem(LAUNCHPAD_KEY, JSON.stringify(next));
+      setEntries(next);
+    }
+    sync();
+    window.addEventListener(LAUNCHPAD_EVENT, sync);
+    window.addEventListener('storage', sync);
+    if (window.__db) {
+      channel = window.__db
+        .channel('launchpad-links-' + Math.random().toString(36).slice(2))
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'launchpad_links' }, sync)
+        .subscribe();
+    }
+    return () => {
+      active = false;
+      window.removeEventListener(LAUNCHPAD_EVENT, sync);
+      window.removeEventListener('storage', sync);
+      if (window.__db && channel) window.__db.removeChannel(channel);
+    };
+  }, []);
+  return entries;
+}
+
+async function saveLaunchpadEntry(entry, profile) {
+  const entries = readLaunchpadEntries();
+  const next = {
+    ...entry,
+    id: entry.id || 'lp-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7),
+    createdAt: entry.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  if (window.__db) {
+    const authUserId = await getLaunchpadAuthUserId();
+    if (!authUserId) throw new Error('You must be signed in to deploy to Launchpad.');
+    if (!entry.id && next.projectId) {
+      const { data: existingRow, error: existingError } = await window.__db
+        .from('launchpad_links')
+        .select('id, created_by, created_at, thumbnail_url')
+        .eq('project_id', next.projectId)
+        .maybeSingle();
+      if (existingError) throw existingError;
+      if (existingRow?.id) {
+        next.id = existingRow.id;
+        next.authorId = existingRow.created_by || next.authorId;
+        next.createdAt = existingRow.created_at || next.createdAt;
+        next.thumbnail = next.thumbnail || existingRow.thumbnail_url || '';
+      }
+    }
+    const thumbnailUrl = entry.thumbnailFile
+      ? await uploadLaunchpadThumbnail(entry.thumbnailFile, next.id, authUserId)
+      : next.thumbnail || '';
+    const row = launchpadToRow({ ...next, thumbnail: thumbnailUrl, authorId: next.authorId || authUserId });
+    const { error } = await window.__db.from('launchpad_links').upsert(row, { onConflict: 'id' });
+    if (error) throw error;
+    window.dispatchEvent(new CustomEvent(LAUNCHPAD_EVENT));
+    return { ...next, thumbnail: thumbnailUrl, authorId: next.authorId || authUserId };
+  }
+  writeLaunchpadEntries([
+    next,
+    ...entries.filter(item => item.id !== next.id && (!next.projectId || item.projectId !== next.projectId)),
+  ]);
+  return next;
+}
+
+async function deleteLaunchpadEntry(id) {
+  if (window.__db) {
+    const { error } = await window.__db.from('launchpad_links').delete().eq('id', id);
+    if (error) {
+      console.warn('Could not delete Launchpad link:', error.message || error);
+      throw error;
+    }
+    window.dispatchEvent(new CustomEvent(LAUNCHPAD_EVENT));
+    return;
+  }
+  writeLaunchpadEntries(readLaunchpadEntries().filter(item => item.id !== id));
+}
+
+function validateLaunchpadUrl(url) {
+  try {
+    const parsed = new URL(url);
+    return /^https?:$/.test(parsed.protocol) && parsed.hostname.includes('.');
+  } catch (e) {
+    return false;
+  }
+}
+
+function canManageLaunchpadEntry(profile, entry) {
+  if (!profile || !entry) return false;
+  if (profile.role === 'admin' || profile.role === 'commander') return true;
+  if (!entry.projectId) return false;
+  const access = window.__projectStore.projectAccess(profile.id, entry.projectId);
+  return access === 'first' || access === 'lead';
+}
+
+function launchpadDraftFromEntry(project, entry) {
+  return {
+    title: entry?.title || project?.title || '',
+    description: entry?.description || project?.description || '',
+    url: entry?.url || '',
+    label: entry?.label || project?.title || '',
+    thumbnail: entry?.thumbnail || '',
+    thumbnailFile: null,
+  };
+}
+
+function LaunchpadDeployModal({ project, profile, existingEntry = null, onClose = () => {}, embedded = false }) {
+  const isEditing = Boolean(existingEntry?.id);
+  const [draft, setDraft] = React.useState(() => launchpadDraftFromEntry(project, existingEntry));
+  const [error, setError] = React.useState('');
+  const [success, setSuccess] = React.useState('');
+  const [saving, setSaving] = React.useState(false);
+  const [deleting, setDeleting] = React.useState(false);
+
+  React.useEffect(() => {
+    setDraft(launchpadDraftFromEntry(project, existingEntry));
+    setError('');
+    setSuccess('');
+  }, [project?.id, existingEntry?.id]);
+
+  function update(key, value) {
+    setDraft(current => ({ ...current, [key]: value }));
+    setSuccess('');
+  }
+
+  function handleThumbnail(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!/^image\/(png|jpeg)$/.test(file.type)) {
+      setError('Thumbnail must be a PNG or JPG image.');
+      event.target.value = '';
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = e => setDraft(current => ({ ...current, thumbnail: e.target.result, thumbnailFile: file }));
+    reader.readAsDataURL(file);
+  }
+
+  async function submit() {
+    const title = draft.title.trim();
+    const description = draft.description.trim();
+    const url = draft.url.trim();
+    const label = draft.label.trim();
+    if (!title || !description || !url) {
+      setError('Title, description, and URL are required.');
+      return;
+    }
+    if (!validateLaunchpadUrl(url)) {
+      setError('Enter a valid external URL that starts with http:// or https://.');
+      return;
+    }
+    setError('');
+    setSaving(true);
+    try {
+      await saveLaunchpadEntry({
+        id: existingEntry?.id,
+        title,
+        description,
+        url,
+        label: label || project?.title || 'Department Platform',
+        thumbnail: draft.thumbnail,
+        thumbnailFile: draft.thumbnailFile,
+        projectId: project?.id || '',
+        projectTitle: project?.title || '',
+        authorId: existingEntry?.authorId || profile?.id || '',
+        authorName: existingEntry?.authorName || profile?.fullName || profile?.email || 'Exonaut',
+        createdAt: existingEntry?.createdAt,
+      }, profile);
+      setSuccess(isEditing ? 'Launchpad resource updated.' : 'Deployed to Launchpad.');
+      setDraft(current => isEditing
+        ? ({ ...current, thumbnailFile: null })
+        : ({ ...current, url: '', thumbnail: '', thumbnailFile: null }));
+      if (!embedded) onClose();
+    } catch (err) {
+      setError(err?.message || 'Could not save this Launchpad resource. Check that the Supabase migration has been applied.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function remove() {
+    if (!existingEntry?.id || deleting) return;
+    if (!confirm('Remove this project from Launchpad? It will no longer appear on the Launchpad page.')) return;
+    setError('');
+    setSuccess('');
+    setDeleting(true);
+    try {
+      await deleteLaunchpadEntry(existingEntry.id);
+      setDraft(launchpadDraftFromEntry(project, null));
+      setSuccess('Removed from Launchpad. You can deploy it again later.');
+      if (!embedded) onClose();
+    } catch (err) {
+      setError(err?.message || 'Could not remove this Launchpad resource.');
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  const content = (
+    <>
+        <div className="modal-head">
+          <div>
+            <div className="t-label project-register-label">{isEditing ? 'MANAGE LAUNCHPAD' : 'DEPLOY TO LAUNCHPAD'}</div>
+            <h2 className="t-heading" style={{ margin: '4px 0 0' }}>{isEditing ? 'Manage Launchpad Resource' : 'Publish resource'}</h2>
+          </div>
+          {!embedded && <button type="button" className="btn btn-ghost btn-sm" onClick={onClose}><i className="fa-solid fa-xmark" /></button>}
+        </div>
+        {embedded && (
+          <p className="t-body" style={{ marginTop: -4, marginBottom: 16 }}>
+            {isEditing
+              ? 'Update how this project appears on Launchpad, or remove it if it should no longer be listed.'
+              : 'Add this project to the Launchpad so other teams can discover and open your platform.'}
+          </p>
+        )}
+        {error && <div className="project-error" style={{ marginBottom: 12 }}>{error}</div>}
+        {success && <div className="project-empty" style={{ marginBottom: 12, padding: 12 }}>{success}</div>}
+        <div className="launchpad-form-grid">
+          <label className="board-field">
+            <span>Title</span>
+            <input className="input" value={draft.title} onChange={e => update('title', e.target.value)} />
+          </label>
+          <label className="board-field">
+            <span>Department / Project Label</span>
+            <input className="input" value={draft.label} onChange={e => update('label', e.target.value)} placeholder="AI Lab, Events, Venture Studio..." />
+          </label>
+          <label className="board-field launchpad-field-full">
+            <span>External URL</span>
+            <input className="input" value={draft.url} onChange={e => update('url', e.target.value)} placeholder="https://example.com" />
+          </label>
+          <label className="board-field launchpad-field-full">
+            <span>Description</span>
+            <textarea className="textarea" rows={4} value={draft.description} onChange={e => update('description', e.target.value)} />
+          </label>
+          <label className="board-field launchpad-field-full">
+            <span>Thumbnail PNG/JPG</span>
+            <label className="launchpad-upload">
+              <i className="fa-solid fa-image" />
+              <span>{draft.thumbnailFile?.name || (draft.thumbnail ? 'Current thumbnail selected' : 'Choose PNG or JPG thumbnail')}</span>
+              <input type="file" accept="image/png,image/jpeg" onChange={handleThumbnail} />
+            </label>
+          </label>
+        </div>
+        {draft.thumbnail && (
+          <div className="launchpad-preview">
+            <img src={draft.thumbnail} alt="Launchpad thumbnail preview" />
+          </div>
+        )}
+        <div className="admin-project-modal-actions launchpad-modal-actions">
+          {isEditing && (
+            <button type="button" className="btn btn-ghost launchpad-remove-btn" onClick={remove} disabled={deleting || saving}>
+              <i className="fa-solid fa-trash" /> {deleting ? 'Removing...' : 'Remove from Launchpad'}
+            </button>
+          )}
+          {isEditing && existingEntry?.url && (
+            <button type="button" className="btn btn-ghost" onClick={() => window.open(existingEntry.url, '_blank', 'noopener,noreferrer')}>
+              <i className="fa-solid fa-arrow-up-right-from-square" /> View on Launchpad
+            </button>
+          )}
+          {!embedded && <button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button>}
+          <button type="button" className="btn btn-primary" onClick={submit} disabled={saving}>
+            <i className={isEditing ? 'fa-solid fa-floppy-disk' : 'fa-solid fa-rocket'} /> {saving ? 'Saving...' : (isEditing ? 'Save Changes' : 'Deploy to Launchpad')}
+          </button>
+        </div>
+    </>
+  );
+
+  if (embedded) {
+    return <section className="card-panel launchpad-deploy-panel">{content}</section>;
+  }
+
+  return (
+    <div className="modal-scrim" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal-body launchpad-modal" onClick={e => e.stopPropagation()}>
+        {content}
+      </div>
+    </div>
+  );
+}
+
+function LaunchpadPage() {
+  const { profile } = useCurrentUserProfile();
+  const { projects } = useProjects();
+  const entries = useLaunchpadEntries();
+  const [query, setQuery] = React.useState('');
+  const [deploying, setDeploying] = React.useState(false);
+  const [editingEntry, setEditingEntry] = React.useState(null);
+  const canManage = ['admin', 'commander'].includes(profile.role);
+  const filtered = entries.filter(entry => {
+    const q = query.trim().toLowerCase();
+    if (!q) return true;
+    return [entry.title, entry.description, entry.label, entry.projectTitle, entry.authorName]
+      .some(value => String(value || '').toLowerCase().includes(q));
+  });
+
+  return (
+    <div className="enter knowledge-page launchpad-page">
+      <div className="section-head community-header">
+        <div>
+          <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>Launchpad</h1>
+          <div className="t-body" style={{ marginTop: 6, color: 'var(--off-white-68)' }}>
+            Discover department-built websites, tools, and platforms from across the program.
+          </div>
+        </div>
+        <div className="launchpad-head-actions">
+          <label className="board-search knowledge-search">
+            <i className="fa-solid fa-magnifying-glass" />
+            <input aria-label="Search Launchpad" value={query} onChange={event => setQuery(event.target.value)} placeholder="Search Launchpad..." />
+          </label>
+          {canManage && (
+            <button type="button" className="btn btn-primary" onClick={() => setDeploying(true)}>
+              <i className="fa-solid fa-rocket" /> Deploy
+            </button>
+          )}
+        </div>
+      </div>
+
+      {filtered.length === 0 && (
+        <div className="card-panel board-empty">
+          <i className="fa-solid fa-rocket" />
+          <div>No Launchpad resources have been published yet.</div>
+        </div>
+      )}
+      <div className="knowledge-grid">
+        {filtered.map(entry => (
+          <LaunchpadCard
+            key={entry.id}
+            entry={entry}
+            canManage={canManageLaunchpadEntry(profile, entry)}
+            onEdit={() => setEditingEntry(entry)}
+            onDelete={async () => {
+              if (!confirm('Remove this Launchpad resource?')) return;
+              try {
+                await deleteLaunchpadEntry(entry.id);
+              } catch (err) {
+                alert(err?.message || 'Could not remove this Launchpad resource.');
+              }
+            }}
+          />
+        ))}
+      </div>
+      {deploying && <LaunchpadDeployModal profile={profile} onClose={() => setDeploying(false)} />}
+      {editingEntry && (
+        <LaunchpadDeployModal
+          project={projects.find(project => project.id === editingEntry.projectId) || null}
+          profile={profile}
+          existingEntry={editingEntry}
+          onClose={() => setEditingEntry(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function LaunchpadCard({ entry, canManage, onEdit, onDelete }) {
+  function openEntry() {
+    window.open(entry.url, '_blank', 'noopener,noreferrer');
+  }
+  return (
+    <article className="card-panel knowledge-card launchpad-card">
+      <button type="button" className={'knowledge-thumb ' + (!entry.thumbnail ? 'empty' : '')} onClick={openEntry} aria-label={'Open Launchpad resource: ' + entry.title}>
+        {entry.thumbnail
+          ? <img src={entry.thumbnail} alt={entry.title + ' thumbnail'} loading="lazy" />
+          : <i className="fa-solid fa-rocket" />}
+        <span><i className="fa-solid fa-arrow-up-right-from-square" /></span>
+      </button>
+      <div className="knowledge-card-body">
+        <div className="knowledge-meta">
+          <span>{entry.label || entry.projectTitle || 'Launchpad'}</span>
+          {canManage && (
+            <div className="launchpad-card-actions">
+              <button type="button" className="launchpad-delete" onClick={e => { e.stopPropagation(); onEdit(); }} title="Edit Launchpad resource">
+                <i className="fa-solid fa-pen" />
+              </button>
+              <button type="button" className="launchpad-delete" onClick={e => { e.stopPropagation(); onDelete(); }} title="Remove from Launchpad">
+                <i className="fa-solid fa-trash" />
+              </button>
+            </div>
+          )}
+        </div>
+        <h2>{entry.title}</h2>
+        <p className="launchpad-description">{entry.description}</p>
+        <div className="knowledge-author">
+          <i className="fa-solid fa-diagram-project" />
+          {entry.projectTitle || entry.authorName || 'Department platform'}
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function BadgeCertificateModal({ badge, profile, onClose }) {
+  const svgRef = React.useRef(null);
+  const [downloading, setDownloading] = React.useState(false);
+  const [copied, setCopied] = React.useState(false);
+  const cleanCode = (badge.code || 'BADGE').replace(/[^A-Z0-9]/gi, '').toUpperCase();
+  const certCode = `EXO-BADGE-${cleanCode}`;
+  const displayName = profile?.name || profile?.fullName || profile?.email || 'Exonaut';
+  const issueDate = badge.date || (badge.earnedAt ? new Date(badge.earnedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase() : 'EARNED');
+  const cohortName = profile?.cohortName || profile?.cohortId || (typeof COHORT !== 'undefined' ? COHORT.name : null) || 'Exonaut Program';
+  const color = badge.color || 'var(--lime)';
+  const caption = [
+    `Just earned the "${badge.name}" badge at Exoasia Innovation Hub.`,
+    '',
+    `${badge.subtitle || 'Badge of achievement'} · ${cohortName}`,
+    '',
+    '#Exonaut #ExoasiaHub #Innovation #Badges',
+  ].join('\n');
+
+  function copyCaption() {
+    navigator.clipboard?.writeText(caption).catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1800);
+  }
+
+  function downloadPng() {
+    const svg = svgRef.current;
+    if (!svg || downloading) return;
+    setDownloading(true);
+    const clone = svg.cloneNode(true);
+    clone.setAttribute('width', '1200');
+    clone.setAttribute('height', '750');
+    clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    const blob = new Blob([new XMLSerializer().serializeToString(clone)], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 2400;
+      canvas.height = 1500;
+      const ctx = canvas.getContext('2d');
+      ctx.scale(2, 2);
+      ctx.drawImage(img, 0, 0);
+      URL.revokeObjectURL(url);
+      const a = document.createElement('a');
+      a.download = `${certCode}.png`;
+      a.href = canvas.toDataURL('image/png');
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setDownloading(false);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      setDownloading(false);
+      alert('PNG export failed. Please try again.');
+    };
+    img.src = url;
+  }
+
+  function shareLinkedIn() {
+    copyCaption();
+    const shareUrl = 'https://www.linkedin.com/feed/?shareActive=true&text=' + encodeURIComponent(caption.slice(0, 1200));
+    window.open(shareUrl, '_blank', 'noopener,noreferrer');
+  }
+
+  return (
+    <div className="modal-scrim" onClick={e => { if (e.target === e.currentTarget) onClose(); }} style={{ zIndex: 9999 }}>
+      <div className="modal-body" onClick={e => e.stopPropagation()} style={{ width: 'min(900px, 94vw)', maxWidth: 900 }}>
+        <div className="modal-head">
+          <div>
+            <div className="t-label" style={{ color }}>BADGE CERTIFICATE</div>
+            <h2 className="t-heading" style={{ margin: '4px 0 0' }}>{badge.name}</h2>
+          </div>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={onClose} aria-label="Close certificate">
+            <i className="fa-solid fa-xmark" />
+          </button>
+        </div>
+
+        <svg ref={svgRef} viewBox="0 0 1200 750" xmlns="http://www.w3.org/2000/svg"
+          style={{ width: '100%', display: 'block', borderRadius: 8, border: '1px solid var(--off-white-15)' }}>
+          <defs>
+            <radialGradient id={`cert-bg-${cleanCode}`} cx="22%" cy="44%" r="82%">
+              <stop offset="0%" stopColor={color} stopOpacity="0.18" />
+              <stop offset="100%" stopColor="#14161A" stopOpacity="1" />
+            </radialGradient>
+            <filter id={`cert-glow-${cleanCode}`}>
+              <feGaussianBlur stdDeviation="5" result="blur" />
+              <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+            </filter>
+          </defs>
+          <rect width="1200" height="750" fill="#14161A" rx="16" />
+          <rect width="1200" height="750" fill={`url(#cert-bg-${cleanCode})`} rx="16" />
+          <rect x="28" y="28" width="1144" height="694" fill="none" stroke={color} strokeWidth="2" strokeOpacity="0.45" rx="10" />
+          <rect x="48" y="48" width="1104" height="654" fill="none" stroke="#F5F2EC" strokeWidth="1" strokeOpacity="0.12" rx="6" />
+
+          <text x="600" y="90" textAnchor="middle" fontFamily="Montserrat, sans-serif" fontSize="18" fontWeight="800" fill={color} letterSpacing="8">EXOASIA INNOVATION HUB</text>
+          <text x="600" y="122" textAnchor="middle" fontFamily="JetBrains Mono, monospace" fontSize="13" fill="#F5F2EC" opacity="0.45" letterSpacing="4">BADGE OF ACHIEVEMENT</text>
+
+          <g transform="translate(148 238)">
+            <circle cx="150" cy="150" r="138" fill={color} fillOpacity="0.08" stroke={color} strokeWidth="3" strokeOpacity="0.75" filter={`url(#cert-glow-${cleanCode})`} />
+            <circle cx="150" cy="150" r="104" fill="#0A0B0E" stroke={color} strokeWidth="1.5" strokeOpacity="0.35" />
+            <text x="150" y="166" textAnchor="middle" fontFamily="JetBrains Mono, monospace" fontSize="52" fontWeight="900" fill={color}>{(badge.code || '').split('-')[1] || 'EXO'}</text>
+            <text x="150" y="198" textAnchor="middle" fontFamily="JetBrains Mono, monospace" fontSize="14" fontWeight="700" fill={color} opacity="0.62" letterSpacing="5">{(badge.category || 'BADGE').toUpperCase()}</text>
+          </g>
+
+          <line x1="455" y1="190" x2="455" y2="610" stroke={color} strokeWidth="1" strokeOpacity="0.25" />
+          <text x="510" y="245" fontFamily="EB Garamond, serif" fontSize="30" fontStyle="italic" fill="#F5F2EC" opacity="0.55">This certifies that</text>
+          <text x="510" y="325" fontFamily="Montserrat, sans-serif" fontSize="58" fontWeight="900" fill="#F5F2EC">{displayName}</text>
+          <line x1="510" y1="348" x2="1085" y2="348" stroke="#F5F2EC" strokeWidth="1" strokeOpacity="0.12" />
+          <text x="510" y="396" fontFamily="EB Garamond, serif" fontSize="25" fontStyle="italic" fill="#F5F2EC" opacity="0.46">has earned the</text>
+          <text x="510" y="480" fontFamily="Montserrat, sans-serif" fontSize={badge.name.length > 22 ? 42 : 54} fontWeight="900" fill={color} filter={`url(#cert-glow-${cleanCode})`}>{badge.name.toUpperCase()}</text>
+          <text x="510" y="518" fontFamily="JetBrains Mono, monospace" fontSize="16" fill={color} opacity="0.62" letterSpacing="4">{(badge.subtitle || 'EXONAUT BADGE').toUpperCase()}</text>
+
+          <text x="510" y="590" fontFamily="JetBrains Mono, monospace" fontSize="14" fill="#F5F2EC" opacity="0.36" letterSpacing="2">ISSUED · {issueDate}</text>
+          <text x="510" y="622" fontFamily="JetBrains Mono, monospace" fontSize="13" fill="#F5F2EC" opacity="0.25" letterSpacing="2">{certCode}</text>
+          <text x="960" y="588" textAnchor="middle" fontFamily="Montserrat, sans-serif" fontSize="18" fontWeight="700" fill="#F5F2EC" opacity="0.46">Mack Comandante</text>
+          <line x1="860" y1="562" x2="1060" y2="562" stroke="#F5F2EC" strokeWidth="1" strokeOpacity="0.18" />
+          <text x="960" y="620" textAnchor="middle" fontFamily="JetBrains Mono, monospace" fontSize="12" fill="#F5F2EC" opacity="0.28" letterSpacing="3">MISSION COMMANDER</text>
+        </svg>
+
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 14 }}>
+          <button type="button" className="btn btn-primary" onClick={downloadPng} disabled={downloading}>
+            <i className={downloading ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-download'} /> {downloading ? 'EXPORTING...' : 'DOWNLOAD PNG'}
+          </button>
+          <button type="button" className="btn btn-ghost" onClick={shareLinkedIn}>
+            <i className="fa-brands fa-linkedin" /> SHARE ON LINKEDIN
+          </button>
+          <button type="button" className="btn btn-ghost" onClick={copyCaption}>
+            <i className={copied ? 'fa-solid fa-check' : 'fa-regular fa-copy'} /> {copied ? 'CAPTION COPIED' : 'COPY CAPTION'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function CertificatesBadgesPage() {
   const { profile } = useCurrentUserProfile();
   const { total, breakdown } = useUserPoints(profile.id);
@@ -2592,12 +3205,13 @@ function CertificatesBadgesPage() {
   const next = MILESTONES.find(m => total < m.at);
   const certificateReady = total >= 900;
   const [selectedCategory, setSelectedCategory] = React.useState('milestone');
+  const [selectedBadge, setSelectedBadge] = React.useState(null);
   const badgeCategories = [
     {
       id: 'milestone',
       title: 'Milestone Tier Badges',
       meta: '4 Badges · Automatic',
-      description: 'Triggered automatically by total point thresholds. All include a PDF certificate.',
+      description: 'Triggered automatically by total point thresholds. Earned badges include a downloadable PNG certificate.',
       icon: 'fa-chart-line',
       items: [
         { name: 'Bronze Builder', detail: '100 total points · Automatic system trigger' },
@@ -2610,7 +3224,7 @@ function CertificatesBadgesPage() {
       id: 'track',
       title: 'Track Completion Badges',
       meta: '7 Badges · Automatic',
-      description: 'Awarded when every mission in the assigned track is graded Good or Excellent. Triggered upon final mission approval. All include a PDF certificate.',
+      description: 'Awarded when every mission in the assigned track is graded Good or Excellent. Earned badges include a downloadable PNG certificate.',
       icon: 'fa-route',
       items: [
         { name: 'AI Strategist', detail: 'Track 01 · AI Strategy' },
@@ -2658,14 +3272,14 @@ function CertificatesBadgesPage() {
     <div className="enter">
       <div className="section-head">
         <div>
-          <div className="t-label" style={{ marginBottom: 8 }}>EXONAUT Â· CERTIFICATES & BADGES</div>
-          <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>Credentials</h1>
-          <div className="t-body" style={{ marginTop: 6 }}>Track your certificate status, badge progress, and approved point total.</div>
+          <div className="t-label" style={{ marginBottom: 8 }}>EXONAUT Â· BADGES</div>
+          <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>Badges</h1>
+          <div className="t-body" style={{ marginTop: 6 }}>Track badge progress, open earned badge certificates, and share wins to LinkedIn.</div>
         </div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr', gap: 18, marginBottom: 20 }}>
         <div className="card-panel" style={{ padding: 24 }}>
-          <div className="t-label" style={{ color: certificateReady ? 'var(--lime)' : 'var(--off-white-40)', marginBottom: 10 }}>CERTIFICATE STATUS</div>
+          <div className="t-label" style={{ color: certificateReady ? 'var(--lime)' : 'var(--off-white-40)', marginBottom: 10 }}>BADGE STATUS</div>
           <h2 className="t-title" style={{ fontSize: 28, margin: 0 }}>{certificateReady ? 'Ready for Issue' : 'In Progress'}</h2>
           <div className="t-body" style={{ marginTop: 8 }}>{certificateReady ? 'You have reached the certificate threshold.' : `${Math.max(0, 900 - total)} points until certificate eligibility.`}</div>
           <div style={{ height: 8, background: 'var(--off-white-07)', borderRadius: 4, overflow: 'hidden', marginTop: 18 }}>
@@ -2714,13 +3328,34 @@ function CertificatesBadgesPage() {
       </div>
       <div className="badge-grid">
         {categoryBadges.map(b => (
-          <div key={b.code} className={'badge' + (!b.earned ? ' locked' : '')}>
+          <div
+            key={b.code}
+            className={'badge' + (!b.earned ? ' locked' : '')}
+            role={b.earned ? 'button' : undefined}
+            tabIndex={b.earned ? 0 : undefined}
+            title={b.earned ? 'Open badge certificate' : 'Locked'}
+            onClick={b.earned ? () => setSelectedBadge(b) : undefined}
+            onKeyDown={(e) => {
+              if (b.earned && (e.key === 'Enter' || e.key === ' ')) {
+                e.preventDefault();
+                setSelectedBadge(b);
+              }
+            }}
+            style={{ cursor: b.earned ? 'pointer' : 'default' }}
+          >
             <div className="badge-medallion"><BadgeMedallion badge={b} size={60} /></div>
             <div className="badge-name">{b.name}</div>
             {b.earned ? <div className="badge-date">{b.date || 'EARNED'}</div> : <div className="badge-locked-label"><i className="fa-solid fa-lock" style={{ fontSize: 8, marginRight: 4 }} />LOCKED</div>}
           </div>
         ))}
       </div>
+      {selectedBadge && (
+        <BadgeCertificateModal
+          badge={selectedBadge}
+          profile={profile}
+          onClose={() => setSelectedBadge(null)}
+        />
+      )}
     </div>
   );
 }
@@ -2733,5 +3368,6 @@ Object.assign(window, {
   SecondOfficerDelegationInboxPage,
   FirstOfficerProjectsPage,
   ProjectTasksPage,
+  LaunchpadPage,
   CertificatesBadgesPage,
 });

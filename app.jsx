@@ -96,7 +96,7 @@ function App() {
     missions:    ['EXONAUT', 'Track'],
     community:   ['EXONAUT', 'Community'],
     'message-board': ['EXONAUT', 'Thread'],
-    certs:       ['EXONAUT', 'Certs & Badges'],
+    certs:       ['EXONAUT', 'Badges'],
     projects:    ['EXONAUT', 'Projects'],
     kudos:       ['EXONAUT', 'Kudos'],
     rituals:     ['EXONAUT', 'Rituals'],

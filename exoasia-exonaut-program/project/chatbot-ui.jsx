@@ -5,7 +5,7 @@
   const WELCOME = {
     id: 'welcome',
     role: 'assistant',
-    content: "Hi! I'm EXO-BOT. Ask me anything about the program — missions, badges, rituals, how points work, and more.",
+    content: "Hi! I'm EX-O. Ask me anything about the program — missions, badges, rituals, how points work, and more.",
     time: new Date().toISOString(),
   };
 
@@ -112,7 +112,7 @@
           <div className="chatbot-header-left">
             <div className="chatbot-header-icon"><i className="fa-solid fa-robot" /></div>
             <div>
-              <div className="chatbot-header-title">EXO-BOT</div>
+              <div className="chatbot-header-title">EX-O</div>
               <div className="chatbot-header-sub">Program Assistant</div>
             </div>
           </div>
@@ -164,7 +164,7 @@
         <button
           className="floating-action floating-chatbot"
           onClick={() => setOpen(v => !v)}
-          title="EXO-BOT"
+          title="EX-O"
           style={{
             position: 'fixed', bottom: 20, right: 136, zIndex: 140,
             background: open ? 'var(--accent)' : 'var(--bg-darkest)',

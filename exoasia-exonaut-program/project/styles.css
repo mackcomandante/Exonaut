@@ -4561,6 +4561,180 @@ body[data-theme="dark"] .board-mention { color: var(--accent); }
   color: var(--accent-deep);
   font-size: 10px;
 }
+.launchpad-head-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.launchpad-card .knowledge-thumb {
+  border: 0;
+  width: 100%;
+  cursor: pointer;
+}
+.launchpad-description {
+  margin: -2px 0 0;
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.launchpad-delete {
+  border: 0;
+  background: transparent;
+  color: var(--ink-faint);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 2px 4px;
+}
+.launchpad-delete:hover {
+  color: var(--red);
+}
+.launchpad-card-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.launchpad-card-actions .launchpad-delete:first-child:hover {
+  color: var(--cyan);
+}
+.launchpad-remove-btn:hover {
+  border-color: rgba(255, 105, 105, 0.45);
+  color: var(--red);
+}
+.launchpad-modal {
+  width: min(860px, 94vw);
+  max-height: min(840px, calc(100vh - 56px));
+  padding: 28px;
+}
+.launchpad-modal .modal-head,
+.launchpad-deploy-panel .modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 16px;
+}
+.launchpad-modal .modal-head h2,
+.launchpad-deploy-panel .modal-head h2 {
+  font-size: 28px;
+  line-height: 1.15;
+}
+.launchpad-modal .modal-head .btn-sm {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 999px;
+}
+.launchpad-deploy-panel {
+  padding: 22px;
+}
+.launchpad-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.launchpad-field-full {
+  grid-column: 1 / -1;
+}
+.launchpad-upload {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 58px;
+  padding: 0 18px;
+  border: 1px dashed var(--hairline-strong);
+  border-radius: var(--radius-md);
+  background: var(--bg-maroon);
+  color: var(--ink-soft);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 800;
+}
+.launchpad-upload:hover {
+  border-color: var(--accent);
+  background: var(--accent-wash);
+  color: var(--ink);
+}
+.launchpad-upload i {
+  color: var(--accent-deep);
+}
+.launchpad-upload input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+.launchpad-preview {
+  display: grid;
+  place-items: center;
+  margin-top: 4px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--bg-maroon);
+}
+.launchpad-preview img {
+  display: block;
+  width: 100%;
+  max-height: 180px;
+  object-fit: cover;
+}
+.launchpad-modal-actions {
+  position: sticky;
+  bottom: -28px;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: flex-end;
+  margin: 20px -28px -28px;
+  padding: 16px 28px 20px;
+  border-top: 1px solid var(--hairline);
+  background: linear-gradient(180deg, rgba(20, 22, 32, 0.92), var(--card-base));
+}
+.launchpad-deploy-panel .launchpad-modal-actions {
+  position: static;
+  margin: 18px 0 0;
+  padding: 0;
+  border-top: 0;
+  background: transparent;
+}
+.launchpad-modal-actions .btn {
+  white-space: nowrap;
+}
+.launchpad-modal-actions .launchpad-remove-btn {
+  margin-right: auto;
+}
+@media (max-width: 640px) {
+  .launchpad-form-grid {
+    grid-template-columns: 1fr;
+  }
+  .launchpad-modal {
+    width: 94vw;
+    padding: 20px;
+  }
+  .launchpad-modal-actions {
+    bottom: -20px;
+    margin: 16px -20px -20px;
+    padding: 14px 20px 18px;
+  }
+  .launchpad-modal-actions .btn,
+  .launchpad-modal-actions .launchpad-remove-btn {
+    width: 100%;
+    margin-right: 0;
+  }
+  .launchpad-head-actions {
+    justify-content: stretch;
+  }
+  .launchpad-head-actions .board-search,
+  .launchpad-head-actions .btn {
+    width: 100%;
+  }
+}
 @media (max-width: 940px) {
   .community-page.board-view {
     display: block;

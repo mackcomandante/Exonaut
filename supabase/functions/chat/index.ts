@@ -256,31 +256,49 @@ serve(async (req) => {
       { role: 'user' as const, content: message },
     ];
 
-    // 9. Call Groq API (OpenAI-compatible)
-    const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${GROQ_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        messages,
-        temperature: 0.4,
-        max_tokens: 800,
-      }),
-    });
+    // 9. Call Groq API with model fallback chain (smartest → dumbest)
+    const GROQ_MODELS = [
+      'groq/compound',
+      'llama-3.3-70b-versatile',
+      'openai/gpt-oss-120b',
+      'openai/gpt-oss-20b',
+      'meta-llama/llama-4-scout-17b-16e-instruct',
+      'qwen/qwen3-32b',
+      'llama-3.1-8b-instant',
+      'allam-2-7b',
+    ];
 
-    if (!groqRes.ok) {
+    let groqData: any = null;
+
+    for (const model of GROQ_MODELS) {
+      const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${GROQ_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ model, messages, temperature: 0.4, max_tokens: 800 }),
+      });
+
+      if (groqRes.ok) {
+        groqData = await groqRes.json();
+        break;
+      }
+
       const errText = await groqRes.text();
-      console.error('Groq API error:', errText);
+      console.error(`Groq model ${model} failed (${groqRes.status}):`, errText);
+
+      // Fall through on rate-limit (429), payload too large (413), or server errors (5xx)
+      if (groqRes.status !== 429 && groqRes.status !== 413 && groqRes.status < 500) break;
+    }
+
+    if (!groqData) {
       return new Response(
-        JSON.stringify({ error: 'AI service unavailable. Please try again.' }),
+        JSON.stringify({ error: 'AI service unavailable. Please try again later.' }),
         { status: 502, headers: { ...CORS, 'Content-Type': 'application/json' } }
       );
     }
 
-    const groqData = await groqRes.json();
     const answer = groqData.choices?.[0]?.message?.content
       ?? 'Sorry, I could not generate a response. Please try again.';
 

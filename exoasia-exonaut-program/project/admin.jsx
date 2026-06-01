@@ -392,7 +392,13 @@ function PlatformAdminSidebar({ current, onNavigate, onSignOut, mobileOpen = fal
       label: 'Communication',
       links: [
         { id: 'pa-announce', label: 'Announcements',      icon: 'fa-bullhorn' },
+      ],
+    },
+    {
+      label: 'Resources',
+      links: [
         { id: 'knowledge-base', label: 'Knowledge Base',  icon: 'fa-book-open' },
+        { id: 'launchpad', label: 'Launchpad', icon: 'fa-rocket' },
       ],
     },
     {

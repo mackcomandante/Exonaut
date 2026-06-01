@@ -54,11 +54,7 @@ function Sidebar({ current, onNavigate, onSignOut, mobileOpen = false, onMobileC
   const { unreadCount } = useNotifications(profile);
   const { unreadCount: messageUnread } = useMessages(profile);
   useCrownState();
-  const projectState = useProjects();
   const crown = window.__crownStore.getUserCrown(profile.id);
-  const isFirstOfficer = window.__projectStore.userIsFirstOfficer(profile.id);
-  const hasAssignedProject = window.__projectStore.visibleProjects(profile).length > 0;
-  const hasProjectTasks = window.__projectStore.firstOfficerTasks(profile.id).length || projectState.assignees.some(a => a.userId === profile.id);
   const displayName = profile.fullName || ME.name;
   const { total: livePoints } = useComputedPoints(profile.id);
   const missions = useMissions();
@@ -86,12 +82,12 @@ function Sidebar({ current, onNavigate, onSignOut, mobileOpen = false, onMobileC
   const links = [
     { id: 'dashboard',   label: 'Dashboard',   icon: 'fa-gauge-high' },
     { id: 'missions',    label: 'Track',       icon: 'fa-bullseye', count: activeTrackCount },
+    { id: 'projects',    label: 'Projects',    icon: 'fa-diagram-project' },
     { id: 'leaderboard', label: 'Leaderboard', icon: 'fa-ranking-star' },
-    { id: 'credentials', label: 'Certificates', icon: 'fa-certificate' },
+    { id: 'credentials', label: 'Badges', icon: 'fa-medal' },
   ];
   const ops = [
     { id: 'community',   label: 'Community',    icon: 'fa-users' },
-    { id: 'knowledge-base', label: 'Knowledge Base', icon: 'fa-book-open' },
     { id: 'kudos',       label: 'Kudos',        icon: 'fa-hand-sparkles' },
     { id: 'rituals',     label: 'Rituals',      icon: 'fa-calendar-check' },
     { id: 'announce',    label: 'Announcements',icon: 'fa-bullhorn' },
@@ -140,7 +136,7 @@ function Sidebar({ current, onNavigate, onSignOut, mobileOpen = false, onMobileC
         <div className="sidebar-nav-section">Program</div>
         {links.map(l => (
           <button type="button" key={l.id}
-               className={'sidebar-link' + (current === l.id ? ' active' : '')}
+               className={'sidebar-link' + (current === l.id || (l.id === 'projects' && ['first-projects', 'project-tasks'].includes(current)) ? ' active' : '')}
                onClick={() => onNavigate(l.id)}>
             <i className={'fa-solid ' + l.icon} />
             <span>{l.label}</span>
@@ -156,6 +152,15 @@ function Sidebar({ current, onNavigate, onSignOut, mobileOpen = false, onMobileC
             <span>{l.label}</span>
           </button>
         ))}
+        <div className="sidebar-nav-section">Resources</div>
+        <button type="button" className={'sidebar-link' + (current === 'knowledge-base' ? ' active' : '')} onClick={() => onNavigate('knowledge-base')}>
+          <i className="fa-solid fa-book-open" />
+          <span>Knowledge Base</span>
+        </button>
+        <button type="button" className={'sidebar-link' + (current === 'launchpad' ? ' active' : '')} onClick={() => onNavigate('launchpad')}>
+          <i className="fa-solid fa-rocket" />
+          <span>Launchpad</span>
+        </button>
         {crown && (
           <>
             <div className="sidebar-nav-section" style={{ color: 'var(--platinum)' }}>
@@ -169,15 +174,6 @@ function Sidebar({ current, onNavigate, onSignOut, mobileOpen = false, onMobileC
                 <span>{l.label}</span>
               </button>
             ))}
-          </>
-        )}
-        {(hasAssignedProject || isFirstOfficer || hasProjectTasks) && (
-          <>
-            <div className="sidebar-nav-section" style={{ color: 'var(--accent)' }}>Projects</div>
-            <button type="button" className={'sidebar-link' + (['projects', 'first-projects', 'project-tasks'].includes(current) ? ' active' : '')} onClick={() => onNavigate('projects')}>
-              <i className="fa-solid fa-diagram-project" />
-              <span>Projects</span>
-            </button>
           </>
         )}
       </nav>

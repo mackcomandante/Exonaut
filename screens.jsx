@@ -1418,7 +1418,7 @@ function CommunityProfileSheet({ m, onClose }) {
   );
 }
 
-// ========== CERTIFICATES & BADGES ==========
+// ========== BADGES ==========
 const TIER_ORDER = ['entry', 'builder', 'prime', 'elite', 'apex'];
 
 function TierCard({ tierKey, tierData, earned, currentPts, isCurrentTier }) {
@@ -1479,17 +1479,28 @@ function BadgeCard({ badge, earned, currentPts, cohortName }) {
     return null;
   })();
   const remaining = ptsNeeded != null ? Math.max(0, ptsNeeded - currentPts) : null;
-  const linkedInUrl = `https://www.linkedin.com/sharing/share-offsite/?url=https://exoasia.hub&title=${encodeURIComponent(`I earned the "${badge.name}" badge on the Exoasia Exonaut Portal!`)}`;
   const [showCert, setShowCert] = React.useState(false);
 
   return (
-    <div style={{
+    <div
+      role={earned ? 'button' : undefined}
+      tabIndex={earned ? 0 : undefined}
+      title={earned ? 'Open certificate' : 'Locked'}
+      onClick={earned ? () => setShowCert(true) : undefined}
+      onKeyDown={(e) => {
+        if (earned && (e.key === 'Enter' || e.key === ' ')) {
+          e.preventDefault();
+          setShowCert(true);
+        }
+      }}
+      style={{
       padding: '14px 16px',
       border: `1px solid ${earned ? badge.color + '50' : 'var(--off-white-15)'}`,
       borderRadius: 6,
       background: earned ? `${badge.color}06` : 'transparent',
       display: 'flex', alignItems: 'center', gap: 16,
       transition: 'all 0.2s',
+      cursor: earned ? 'pointer' : 'default',
     }}>
       {/* Badge SVG thumbnail */}
       <div style={{ width: 72, flexShrink: 0 }}>
@@ -1513,32 +1524,32 @@ function BadgeCard({ badge, earned, currentPts, cohortName }) {
         </div>
         {earned && (
           <div style={{ display:'flex', gap:8, marginTop:8, flexWrap:'wrap' }}>
-            <button onClick={() => setShowCert(true)}
+            <button onClick={(e) => { e.stopPropagation(); setShowCert(true); }}
               style={{ display:'inline-flex', alignItems:'center', gap:5, padding:'4px 10px',
                        background:'rgba(255,255,255,0.07)', border:'1px solid rgba(255,255,255,0.15)',
                        borderRadius:3, color:'rgba(255,255,255,0.8)', fontFamily:'var(--font-mono)',
                        fontSize:9, fontWeight:700, cursor:'pointer', letterSpacing:'0.06em' }}>
               <i className="fa-solid fa-certificate"/>VIEW CERT
             </button>
-            <a href={linkedInUrl} target="_blank" rel="noreferrer"
+            <button onClick={(e) => { e.stopPropagation(); setShowCert(true); }}
               style={{ display:'inline-flex', alignItems:'center', gap:5,
-                       padding:'4px 10px', background:'#0A66C2', borderRadius:3,
+                       padding:'4px 10px', background:'#0A66C2', border:'none', borderRadius:3,
                        color:'#fff', fontFamily:'var(--font-mono)', fontSize:9,
-                       fontWeight:700, textDecoration:'none', letterSpacing:'0.06em' }}>
+                       fontWeight:700, cursor:'pointer', letterSpacing:'0.06em' }}>
               <i className="fa-brands fa-linkedin"/>SHARE
-            </a>
+            </button>
           </div>
         )}
       </div>
 
       {/* ── Full badge certificate modal ── */}
       {showCert && earned && (
-        <div onClick={e => { if (e.target===e.currentTarget) setShowCert(false); }}
+        <div onClick={e => { e.stopPropagation(); if (e.target===e.currentTarget) setShowCert(false); }}
           style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.8)',
                    display:'flex', alignItems:'center', justifyContent:'center',
                    zIndex:9999, padding:20 }}>
           <div style={{ width:'100%', maxWidth:760, position:'relative' }}>
-            <button onClick={() => setShowCert(false)}
+            <button onClick={(e) => { e.stopPropagation(); setShowCert(false); }}
               style={{ position:'absolute', top:-36, right:0, background:'none', border:'none',
                        color:'rgba(255,255,255,0.5)', cursor:'pointer', fontSize:22 }}>✕</button>
             {window.BadgeCertificate
@@ -1580,7 +1591,7 @@ function CertsBadgesPage() {
       <div className="section-head">
         <div>
           <div className="t-label" style={{ marginBottom: 8 }}>YOUR ACHIEVEMENTS</div>
-          <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>Certs & Badges</h1>
+          <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>Badges</h1>
         </div>
         <div style={{ textAlign: 'right' }}>
           <div className="t-mono" style={{ fontSize: 18, fontWeight: 700, color: 'var(--ink)' }}>{currentPts} PTS</div>
