@@ -264,6 +264,46 @@
     return logToRecord(log);
   }
 
+  async function deleteLog(logId, options = {}) {
+    const log = state.logs.find(item => item.id === logId);
+    if (!log) return null;
+    const previous = state.logs;
+    state.logs = state.logs.filter(item => item.id !== logId);
+    notify();
+
+    try {
+      if (window.__db) {
+        const { error } = await window.__db.from('ritual_logs').delete().eq('id', logId);
+        if (error) throw error;
+      }
+
+      if (window.__pointsStore) {
+        const pointId = 'pts-ritual-' + weekKey(log.week) + '-' + log.ritualId + '-' + log.userId;
+        if (window.__db && typeof window.__pointsStore.refresh === 'function') {
+          await window.__pointsStore.refresh();
+        } else if (typeof window.__pointsStore.remove === 'function') {
+          await window.__pointsStore.remove(pointId);
+        } else if (typeof window.__pointsStore.removeWhere === 'function') {
+          await window.__pointsStore.removeWhere(entry =>
+            entry.userId === log.userId &&
+            entry.sourceType === 'ritual' &&
+            entry.sourceId === weekKey(log.week) + ':' + log.ritualId
+          );
+        }
+      }
+      return log;
+    } catch (err) {
+      state.logs = previous;
+      notify();
+      throw err;
+    }
+  }
+
+  async function deleteLogForThreadPost(post) {
+    if (!post || post.sourceType !== 'ritual' || !post.sourceId) return null;
+    return deleteLog(post.sourceId);
+  }
+
   window.__ritualStore = {
     subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
     logs() { return state.logs; },
@@ -271,6 +311,8 @@
     recordsFor,
     historyFor,
     completeRitual,
+    deleteLog,
+    deleteLogForThreadPost,
     refreshRemote,
     weekKey,
   };

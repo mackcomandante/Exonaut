@@ -2877,7 +2877,7 @@ function LaunchpadDeployModal({ project, profile, existingEntry = null, onClose 
             <div className="t-label project-register-label">{isEditing ? 'MANAGE LAUNCHPAD' : 'DEPLOY TO LAUNCHPAD'}</div>
             <h2 className="t-heading" style={{ margin: '4px 0 0' }}>{isEditing ? 'Manage Launchpad Resource' : 'Publish resource'}</h2>
           </div>
-          {!embedded && <button type="button" className="btn btn-ghost btn-sm" onClick={onClose}><i className="fa-solid fa-xmark" /></button>}
+          {!embedded && <button type="button" className="btn btn-ghost btn-sm launchpad-modal-close" onClick={onClose} aria-label="Close Launchpad editor"><i className="fa-solid fa-xmark" /></button>}
         </div>
         {embedded && (
           <p className="t-body" style={{ marginTop: -4, marginBottom: 16 }}>

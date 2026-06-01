@@ -38,6 +38,15 @@ ON public.ritual_logs
 FOR INSERT
 WITH CHECK (user_id = auth.uid());
 
+DROP POLICY IF EXISTS "ritual_logs_delete_own_or_staff" ON public.ritual_logs;
+CREATE POLICY "ritual_logs_delete_own_or_staff"
+ON public.ritual_logs
+FOR DELETE
+USING (
+  user_id = auth.uid()
+  OR public.has_any_role(ARRAY['commander', 'admin'])
+);
+
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('ritual-proofs', 'ritual-proofs', false)
 ON CONFLICT (id) DO NOTHING;

@@ -227,7 +227,7 @@ function App() {
     'lead-queue':  ['LEAD', 'Review Queue'],
     'lead-grade':  ['LEAD', 'Grade Submission'],
     'lead-manual-credit': ['LEAD', 'Manual Activity Credit'],
-    'lead-announce': ['LEAD', 'Announcements'],
+    'lead-announce': ['TRACK OPS', 'Announce'],
     'lead-projects': ['LEAD', 'Projects'],
     'lead-project-tasks': ['LEAD', 'Projects'],
     'lead-removals': ['TRACK OPS', 'Removals'],
@@ -450,7 +450,7 @@ function LeadSidebar({ current, onNavigate, onSignOut, mobileOpen = false, onMob
     { id: 'lead-roster', label: 'Roster',        icon: 'fa-users' },
     { id: 'lead-projects', label: 'Projects',    icon: 'fa-diagram-project' },
     { id: 'lead-manual-credit', label: 'Manual Credit', icon: 'fa-clipboard-check' },
-    { id: 'lead-announce', label: 'Announcements', icon: 'fa-bullhorn' },
+    { id: 'lead-announce', label: 'Announce', icon: 'fa-bullhorn' },
     { id: 'kudos',       label: 'Kudos',         icon: 'fa-hand-sparkles' },
   ];
   return (

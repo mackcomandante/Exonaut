@@ -389,14 +389,23 @@
     },
     async deletePost(postId, profile) {
       const previous = state.posts;
+      const deletedPost = state.posts.find(post => post.id === postId);
       state.posts = state.posts.filter(post => post.id !== postId);
       notify();
-      if (!window.__db) return;
+      if (!window.__db) {
+        if (deletedPost?.sourceType === 'ritual' && window.__ritualStore?.deleteLogForThreadPost) {
+          await window.__ritualStore.deleteLogForThreadPost(deletedPost);
+        }
+        return;
+      }
       const result = await window.__db.from('community_posts').delete().eq('id', postId);
       if (result.error) {
         state.posts = previous;
         notify();
         throw result.error;
+      }
+      if (deletedPost?.sourceType === 'ritual' && window.__ritualStore?.deleteLogForThreadPost) {
+        await window.__ritualStore.deleteLogForThreadPost(deletedPost);
       }
       await refresh(profile);
     },

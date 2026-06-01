@@ -4272,6 +4272,18 @@ body[data-theme="dark"] .board-mention { color: var(--accent); }
 .board-media-grid.count-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .board-media-grid.count-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .board-media-grid.count-3 > :first-child { grid-row: span 2; }
+.board-media-image-button {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: zoom-in;
+}
+.board-media-image-button:hover img {
+  border-color: var(--accent);
+  filter: brightness(1.08);
+}
 .board-media-grid img,
 .board-media-grid video {
   width: 100%;
@@ -4281,6 +4293,43 @@ body[data-theme="dark"] .board-mention { color: var(--accent); }
   background: var(--deep-black);
   border: 1px solid var(--hairline);
   border-radius: var(--radius-sm);
+}
+.board-image-viewer {
+  z-index: 1200;
+  padding: 26px;
+}
+.board-image-viewer-frame {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: min(1120px, 96vw);
+  max-height: 92vh;
+  padding: 18px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-lg);
+  background: rgba(14, 15, 24, 0.96);
+  box-shadow: var(--shadow-lg);
+}
+.board-image-viewer-frame img {
+  width: auto;
+  max-width: 100%;
+  max-height: calc(92vh - 84px);
+  object-fit: contain;
+  border-radius: var(--radius-md);
+}
+.board-image-viewer-close {
+  top: 14px;
+  right: 14px;
+  z-index: 2;
+}
+.board-image-viewer-caption {
+  width: 100%;
+  margin-top: 12px;
+  color: var(--ink-muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+  overflow-wrap: anywhere;
 }
 .board-post-actions {
   display: flex;
@@ -4607,6 +4656,9 @@ body[data-theme="dark"] .board-mention { color: var(--accent); }
   max-height: min(840px, calc(100vh - 56px));
   padding: 28px;
 }
+.launchpad-modal .modal-head {
+  padding-right: 54px;
+}
 .launchpad-modal .modal-head,
 .launchpad-deploy-panel .modal-head {
   display: flex;
@@ -4620,12 +4672,21 @@ body[data-theme="dark"] .board-mention { color: var(--accent); }
   font-size: 28px;
   line-height: 1.15;
 }
-.launchpad-modal .modal-head .btn-sm {
-  flex: 0 0 auto;
+.launchpad-modal-close {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  display: grid;
+  place-items: center;
   width: 36px;
   height: 36px;
   padding: 0;
   border-radius: 999px;
+  font-size: 14px;
+  line-height: 1;
+}
+.launchpad-modal-close i {
+  margin: 0;
 }
 .launchpad-deploy-panel {
   padding: 22px;

@@ -114,13 +114,40 @@ function MentionTextarea({ value, onChange, members, rows = 4, placeholder, clas
 }
 
 function MediaGrid({ media }) {
+  const [viewer, setViewer] = React.useState(null);
+  React.useEffect(() => {
+    if (!viewer) return undefined;
+    function closeOnEscape(event) {
+      if (event.key === 'Escape') setViewer(null);
+    }
+    document.addEventListener('keydown', closeOnEscape);
+    return () => document.removeEventListener('keydown', closeOnEscape);
+  }, [viewer]);
+
   if (!media?.length) return null;
   return (
-    <div className={'board-media-grid count-' + Math.min(media.length, 3)}>
-      {media.map(item => item.type === 'video'
-        ? <video key={item.id} src={item.url} controls preload="metadata" aria-label={item.name} />
-        : <img key={item.id} src={item.url} alt={item.name || 'Post attachment'} loading="lazy" />)}
-    </div>
+    <>
+      <div className={'board-media-grid count-' + Math.min(media.length, 3)}>
+        {media.map(item => item.type === 'video'
+          ? <video key={item.id} src={item.url} controls preload="metadata" aria-label={item.name} />
+          : (
+            <button key={item.id} type="button" className="board-media-image-button" onClick={() => setViewer(item)} aria-label={'View image: ' + (item.name || 'Post attachment')}>
+              <img src={item.url} alt={item.name || 'Post attachment'} loading="lazy" />
+            </button>
+          ))}
+      </div>
+      {viewer && (
+        <div className="modal-scrim board-image-viewer" onClick={() => setViewer(null)}>
+          <div className="board-image-viewer-frame" onClick={event => event.stopPropagation()} role="dialog" aria-modal="true" aria-label="Image preview">
+            <button type="button" className="modal-close board-image-viewer-close" onClick={() => setViewer(null)} aria-label="Close image preview">
+              <i className="fa-solid fa-xmark" />
+            </button>
+            <img src={viewer.url} alt={viewer.name || 'Post attachment'} />
+            {viewer.name && <div className="board-image-viewer-caption">{viewer.name}</div>}
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 

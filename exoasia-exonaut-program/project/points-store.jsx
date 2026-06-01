@@ -126,6 +126,29 @@
     return local;
   }
 
+  async function remove(entryId) {
+    if (!entryId) return;
+    const previous = state.ledger;
+    state = { ...state, ledger: state.ledger.filter(e => e.id !== entryId) };
+    notify();
+    if (!window.__db) return;
+    const { error } = await window.__db.from('point_ledger').delete().eq('id', entryId);
+    if (error) {
+      state = { ...state, ledger: previous };
+      notify();
+      throw error;
+    }
+    await refresh();
+  }
+
+  async function removeWhere(predicate) {
+    const matches = state.ledger.filter(predicate);
+    for (const entry of matches) {
+      await remove(entry.id);
+    }
+    return matches.length;
+  }
+
   function totalForUser(userId = activeUserId()) {
     return state.ledger
       .filter(e => e.userId === userId)
@@ -145,6 +168,8 @@
     all() { return state; },
     refresh,
     award,
+    remove,
+    removeWhere,
     totalForUser,
     breakdownForUser,
     entriesForUser(userId = activeUserId()) { return state.ledger.filter(e => e.userId === userId); },
