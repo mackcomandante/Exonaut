@@ -705,6 +705,7 @@ function RitualsPage() {
     return window.EOW?.weeklyPoints?.(myRosterRow, currentWeek, activeCohort) || 0;
   }, [myRosterRow, currentWeek, activeCohort]);
   const isInternOfWeek = iotwLeader?.user?.id === profile.id;
+  const lockAfterDoneRituals = new Set(['mon-ign', 'mid-pls', 'fri-win', 'teach-bk']);
 
   React.useEffect(() => {
     const manilaDay = new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'Asia/Manila' }).format(new Date());
@@ -758,13 +759,14 @@ function RitualsPage() {
             const iconCls = state === 'done' ? 'fa-circle-check' : state === 'missed' ? 'fa-circle-xmark' : 'fa-circle-dot';
             const cCls = state === 'done' ? 'done-c' : state === 'missed' ? 'miss-c' : 'pend-c';
             const canOpenIotw = r.id === 'iotw' && (isInternOfWeek || state === 'done');
-            const clickable = r.id !== 'iotw' || canOpenIotw;
+            const lockedDone = lockAfterDoneRituals.has(r.id) && state === 'done';
+            const clickable = !lockedDone && (r.id !== 'iotw' || canOpenIotw);
             return (
               <div
                 key={r.id}
-                className={'ritual-cell ' + state}
-                onClick={() => submitProof(r)}
-                title={r.id === 'iotw' ? (canOpenIotw ? 'Open Intern of the Week certificate' : 'Awarded to the weekly points leader') : ''}
+                className={'ritual-cell ' + state + (lockedDone ? ' locked-done' : '')}
+                onClick={clickable ? () => submitProof(r) : undefined}
+                title={lockedDone ? 'Already logged this week' : (r.id === 'iotw' ? (canOpenIotw ? 'Open Intern of the Week certificate' : 'Awarded to the weekly points leader') : '')}
                 style={{ cursor: clickable ? 'pointer' : 'default' }}
               >
                 <div className="ritual-head">
