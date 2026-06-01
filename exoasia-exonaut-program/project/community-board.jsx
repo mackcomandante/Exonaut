@@ -28,6 +28,7 @@ function extractMentionIds(text, members) {
 function authorFor(post) {
   const profile = (window.__profileDirectory || []).find(item => item.id === post.authorId);
   return {
+    id: post.authorId,
     name: post.authorName || profile?.fullName || 'Exonaut',
     avatarUrl: profile?.avatarUrl || '',
     role: post.authorRole || profile?.role || 'exonaut',
@@ -123,12 +124,16 @@ function MediaGrid({ media }) {
   );
 }
 
-function CommunityBoard({ channel, onChannelChange, sort, search, composerOpen, onComposeClose }) {
+function CommunityBoard({ channel, onChannelChange, sort, search, composerOpen, onComposeClose, profileMembers = [], onOpenProfile }) {
   const me = useBoardIdentity();
   const { profiles } = useUserProfiles();
   const members = React.useMemo(() => boardMembers(profiles, me), [profiles, me.id, me.fullName]);
   const board = useBoard(me);
   const posts = board.list({ channel, sort, search });
+  const openProfile = React.useCallback((userId) => {
+    const member = profileMembers.find(item => item.id === userId);
+    if (member) onOpenProfile?.(member);
+  }, [profileMembers, onOpenProfile]);
 
   return (
     <div className="board-layout">
@@ -164,7 +169,7 @@ function CommunityBoard({ channel, onChannelChange, sort, search, composerOpen, 
           </div>
         )}
         <div className="board-posts">
-          {posts.map(post => <PostCard key={post.id} post={post} board={board} me={me} members={members} />)}
+          {posts.map(post => <PostCard key={post.id} post={post} board={board} me={me} members={members} onOpenProfile={openProfile} />)}
         </div>
       </section>
 
@@ -173,7 +178,7 @@ function CommunityBoard({ channel, onChannelChange, sort, search, composerOpen, 
   );
 }
 
-function PostCard({ post, board, me, members }) {
+function PostCard({ post, board, me, members, onOpenProfile }) {
   const [commentsOpen, setCommentsOpen] = React.useState(false);
   const [commentText, setCommentText] = React.useState('');
   const [busy, setBusy] = React.useState(false);
@@ -212,9 +217,11 @@ function PostCard({ post, board, me, members }) {
   return (
     <article className="card-panel board-post">
       <header className="board-post-head">
-        <AvatarWithRing name={author.name} avatarUrl={author.avatarUrl} size={37} tier={author.tier} />
+        <button type="button" className="board-author-avatar" onClick={() => onOpenProfile?.(author.id)} aria-label={'View ' + author.name + ' profile'}>
+          <AvatarWithRing name={author.name} avatarUrl={author.avatarUrl} size={37} tier={author.tier} />
+        </button>
         <div className="board-post-author">
-          <strong>{author.name}</strong>
+          <button type="button" className="board-author-name" onClick={() => onOpenProfile?.(author.id)}>{author.name}</button>
           <span>@{author.handle}</span>
           <RoleChip role={author.role} />
           <time>{board.timeAgo(post.createdAt)}</time>
@@ -241,14 +248,14 @@ function PostCard({ post, board, me, members }) {
             <button className="btn btn-primary btn-sm" disabled={!commentText.trim() || busy} onClick={comment}>Comment</button>
           </div>
           {post.comments.length === 0 && <div className="board-no-comments">No comments yet.</div>}
-          {post.comments.map(item => <CommentCard key={item.id} comment={item} postId={post.id} board={board} me={me} members={members} depth={0} />)}
+          {post.comments.map(item => <CommentCard key={item.id} comment={item} postId={post.id} board={board} me={me} members={members} depth={0} onOpenProfile={onOpenProfile} />)}
         </div>
       )}
     </article>
   );
 }
 
-function CommentCard({ comment, postId, board, me, members, depth }) {
+function CommentCard({ comment, postId, board, me, members, depth, onOpenProfile }) {
   const [replying, setReplying] = React.useState(false);
   const [reply, setReply] = React.useState('');
   const [error, setError] = React.useState('');
@@ -269,8 +276,10 @@ function CommentCard({ comment, postId, board, me, members, depth }) {
   return (
     <div className="board-comment" style={{ marginLeft: Math.min(depth, 4) * 18 }}>
       <div className="board-comment-head">
-        <AvatarWithRing name={author.name} avatarUrl={author.avatarUrl} size={25} tier={author.tier} />
-        <strong>{author.name}</strong>
+        <button type="button" className="board-author-avatar" onClick={() => onOpenProfile?.(author.id)} aria-label={'View ' + author.name + ' profile'}>
+          <AvatarWithRing name={author.name} avatarUrl={author.avatarUrl} size={25} tier={author.tier} />
+        </button>
+        <button type="button" className="board-author-name" onClick={() => onOpenProfile?.(author.id)}>{author.name}</button>
         <RoleChip role={author.role} />
         <time>{board.timeAgo(comment.createdAt)}</time>
       </div>
@@ -289,7 +298,7 @@ function CommentCard({ comment, postId, board, me, members, depth }) {
         </div>
       )}
       {error && <div className="board-inline-error">{error}</div>}
-      {comment.replies.map(child => <CommentCard key={child.id} comment={child} postId={postId} board={board} me={me} members={members} depth={depth + 1} />)}
+      {comment.replies.map(child => <CommentCard key={child.id} comment={child} postId={postId} board={board} me={me} members={members} depth={depth + 1} onOpenProfile={onOpenProfile} />)}
     </div>
   );
 }

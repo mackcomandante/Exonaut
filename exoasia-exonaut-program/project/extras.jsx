@@ -173,7 +173,7 @@ function LegacyKudosModal({ onClose, onSent }) {
   };
 
   return (
-    <div className="modal-scrim" onClick={onClose}>
+    <div className="modal-scrim" onClick={onClose} style={{ zIndex: 500 }}>
       <div className="modal-body" onClick={(e) => e.stopPropagation()}>
         <div className="modal-close" onClick={onClose}><i className="fa-solid fa-xmark" /></div>
         <div className="t-label" style={{ marginBottom: 8 }}>
@@ -314,8 +314,8 @@ function TweaksFab({ onClick }) {
 
 // Cohort-scoped Kudos modal. This declaration intentionally overrides the
 // legacy community-wide modal above while keeping the rest of extras.jsx intact.
-function KudosModal({ onClose, onSent }) {
-  const [recipient, setRecipient] = React.useState('');
+function KudosModal({ onClose, onSent, initialRecipientId = '' }) {
+  const [recipient, setRecipient] = React.useState(initialRecipientId || '');
   const [message, setMessage] = React.useState('');
   const [pillar, setPillar] = React.useState('culture');
   const [search, setSearch] = React.useState('');
@@ -325,6 +325,10 @@ function KudosModal({ onClose, onSent }) {
   const kudos = useKudos();
   const { profile } = useCurrentUserProfile();
   const { profiles } = useUserProfiles();
+
+  React.useEffect(() => {
+    setRecipient(initialRecipientId || '');
+  }, [initialRecipientId]);
 
   const me = React.useMemo(() => {
     const role = profile.role || 'exonaut';
@@ -409,7 +413,7 @@ function KudosModal({ onClose, onSent }) {
   };
 
   return (
-    <div className="modal-scrim" onClick={onClose}>
+    <div className="modal-scrim" onClick={onClose} style={{ zIndex: 500 }}>
       <div className="modal-body" onClick={(e) => e.stopPropagation()}>
         <div className="modal-close" onClick={onClose}><i className="fa-solid fa-xmark" /></div>
         <div className="t-label" style={{ marginBottom: 8 }}>

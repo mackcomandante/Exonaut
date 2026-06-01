@@ -15,6 +15,7 @@ function App() {
   const [tweaksOpen, setTweaksOpen] = React.useState(false);
   const [celebration, setCelebration] = React.useState(null);
   const [kudosOpen, setKudosOpen] = React.useState(false);
+  const [kudosInitialRecipientId, setKudosInitialRecipientId] = React.useState('');
   const [mobileNavOpen, setMobileNavOpen] = React.useState(false);
   const [toasts, setToasts] = React.useState([]);
   const [messageIntent, setMessageIntent] = React.useState(null);
@@ -112,7 +113,12 @@ function App() {
   // Auto-issue milestone badges when the Exonaut's total crosses thresholds.
   useAutoBadgeFire(onCelebrate);
 
-  React.useEffect(() => { window.__openKudos = () => setKudosOpen(true); }, []);
+  React.useEffect(() => {
+    window.__openKudos = (recipientId = '') => {
+      setKudosInitialRecipientId(typeof recipientId === 'string' ? recipientId : '');
+      setKudosOpen(true);
+    };
+  }, []);
   React.useEffect(() => {
     document.body.classList.toggle('mobile-nav-open', mobileNavOpen);
     const closeOnEscape = event => {
@@ -373,7 +379,7 @@ function App() {
       </main>
 
       {celebration && <ExtrasCelebration kind={celebration.kind} payload={celebration.payload} onClose={() => setCelebration(null)} />}
-      {kudosOpen && <ExtrasKudosModal onClose={() => setKudosOpen(false)}
+      {kudosOpen && <ExtrasKudosModal initialRecipientId={kudosInitialRecipientId} onClose={() => { setKudosOpen(false); setKudosInitialRecipientId(''); }}
                                 onSent={(k) => { pushToast({ title: 'KUDOS SENT', sub: `+${Number(k.giverPoints || 0)} to you · +${Number(k.receiverPoints || 0.25)} to ${k.recipientName || 'recipient'}`, icon: 'fa-hand-sparkles' }); }} />}
       <ExtrasToastStack toasts={toasts} />
 

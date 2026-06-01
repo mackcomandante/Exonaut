@@ -4176,6 +4176,34 @@ body[data-density="compact"] .pillar-card { padding: 16px; }
   font-size: 11px;
 }
 .board-post-author strong { color: var(--ink); font-size: 13px; }
+.board-post-author .board-author-name { font-size: 13px; }
+.board-author-avatar,
+.board-author-name {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+.board-author-avatar {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+.board-author-name:hover,
+.board-author-name:focus-visible {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.board-author-avatar:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 999px;
+}
 .board-post-author time::before { content: "/"; margin-right: 8px; color: var(--ink-faint); }
 .board-role-chip {
   padding: 2px 6px;
@@ -4301,6 +4329,9 @@ body[data-theme="dark"] .board-mention { color: var(--accent); }
   font-size: 10px;
 }
 .board-comment-head strong { color: var(--ink); font-size: 12px; }
+.board-comment-head .board-author-name {
+  font-size: 12px;
+}
 .board-comment p {
   margin: 8px 0 5px;
   color: var(--ink-soft);

@@ -2063,6 +2063,8 @@ function CommunityPage() {
           search={boardSearch}
           composerOpen={boardComposerOpen}
           onComposeClose={() => setBoardComposerOpen(false)}
+          profileMembers={members}
+          onOpenProfile={setSelected}
         />
       ) : (
         <React.Fragment>
@@ -2132,10 +2134,9 @@ function CommunityPage() {
           ))}
         </div>
       )}
-
-      {selected && <CommunityProfileSheet m={selected} onClose={() => setSelected(null)} />}
         </React.Fragment>
       )}
+      {selected && <CommunityProfileSheet m={selected} onClose={() => setSelected(null)} />}
     </div>
   );
 }
@@ -2237,9 +2238,11 @@ function CommunityCard({ m, onOpen }) {
 }
 
 function CommunityProfileSheet({ m, onClose }) {
+  const { profile } = useCurrentUserProfile();
   const track = TRACKS.find(t => t.code === m.track);
   const isAlumni = m.status === 'alumni';
   const displayBadges = m.earnedBadges || [];
+  const canGiveKudos = profile.id !== m.id;
 
   return (
     <div onClick={onClose} style={{
@@ -2284,6 +2287,16 @@ function CommunityProfileSheet({ m, onClose }) {
                   <i className="fa-solid fa-briefcase" style={{ color: 'var(--off-white-40)', fontSize: 10, marginRight: 6 }} />
                   {m.role}
                 </div>
+              )}
+              {canGiveKudos && (
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  onClick={() => window.__openKudos?.(m.id)}
+                  style={{ marginTop: 12 }}
+                >
+                  <i className="fa-solid fa-hand-sparkles" /> Give Kudos
+                </button>
               )}
             </div>
           </div>

@@ -402,7 +402,6 @@
       if (project.firstOfficerId === userId) return 'first';
       if (state.members.some(member => member.projectId === projectId && member.userId === userId && member.memberRole === 'lead')) return 'lead';
       if (state.tasks.some(t => t.projectId === projectId && (t.trackLeadId === userId || t.secondOfficerId === userId))) return 'track-lead';
-      if (project.trackCodes.some(code => window.__crownStore?.getActiveCrownForTrack(code)?.userId === userId)) return 'track-lead';
       if (state.assignees.some(a => a.userId === userId && state.tasks.some(t => t.id === a.taskId && t.projectId === projectId))) return 'member';
       if (projectRoster(projectId).includes(userId)) return 'member';
       return 'none';
@@ -752,14 +751,10 @@ function ProjectBuilderPage({ roleLabel = 'PLATFORM ADMIN' } = {}) {
   const [saving, setSaving] = React.useState(false);
   const selectedTrackCodes = draft.trackCodes;
   const selectedRoster = profiles.filter(p => selectedTrackCodes.includes(p.trackCode || 'AIS'));
-  const trackLeadIds = selectedTrackCodes
-    .map(code => window.__crownStore?.getActiveCrownForTrack(code)?.userId)
-    .filter(Boolean);
   const officers = selectedRoster.length ? selectedRoster : profiles.filter(p => ['exonaut', 'lead', 'commander'].includes(p.role || 'exonaut'));
   const exonauts = selectedRoster.filter(p => (p.role || 'exonaut') === 'exonaut');
   const currentMemberTrack = selectedTrackCodes.includes(memberTrackFilter) ? memberTrackFilter : (selectedTrackCodes[0] || '');
   const currentTrackExonauts = exonauts.filter(p => (p.trackCode || 'AIS') === currentMemberTrack);
-  const autoMemberIds = [...new Set([draft.firstOfficerId, ...trackLeadIds].filter(Boolean))];
   const nameOf = id => profiles.find(p => p.id === id)?.fullName || profiles.find(p => p.id === id)?.email || 'Unassigned';
   const trackName = code => tracks.find(t => t.code === code)?.short || code || 'TRACK';
 
@@ -804,7 +799,7 @@ function ProjectBuilderPage({ roleLabel = 'PLATFORM ADMIN' } = {}) {
     setSaving(true);
     try {
       const id = 'proj-' + Date.now();
-      const memberIds = [...new Set([...draft.memberIds, ...autoMemberIds])];
+      const memberIds = [...new Set(draft.memberIds)];
       await window.__projectStore.createProject({ ...draft, memberIds, id, title: draft.title.trim(), description: draft.description.trim(), status: 'active' });
       setDraft({ title: '', description: '', trackCodes: [], firstOfficerId: '', memberIds: [], startDate: '', dueDate: '' });
     } finally {
@@ -839,9 +834,6 @@ function ProjectBuilderPage({ roleLabel = 'PLATFORM ADMIN' } = {}) {
             <option value="">Select officer</option>
             {officers.map(p => <option key={p.id} value={p.id}>{p.fullName || p.email} · {tracks.find(t => t.code === (p.trackCode || 'AIS'))?.short || p.trackCode}</option>)}
           </select>
-          <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', margin: '6px 0 10px' }}>
-            Auto First Officers: {[...new Set(trackLeadIds)].map(nameOf).join(', ') || 'none until track leads are assigned'}
-          </div>
           <label className="t-label-muted">PROJECT EXONAUTS</label>
           <select className="select" value={currentMemberTrack} disabled={!selectedTrackCodes.length} onChange={e => setMemberTrackFilter(e.target.value)} style={{ marginBottom: 8 }}>
             {!selectedTrackCodes.length && <option value="">Select tracks first</option>}
@@ -866,7 +858,7 @@ function ProjectBuilderPage({ roleLabel = 'PLATFORM ADMIN' } = {}) {
             </div>
           )}
           <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', marginTop: 6 }}>
-            Project Lead and selected Track Leads are included automatically.
+            Project Lead is included automatically. Add all other Exonauts manually.
           </div>
           <div className="project-date-grid">
             <input className="input" type="date" value={draft.startDate} onChange={e => setDraft(d => ({ ...d, startDate: e.target.value }))} />
@@ -896,7 +888,6 @@ function LegacyProjectWorkspacePage({ mode = 'member' }) {
     projectAccess === 'first'
     || profile.role === 'admin'
     || tasks.some(t => t.projectId === project.id && t.trackCode === code && (t.trackLeadId === profile.id || t.secondOfficerId === profile.id))
-    || window.__crownStore?.getActiveCrownForTrack(code)?.userId === profile.id
   ) : [];
   const allowedTracks = project
     ? (profile.role === 'admin' || projectAccess === 'first'
@@ -908,8 +899,7 @@ function LegacyProjectWorkspacePage({ mode = 'member' }) {
   const access = projectAccess;
   const canOfficer = profile.role === 'admin'
     || access === 'first'
-    || projectTasks.some(t => t.trackLeadId === profile.id || t.secondOfficerId === profile.id)
-    || window.__crownStore?.getActiveCrownForTrack(activeTrack)?.userId === profile.id;
+    || projectTasks.some(t => t.trackLeadId === profile.id || t.secondOfficerId === profile.id);
   const [selectedTaskId, setSelectedTaskId] = React.useState(null);
   const selectedTask = tasks.find(t => t.id === selectedTaskId);
   const modeLabel = mode === 'project-lead' ? 'PROJECT LEAD' : mode === 'first-officer' ? 'FIRST OFFICER' : 'ROSTER';
