@@ -77,6 +77,88 @@
     } catch {}
   }
 
+  function isUuid(value) {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''));
+  }
+
+  async function remoteChatUserId(profile) {
+    if (!window.__db?.auth) return null;
+    const sessionResult = await window.__db.auth.getSession();
+    const userId = sessionResult?.data?.session?.user?.id || profile?.id || localStorage.getItem('exo:userId');
+    return isUuid(userId) ? userId : null;
+  }
+
+  function toRemoteMessageRow(message, conversationId, userId) {
+    return {
+      id: message.id,
+      conversation_id: conversationId,
+      user_id: userId,
+      role: message.role,
+      content: message.content,
+      created_at: message.time || new Date().toISOString(),
+    };
+  }
+
+  async function loadRemoteChatHistory(profile) {
+    const userId = await remoteChatUserId(profile);
+    if (!userId) return null;
+    const conversationResult = await window.__db
+      .from('chatbot_conversations')
+      .select('*')
+      .eq('user_id', userId)
+      .order('last_message_at', { ascending: false })
+      .limit(1);
+    if (conversationResult.error) throw conversationResult.error;
+    const conversation = (conversationResult.data || [])[0];
+    if (!conversation?.id) return null;
+    const messageResult = await window.__db
+      .from('chatbot_messages')
+      .select('*')
+      .eq('conversation_id', conversation.id)
+      .eq('user_id', userId)
+      .order('created_at', { ascending: true });
+    if (messageResult.error) throw messageResult.error;
+    return {
+      conversationId: conversation.id,
+      messages: plainChatMessages((messageResult.data || []).map(row => ({
+        id: row.id,
+        role: row.role,
+        content: row.content,
+        time: row.created_at,
+      }))),
+    };
+  }
+
+  async function syncRemoteChatHistory(conversationId, items, profile) {
+    const userId = await remoteChatUserId(profile);
+    const messages = plainChatMessages(items).filter(msg => msg.id !== 'welcome');
+    if (!userId || !conversationId || !messages.length) return;
+    const lastMessageAt = messages[messages.length - 1].time || new Date().toISOString();
+    const conversationResult = await window.__db
+      .from('chatbot_conversations')
+      .upsert({
+        id: conversationId,
+        user_id: userId,
+        last_message_at: lastMessageAt,
+      }, { onConflict: 'id' });
+    if (conversationResult.error) throw conversationResult.error;
+    const messageResult = await window.__db
+      .from('chatbot_messages')
+      .upsert(messages.map(msg => toRemoteMessageRow(msg, conversationId, userId)), { onConflict: 'id' });
+    if (messageResult.error) throw messageResult.error;
+  }
+
+  async function clearRemoteChatHistory(conversationId, profile) {
+    const userId = await remoteChatUserId(profile);
+    if (!userId || !conversationId) return;
+    const result = await window.__db
+      .from('chatbot_conversations')
+      .delete()
+      .eq('id', conversationId)
+      .eq('user_id', userId);
+    if (result.error) throw result.error;
+  }
+
   async function sendMessage(message, conversationId) {
     const token = localStorage.getItem('sb-vkiikgsxhymnymacwygr-auth-token');
     if (!token) throw new Error('Not authenticated');
@@ -667,6 +749,8 @@
     const bottomRef = React.useRef(null);
     const inputRef = React.useRef(null);
     const conversationId = React.useRef('conv-' + Date.now());
+    const remoteProfileId = React.useRef(null);
+    const [remoteReady, setRemoteReady] = React.useState(!window.__db);
 
     React.useEffect(() => {
       bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -677,14 +761,48 @@
     }, []);
 
     React.useEffect(() => {
+      let cancelled = false;
+      remoteProfileId.current = null;
+      if (window.__db) setRemoteReady(false);
+      async function loadRemote() {
+        if (!window.__db) return;
+        try {
+          const remote = await loadRemoteChatHistory(profile);
+          if (cancelled) return;
+          if (remote?.conversationId) conversationId.current = remote.conversationId;
+          if (remote?.messages?.length) setMessages([freshWelcome(), ...remote.messages]);
+        } catch (err) {
+          console.warn('Could not load EX-O chat history:', err?.message || err);
+        } finally {
+          if (!cancelled) {
+            remoteProfileId.current = profile?.id || null;
+            setRemoteReady(true);
+          }
+        }
+      }
+      loadRemote();
+      return () => { cancelled = true; };
+    }, [profile?.id]);
+
+    React.useEffect(() => {
       saveChatHistory(messages);
-    }, [messages]);
+      if (!window.__db || !remoteReady || remoteProfileId.current !== (profile?.id || null)) return;
+      syncRemoteChatHistory(conversationId.current, messages, profile).catch(err => {
+        console.warn('Could not sync EX-O chat history:', err?.message || err);
+      });
+    }, [messages, remoteReady, profile?.id]);
 
     async function handleSend() {
       const text = input.trim();
       if (!text || loading) return;
       if (text.toLowerCase() === '/clear') {
         localStorage.removeItem(CHAT_HISTORY_KEY);
+        if (window.__db) {
+          clearRemoteChatHistory(conversationId.current, profile).catch(err => {
+            console.warn('Could not clear EX-O chat history:', err?.message || err);
+          });
+        }
+        conversationId.current = 'conv-' + Date.now();
         setMessages([freshWelcome()]);
         setInput('');
         return;
