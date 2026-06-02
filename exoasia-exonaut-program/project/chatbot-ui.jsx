@@ -201,6 +201,7 @@
     const command = match[1].toLowerCase();
     const body = String(match[2] || '').trim();
     const bodyWords = body ? body.split(/\s+/).filter(Boolean) : [];
+    const selectedArgument = firstSelectedCommandArgument(raw);
     const known = ['messages', 'message', 'msg', 'kudos', 'project', 'action', 'ritual', 'thread', 'post', 'clear'];
     if (!known.some(item => item.startsWith(command))) return '';
 
@@ -219,9 +220,9 @@
       if (normalized === 'thread') return ' [channel] [caption]';
     }
 
-    if (normalized === 'messages') return bodyWords.length <= 2 ? ' [message]' : '';
-    if (normalized === 'kudos') return bodyWords.length <= 2 ? ' [kudos message]' : '';
-    if (normalized === 'project') return bodyWords.length <= 2 ? ' [action title]' : '';
+    if (normalized === 'messages') return selectedArgument && raw.endsWith(' ') ? ' [message]' : (bodyWords.length <= 2 ? ' [message]' : '');
+    if (normalized === 'kudos') return selectedArgument && raw.endsWith(' ') ? ' [kudos message]' : (bodyWords.length <= 2 ? ' [kudos message]' : '');
+    if (normalized === 'project') return selectedArgument && raw.endsWith(' ') ? ' [action title]' : (bodyWords.length <= 2 ? ' [action title]' : '');
     if (normalized === 'thread') return bodyWords.length <= 1 ? ' [caption]' : '';
     if (normalized === 'ritual') {
       const ritual = findRitual(body);
@@ -230,6 +231,127 @@
       return remainder ? '' : ' [description/link]';
     }
     return '';
+  }
+
+  function commandAutocompleteConfig(command) {
+    const normalized = String(command || '').toLowerCase();
+    if (['messages', 'message', 'msg'].includes(normalized)) {
+      return { key: 'messages', label: 'recipient', nextHint: 'message' };
+    }
+    if (normalized === 'kudos') {
+      return { key: 'kudos', label: 'recipient', nextHint: 'kudos message' };
+    }
+    if (['project', 'action'].includes(normalized)) {
+      return { key: 'project', label: 'project name', nextHint: 'action title' };
+    }
+    if (normalized === 'ritual') {
+      return { key: 'ritual', label: 'ritual name', nextHint: 'description/link' };
+    }
+    if (['thread', 'post'].includes(normalized)) {
+      return { key: 'thread', label: 'channel', nextHint: 'caption' };
+    }
+    return null;
+  }
+
+  function suggestionLabel(item, type) {
+    if (type === 'project') return item.title || item.name || item.id || '';
+    if (type === 'ritual') return item.name || item.id || '';
+    if (type === 'thread') return item.name || item.id || '';
+    return item.fullName || item.email || item.id || '';
+  }
+
+  function suggestionMeta(item, type) {
+    if (type === 'project') return [item.trackCodes?.join(', '), item.status].filter(Boolean).join(' · ');
+    if (type === 'ritual') return item.points ? `+${item.points} points` : '';
+    if (type === 'thread') return item.hint || '';
+    return [item.email, item.trackCode].filter(Boolean).join(' · ');
+  }
+
+  function suggestionIcon(type) {
+    if (type === 'project') return 'fa-diagram-project';
+    if (type === 'ritual') return 'fa-calendar-check';
+    if (type === 'thread') return 'fa-comments';
+    if (type === 'kudos') return 'fa-hand-sparkles';
+    return 'fa-user';
+  }
+
+  function commandSuggestionSource(config, context) {
+    if (!config) return [];
+    if (config.key === 'project') {
+      if (!context.profile?.id) return window.__projectStore?.all?.() || [];
+      return (window.__projectStore?.visibleProjects?.(context.profile) || []).filter(project => project.status !== 'archived');
+    }
+    if (config.key === 'ritual') {
+      return typeof RITUALS === 'undefined' ? [] : RITUALS;
+    }
+    if (config.key === 'thread') {
+      return Object.keys(CHANNEL_COMMANDS).map(id => ({
+        id,
+        name: id.charAt(0).toUpperCase() + id.slice(1),
+        hint: (CHANNEL_COMMANDS[id] || []).slice(0, 2).join(', '),
+      }));
+    }
+    return (context.profiles || []).filter(item => item.id !== context.profile?.id);
+  }
+
+  function firstSelectedCommandArgument(value) {
+    const match = String(value || '').match(/^\/([a-z-]+)\s+([\s\S]*)$/i);
+    if (!match) return null;
+    const config = commandAutocompleteConfig(match[1]);
+    if (!config) return null;
+    const body = match[2] || '';
+    const items = commandSuggestionSource(config, {
+      profile: {},
+      profiles: Array.isArray(window.__profileDirectory) ? window.__profileDirectory : [],
+    });
+    return items
+      .map(item => suggestionLabel(item, config.key))
+      .filter(Boolean)
+      .find(label => {
+        const lowerLabel = label.toLowerCase();
+        const lowerBody = body.toLowerCase();
+        return lowerBody === lowerLabel || lowerBody.startsWith(lowerLabel + ' ');
+      }) || null;
+  }
+
+  function filterCommandSuggestions(items, query, type) {
+    const q = cleanText(query).toLowerCase().replace(/^@/, '');
+    const compact = q.replace(/[^a-z0-9]+/g, '');
+    return (items || []).filter(item => {
+      const label = suggestionLabel(item, type).toLowerCase();
+      const meta = suggestionMeta(item, type).toLowerCase();
+      const id = String(item.id || '').toLowerCase();
+      const handle = type === 'project' ? label.replace(/[^a-z0-9]+/g, '') : profileHandle(item);
+      const words = label.split(/\s+/).filter(Boolean);
+      return !q
+        || label.startsWith(q)
+        || words.some(word => word.startsWith(q))
+        || meta.startsWith(q)
+        || id.includes(q)
+        || handle.startsWith(compact);
+    });
+  }
+
+  function getCommandPaletteState(value, context) {
+    const raw = String(value || '');
+    const match = raw.match(/^\/([a-z-]+)\s+([\s\S]*)$/i);
+    if (!match) return null;
+    const config = commandAutocompleteConfig(match[1]);
+    if (!config) return null;
+    const source = commandSuggestionSource(config, context);
+    const body = match[2] || '';
+    const selected = source.find(item => {
+      const label = suggestionLabel(item, config.key).toLowerCase();
+      const lowerBody = body.toLowerCase();
+      return lowerBody === label || lowerBody.startsWith(label + ' ');
+    });
+    if (selected && body.toLowerCase().startsWith(suggestionLabel(selected, config.key).toLowerCase() + ' ')) return null;
+    return {
+      ...config,
+      typedCommand: match[1],
+      query: body,
+      suggestions: filterCommandSuggestions(source, body, config.key),
+    };
   }
 
   function profileHandle(profile) {
@@ -748,9 +870,12 @@
     const [loading, setLoading] = React.useState(false);
     const bottomRef = React.useRef(null);
     const inputRef = React.useRef(null);
+    const inputAreaRef = React.useRef(null);
     const conversationId = React.useRef('conv-' + Date.now());
     const remoteProfileId = React.useRef(null);
     const [remoteReady, setRemoteReady] = React.useState(!window.__db);
+    const [paletteIndex, setPaletteIndex] = React.useState(0);
+    const [paletteClosedFor, setPaletteClosedFor] = React.useState('');
 
     React.useEffect(() => {
       bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -792,6 +917,42 @@
       });
     }, [messages, remoteReady, profile?.id]);
 
+    const paletteState = getCommandPaletteState(input, { profile, profiles });
+    const showCommandPalette = !!paletteState && paletteClosedFor !== input;
+    const paletteSuggestions = paletteState?.suggestions || [];
+
+    React.useEffect(() => {
+      setPaletteIndex(0);
+    }, [input, paletteSuggestions.length]);
+
+    React.useEffect(() => {
+      function handlePointerDown(event) {
+        if (!showCommandPalette) return;
+        if (inputAreaRef.current?.contains(event.target)) return;
+        setPaletteClosedFor(input);
+      }
+      document.addEventListener('mousedown', handlePointerDown);
+      return () => document.removeEventListener('mousedown', handlePointerDown);
+    }, [showCommandPalette, input]);
+
+    function updateInput(value) {
+      setPaletteClosedFor('');
+      setInput(value);
+    }
+
+    function acceptPaletteSuggestion(item) {
+      if (!paletteState || !item) return;
+      const label = suggestionLabel(item, paletteState.key);
+      const nextInput = `/${paletteState.typedCommand} ${label} `;
+      setPaletteClosedFor(nextInput);
+      setInput(nextInput);
+      setTimeout(() => {
+        inputRef.current?.focus();
+        const end = nextInput.length;
+        inputRef.current?.setSelectionRange(end, end);
+      }, 0);
+    }
+
     async function handleSend() {
       const text = input.trim();
       if (!text || loading) return;
@@ -805,11 +966,13 @@
         conversationId.current = 'conv-' + Date.now();
         setMessages([freshWelcome()]);
         setInput('');
+        setPaletteClosedFor('');
         return;
       }
       const userMsg = { id: 'u-' + Date.now(), role: 'user', content: text, time: new Date().toISOString() };
       setMessages(prev => [...prev, userMsg]);
       setInput('');
+      setPaletteClosedFor('');
       const proposed = text ? parseAgentAction(text, { profile, profiles }) : null;
       if (proposed?.error) {
         setMessages(prev => [...prev, { id: 'exo-err-' + Date.now(), role: 'assistant', content: proposed.error, time: new Date().toISOString() }]);
@@ -854,6 +1017,30 @@
     }
 
     function handleKey(e) {
+      if (showCommandPalette) {
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          setPaletteIndex(index => Math.min(index + 1, Math.max(paletteSuggestions.length - 1, 0)));
+          return;
+        }
+        if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          setPaletteIndex(index => Math.max(index - 1, 0));
+          return;
+        }
+        if ((e.key === 'Enter' && !e.shiftKey) || e.key === 'Tab') {
+          if (paletteSuggestions[paletteIndex]) {
+            e.preventDefault();
+            acceptPaletteSuggestion(paletteSuggestions[paletteIndex]);
+            return;
+          }
+        }
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          setPaletteClosedFor(input);
+          return;
+        }
+      }
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         handleSend();
@@ -889,7 +1076,7 @@
           <div ref={bottomRef} />
         </div>
 
-        <div className="chatbot-input-area">
+        <div className="chatbot-input-area" ref={inputAreaRef}>
           {showCommandMenu && (
             <div className="chatbot-command-menu">
               {SLASH_COMMAND_MENU.map(item => (
@@ -897,7 +1084,7 @@
                   type="button"
                   key={item.command}
                   onClick={() => {
-                    setInput(item.command + ' ');
+                    updateInput(item.command + ' ');
                     setTimeout(() => inputRef.current?.focus(), 0);
                   }}
                 >
@@ -906,6 +1093,34 @@
                   <span>{item.hint}</span>
                 </button>
               ))}
+            </div>
+          )}
+          {showCommandPalette && (
+            <div className="chatbot-command-palette">
+              <div className="chatbot-command-palette-list">
+                {paletteSuggestions.length ? paletteSuggestions.map((item, index) => {
+                  const label = suggestionLabel(item, paletteState.key);
+                  const meta = suggestionMeta(item, paletteState.key);
+                  return (
+                    <button
+                      type="button"
+                      key={item.id || label}
+                      className={index === paletteIndex ? 'active' : ''}
+                      onMouseEnter={() => setPaletteIndex(index)}
+                      onMouseDown={event => {
+                        event.preventDefault();
+                        acceptPaletteSuggestion(item);
+                      }}
+                    >
+                      <i className={'fa-solid ' + suggestionIcon(paletteState.key)} />
+                      <strong>{label}</strong>
+                      <span>{meta || paletteState.label}</span>
+                    </button>
+                  );
+                }) : (
+                  <div className="chatbot-command-palette-empty">No matches found</div>
+                )}
+              </div>
             </div>
           )}
           <div className="chatbot-input-wrap">
@@ -919,7 +1134,7 @@
               className={'chatbot-input' + (input.trim().startsWith('/') ? ' command-mode' : '')}
               placeholder="Ask EX-O or use /kudos, /messages, /project, /ritual..."
               value={input}
-              onChange={e => setInput(e.target.value)}
+              onChange={e => updateInput(e.target.value)}
               onKeyDown={handleKey}
               rows={1}
               disabled={loading}

@@ -5685,6 +5685,92 @@ body.mobile-nav-open {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.chatbot-command-palette {
+  position: absolute;
+  right: 12px;
+  bottom: calc(100% + 8px);
+  left: 12px;
+  z-index: 5;
+  max-height: 230px;
+  overflow-y: auto;
+  padding: 8px;
+  border: 1px solid var(--hairline);
+  border-radius: 14px;
+  background: rgba(14, 15, 24, 0.96);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(10px);
+}
+.chatbot-command-palette-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--off-white-10);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+.chatbot-command-palette-head small {
+  min-width: 0;
+  color: var(--ink-muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: none;
+  white-space: nowrap;
+}
+.chatbot-command-palette-list {
+  display: grid;
+  gap: 2px;
+}
+.chatbot-command-palette-list button {
+  display: grid;
+  grid-template-columns: 24px auto 1fr;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  padding: 8px 9px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--ink-muted);
+  text-align: left;
+  cursor: pointer;
+}
+.chatbot-command-palette-list button:hover,
+.chatbot-command-palette-list button.active {
+  background: var(--off-white-07);
+  color: var(--ink);
+}
+.chatbot-command-palette-list i {
+  color: var(--accent);
+  font-size: 12px;
+}
+.chatbot-command-palette-list strong,
+.chatbot-command-palette-list span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chatbot-command-palette-list strong {
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 800;
+}
+.chatbot-command-palette-list span {
+  color: var(--ink-faint);
+  font-size: 11px;
+}
+.chatbot-command-palette-empty {
+  padding: 12px 10px;
+  color: var(--ink-muted);
+  font-size: 12px;
+  text-align: center;
+}
 .chatbot-input-wrap {
   position: relative;
   flex: 1;
