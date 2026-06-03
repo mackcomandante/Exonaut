@@ -5649,8 +5649,8 @@ body.mobile-nav-open {
   padding: 8px;
   border: 1px solid var(--hairline);
   border-radius: 14px;
-  background: rgba(14, 15, 24, 0.96);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.42);
+  background: color-mix(in srgb, var(--bg-darkest) 96%, var(--accent) 4%);
+  box-shadow: var(--shadow-lg);
   backdrop-filter: blur(10px);
 }
 .chatbot-command-menu button {
@@ -5696,8 +5696,8 @@ body.mobile-nav-open {
   padding: 8px;
   border: 1px solid var(--hairline);
   border-radius: 14px;
-  background: rgba(14, 15, 24, 0.96);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.42);
+  background: color-mix(in srgb, var(--bg-darkest) 96%, var(--accent) 4%);
+  box-shadow: var(--shadow-lg);
   backdrop-filter: blur(10px);
 }
 .chatbot-command-palette-head {
@@ -5770,6 +5770,11 @@ body.mobile-nav-open {
   color: var(--ink-muted);
   font-size: 12px;
   text-align: center;
+}
+body[data-theme="dark"] .chatbot-command-menu,
+body[data-theme="dark"] .chatbot-command-palette {
+  background: rgba(14, 15, 24, 0.96);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.42);
 }
 .chatbot-input-wrap {
   position: relative;

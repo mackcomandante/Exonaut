@@ -50,7 +50,7 @@
   }
 
   function plainChatMessages(items) {
-    return (Array.isArray(items) ? items : [])
+    const normalized = (Array.isArray(items) ? items : [])
       .filter(msg => msg && !msg.action && (msg.role === 'user' || msg.role === 'assistant'))
       .map(msg => ({
         id: msg.id || ('chat-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7)),
@@ -58,7 +58,18 @@
         content: String(msg.content || ''),
         time: msg.time || new Date().toISOString(),
       }))
-      .filter(msg => msg.content.trim())
+      .filter(msg => msg.content.trim());
+    const deduped = [];
+    normalized.forEach(msg => {
+      const duplicateIndex = deduped.findIndex(item => item.role === msg.role && item.content === msg.content);
+      if (duplicateIndex >= 0) {
+        const prevTime = new Date(deduped[duplicateIndex].time || 0).getTime();
+        const nextTime = new Date(msg.time || 0).getTime();
+        if (Math.abs(nextTime - prevTime) < 10000) return;
+      }
+      deduped.push(msg);
+    });
+    return deduped
       .slice(-CHAT_HISTORY_LIMIT);
   }
 
@@ -86,17 +97,6 @@
     const sessionResult = await window.__db.auth.getSession();
     const userId = sessionResult?.data?.session?.user?.id || profile?.id || localStorage.getItem('exo:userId');
     return isUuid(userId) ? userId : null;
-  }
-
-  function toRemoteMessageRow(message, conversationId, userId) {
-    return {
-      id: message.id,
-      conversation_id: conversationId,
-      user_id: userId,
-      role: message.role,
-      content: message.content,
-      created_at: message.time || new Date().toISOString(),
-    };
   }
 
   async function loadRemoteChatHistory(profile) {
@@ -129,32 +129,12 @@
     };
   }
 
-  async function syncRemoteChatHistory(conversationId, items, profile) {
-    const userId = await remoteChatUserId(profile);
-    const messages = plainChatMessages(items).filter(msg => msg.id !== 'welcome');
-    if (!userId || !conversationId || !messages.length) return;
-    const lastMessageAt = messages[messages.length - 1].time || new Date().toISOString();
-    const conversationResult = await window.__db
-      .from('chatbot_conversations')
-      .upsert({
-        id: conversationId,
-        user_id: userId,
-        last_message_at: lastMessageAt,
-      }, { onConflict: 'id' });
-    if (conversationResult.error) throw conversationResult.error;
-    const messageResult = await window.__db
-      .from('chatbot_messages')
-      .upsert(messages.map(msg => toRemoteMessageRow(msg, conversationId, userId)), { onConflict: 'id' });
-    if (messageResult.error) throw messageResult.error;
-  }
-
   async function clearRemoteChatHistory(conversationId, profile) {
     const userId = await remoteChatUserId(profile);
-    if (!userId || !conversationId) return;
+    if (!userId) return;
     const result = await window.__db
       .from('chatbot_conversations')
       .delete()
-      .eq('id', conversationId)
       .eq('user_id', userId);
     if (result.error) throw result.error;
   }
@@ -873,7 +853,7 @@
     const inputAreaRef = React.useRef(null);
     const conversationId = React.useRef('conv-' + Date.now());
     const remoteProfileId = React.useRef(null);
-    const [remoteReady, setRemoteReady] = React.useState(!window.__db);
+    const historyClearVersion = React.useRef(0);
     const [paletteIndex, setPaletteIndex] = React.useState(0);
     const [paletteClosedFor, setPaletteClosedFor] = React.useState('');
 
@@ -887,13 +867,14 @@
 
     React.useEffect(() => {
       let cancelled = false;
+      const clearVersion = historyClearVersion.current;
       remoteProfileId.current = null;
-      if (window.__db) setRemoteReady(false);
       async function loadRemote() {
         if (!window.__db) return;
         try {
           const remote = await loadRemoteChatHistory(profile);
           if (cancelled) return;
+          if (clearVersion !== historyClearVersion.current) return;
           if (remote?.conversationId) conversationId.current = remote.conversationId;
           if (remote?.messages?.length) setMessages([freshWelcome(), ...remote.messages]);
         } catch (err) {
@@ -901,7 +882,6 @@
         } finally {
           if (!cancelled) {
             remoteProfileId.current = profile?.id || null;
-            setRemoteReady(true);
           }
         }
       }
@@ -911,11 +891,7 @@
 
     React.useEffect(() => {
       saveChatHistory(messages);
-      if (!window.__db || !remoteReady || remoteProfileId.current !== (profile?.id || null)) return;
-      syncRemoteChatHistory(conversationId.current, messages, profile).catch(err => {
-        console.warn('Could not sync EX-O chat history:', err?.message || err);
-      });
-    }, [messages, remoteReady, profile?.id]);
+    }, [messages]);
 
     const paletteState = getCommandPaletteState(input, { profile, profiles });
     const showCommandPalette = !!paletteState && paletteClosedFor !== input;
@@ -957,11 +933,14 @@
       const text = input.trim();
       if (!text || loading) return;
       if (text.toLowerCase() === '/clear') {
+        historyClearVersion.current += 1;
         localStorage.removeItem(CHAT_HISTORY_KEY);
         if (window.__db) {
-          clearRemoteChatHistory(conversationId.current, profile).catch(err => {
+          try {
+            await clearRemoteChatHistory(conversationId.current, profile);
+          } catch (err) {
             console.warn('Could not clear EX-O chat history:', err?.message || err);
-          });
+          }
         }
         conversationId.current = 'conv-' + Date.now();
         setMessages([freshWelcome()]);
@@ -1048,7 +1027,11 @@
     }
 
     const slashSuggestion = getSlashCommandSuggestion(input);
-    const showCommandMenu = input === '/';
+    const slashCommandQuery = String(input || '').trim().toLowerCase();
+    const filteredSlashCommandMenu = /^\/[a-z-]*$/i.test(slashCommandQuery)
+      ? SLASH_COMMAND_MENU.filter(item => item.command.startsWith(slashCommandQuery))
+      : [];
+    const showCommandMenu = filteredSlashCommandMenu.length > 0 && !input.includes(' ');
 
     return (
       <div className="chatbot-popup">
@@ -1079,7 +1062,7 @@
         <div className="chatbot-input-area" ref={inputAreaRef}>
           {showCommandMenu && (
             <div className="chatbot-command-menu">
-              {SLASH_COMMAND_MENU.map(item => (
+              {filteredSlashCommandMenu.map(item => (
                 <button
                   type="button"
                   key={item.command}
