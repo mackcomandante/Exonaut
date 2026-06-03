@@ -385,6 +385,7 @@ function PlatformAdminSidebar({ current, onNavigate, onSignOut, mobileOpen = fal
       links: [
         { id: 'pa-users',    label: 'User Directory',     icon: 'fa-address-book' },
         { id: 'pa-manual-credit', label: 'Manual Credit', icon: 'fa-clipboard-check' },
+        { id: 'pa-recruitment', label: 'Recruitment', icon: 'fa-user-plus' },
         { id: 'kudos',       label: 'Kudos',              icon: 'fa-hand-sparkles' },
       ],
     },

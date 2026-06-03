@@ -80,34 +80,112 @@ function formatKnowledge(k: typeof knowledge, userTrackCode: string): string {
 // ─── Real-time data formatter ────────────────────────────────────────────────
 function formatRealtimeData(
   totalPoints: number,
+  pointBreakdown: Record<string, number>,
   userBadges: Array<{ badge_code: string; badge_name: string }>,
-  leaderboard: Array<{ user_id: string; users: { full_name: string }; points: number }>,
-  announcements: Array<{ title: string; body: string; type: string; author_name: string }>
+  leaderboard: Array<{ full_name: string; points: number }>,
+  announcements: Array<{ title: string; body: string; type: string; author_name: string }>,
+  ritualLogs: Array<{ ritual_id: string; logged_at: string }>,
+  kudosReceived: Array<{ giver_id: string; message: string; created_at: string }>,
+  kudosGiven: Array<{ receiver_id: string; message: string; created_at: string }>,
+  profiles: Array<{ id: string; full_name: string }>,
+  userProjects: Array<{ id: string; title: string; status: string; description: string }>,
+  userTasks: Array<{ id: string; project_id: string; title: string; status: string; topic: string; next_step: string; due_date: string }>,
+  missionSubs: Array<{ mission_id: string; mission_title: string; grade: string | null; feedback: string | null; submitted_at: string; graded_at: string | null }>
 ): string {
   const lines: string[] = [];
 
   lines.push('=== YOUR PROGRESS ===');
   lines.push(`• Total Points: ${totalPoints}`);
+
+  const ritualNames: Record<string, string> = {
+    'mon-ign': 'Monday Ignition',
+    'mid-pls': 'Mid-Week Pulse',
+    'fri-win': 'Friday Win Wall',
+    'iotw': 'Intern of Week',
+    'teach-bk': 'Teach-Back',
+  };
+
+  if (Object.keys(pointBreakdown).length > 0) {
+    lines.push('• Points by source:');
+    Object.entries(pointBreakdown).forEach(([source, pts]) => {
+      lines.push(`  - ${source}: ${pts} pts`);
+    });
+  }
+
   if (userBadges && userBadges.length > 0) {
     lines.push(`• Badges Earned (${userBadges.length}): ${userBadges.map(b => b.badge_name).join(', ')}`);
   } else {
     lines.push('• Badges Earned: None yet');
   }
 
-  lines.push('\n=== LEADERBOARD (TOP 10) ===');
+  lines.push('\n=== THIS WEEK\'S RITUALS ===');
+  if (ritualLogs && ritualLogs.length > 0) {
+    const loggedIds = new Set(ritualLogs.map(r => r.ritual_id));
+    const allRituals = ['mon-ign', 'mid-pls', 'fri-win', 'teach-bk'];
+    allRituals.forEach(id => {
+      const done = loggedIds.has(id);
+      lines.push(`• ${ritualNames[id] ?? id}: ${done ? 'LOGGED' : 'Not yet logged'}`);
+    });
+  } else {
+    lines.push('• No rituals logged this week yet');
+  }
+
+  lines.push('\n=== KUDOS ===');
+  if (kudosReceived && kudosReceived.length > 0) {
+    lines.push(`• Received (${kudosReceived.length} recent):`);
+    kudosReceived.slice(0, 3).forEach(k => {
+      const name = profiles.find(p => p.id === k.giver_id)?.full_name ?? 'Someone';
+      lines.push(`  - From ${name}: "${k.message.substring(0, 80)}"`);
+    });
+  } else {
+    lines.push('• No kudos received yet');
+  }
+  if (kudosGiven && kudosGiven.length > 0) {
+    lines.push(`• Given (${kudosGiven.length} total)`);
+  }
+
+  lines.push('\n=== LEADERBOARD (TOP 10 IN COHORT) ===');
   if (leaderboard && leaderboard.length > 0) {
     leaderboard.forEach((entry, idx) => {
-      lines.push(`${idx + 1}. ${entry.users.full_name}: ${entry.points} points`);
+      lines.push(`${idx + 1}. ${entry.full_name}: ${entry.points} pts`);
     });
   } else {
     lines.push('No leaderboard data available');
+  }
+
+  lines.push('\n=== MY PROJECTS ===');
+  if (userProjects && userProjects.length > 0) {
+    userProjects.forEach(p => {
+      lines.push(`• ${p.title} [${p.status}]`);
+      const tasks = userTasks.filter((t: any) => t.project_id === p.id);
+      if (tasks.length > 0) {
+        tasks.slice(0, 5).forEach((t: any) => {
+          const due = t.due_date ? ` (due ${t.due_date})` : '';
+          const next = t.next_step ? ` → ${t.next_step.substring(0, 60)}` : '';
+          lines.push(`  - [${t.status}] ${t.title}${due}${next}`);
+        });
+      }
+    });
+  } else {
+    lines.push('• Not assigned to any active projects');
+  }
+
+  lines.push('\n=== TRACK TASK SUBMISSIONS ===');
+  if (missionSubs && missionSubs.length > 0) {
+    missionSubs.forEach(s => {
+      const grade = s.grade ? ` — ${s.grade.toUpperCase()}` : ' — Pending review';
+      const feedback = s.feedback ? ` Feedback: "${s.feedback.substring(0, 80)}"` : '';
+      lines.push(`• ${s.mission_title}${grade}${feedback}`);
+    });
+  } else {
+    lines.push('• No track task submissions yet');
   }
 
   lines.push('\n=== RECENT ANNOUNCEMENTS ===');
   if (announcements && announcements.length > 0) {
     announcements.forEach(ann => {
       lines.push(`• [${ann.type.toUpperCase()}] ${ann.title} — ${ann.author_name}`);
-      lines.push(`  ${ann.body.substring(0, 100)}...`);
+      lines.push(`  ${ann.body.substring(0, 150)}`);
     });
   } else {
     lines.push('No announcements yet');
@@ -124,6 +202,14 @@ Your job: answer questions about the Exonaut Program accurately, concisely, and 
 Stay on topic — only answer questions related to the Exonaut Program.
 If asked about something outside the program, politely redirect.
 Never make up points values, badge names, or rules — only use what is in the knowledge base below.
+
+TERMINOLOGY (important):
+• The "Track" page is where Exonauts complete their weekly program work. It was formerly called "Missions".
+• A "mission" or "weekly mission" = a week's collection of tasks (e.g., "Week 02 — Concept Papers & Discovery").
+• A "task" or "track task" = an individual deliverable inside a mission (e.g., "10 Concept Papers", "Discovery Meetings").
+• "Track task submissions" = deliverables the user has submitted for grading.
+• Always refer to these as "track tasks" or "weekly tasks", not just "missions", to match what users see in the app.
+• The person who oversees and approves track task submissions is called the "Track Lead", not "Mission Lead".
 
 CURRENT USER:
 - Name: ${profile.full_name ?? 'Exonaut'}
@@ -209,24 +295,42 @@ serve(async (req) => {
 
     const historyMessages = (history ?? []).reverse();
 
-    // 6. Load real-time data (Phase 5)
-    const { data: userPoints } = await supabase
+    // 6. Load real-time data
+    // Points: total + breakdown by source_type
+    const { data: userPointRows } = await supabase
       .from('point_ledger')
-      .select('points')
+      .select('points, source_type')
       .eq('user_id', user.id);
-    const totalPoints = userPoints?.reduce((sum, row) => sum + (row.points || 0), 0) ?? 0;
+    const totalPoints = userPointRows?.reduce((sum: number, row: any) => sum + (row.points || 0), 0) ?? 0;
+    const pointBreakdown: Record<string, number> = {};
+    (userPointRows || []).forEach((row: any) => {
+      const src = row.source_type || 'other';
+      pointBreakdown[src] = (pointBreakdown[src] || 0) + (row.points || 0);
+    });
 
     const { data: userBadges } = await supabase
       .from('user_badges')
       .select('badge_code, badge_name')
       .eq('user_id', user.id);
 
-    const { data: leaderboard } = await supabase
+    // Leaderboard: aggregate point_ledger per user in cohort
+    const { data: cohortProfiles } = await supabase
+      .from('user_profiles')
+      .select('id, full_name')
+      .eq('cohort_id', profile?.cohort_id);
+    const cohortUserIds = (cohortProfiles || []).map((p: any) => p.id);
+    const { data: cohortPointRows } = cohortUserIds.length ? await supabase
       .from('point_ledger')
-      .select('user_id, users!inner(full_name), points')
-      .eq('users.cohort_id', profile?.cohort_id)
-      .order('points', { ascending: false })
-      .limit(10);
+      .select('user_id, points')
+      .in('user_id', cohortUserIds) : { data: [] };
+    const cohortTotals: Record<string, number> = {};
+    (cohortPointRows || []).forEach((row: any) => {
+      cohortTotals[row.user_id] = (cohortTotals[row.user_id] || 0) + (row.points || 0);
+    });
+    const leaderboard = (cohortProfiles || [])
+      .map((p: any) => ({ full_name: p.full_name, points: cohortTotals[p.id] || 0 }))
+      .sort((a: any, b: any) => b.points - a.points)
+      .slice(0, 10);
 
     const { data: announcements } = await supabase
       .from('announcements')
@@ -234,8 +338,68 @@ serve(async (req) => {
       .order('created_at', { ascending: false })
       .limit(3);
 
+    // Ritual logs: current week (last 9 days covers Mon–Sun safely)
+    const nineAgo = new Date(Date.now() - 9 * 24 * 60 * 60 * 1000).toISOString();
+    const { data: ritualLogs } = await supabase
+      .from('ritual_logs')
+      .select('ritual_id, logged_at')
+      .eq('user_id', user.id)
+      .gte('logged_at', nineAgo);
+
+    // Kudos received and given
+    const { data: kudosReceived } = await supabase
+      .from('kudos')
+      .select('giver_id, message, created_at')
+      .eq('receiver_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(5);
+    const { data: kudosGiven } = await supabase
+      .from('kudos')
+      .select('receiver_id, message, created_at')
+      .eq('giver_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(5);
+
+    // Projects: get projects the user is a member of + their open tasks
+    const { data: projectMemberships } = await supabase
+      .from('project_members')
+      .select('project_id, member_role')
+      .eq('user_id', user.id);
+    const memberProjectIds = (projectMemberships || []).map((m: any) => m.project_id);
+
+    let userProjects: any[] = [];
+    let userTasks: any[] = [];
+    if (memberProjectIds.length) {
+      const [projectsRes, tasksRes] = await Promise.all([
+        supabase
+          .from('projects')
+          .select('id, title, status, description')
+          .in('id', memberProjectIds)
+          .neq('status', 'archived'),
+        supabase
+          .from('project_tasks')
+          .select('id, project_id, title, status, topic, next_step, due_date')
+          .in('project_id', memberProjectIds)
+          .not('status', 'in', '("done","cancelled")'),
+      ]);
+      userProjects = projectsRes.data || [];
+      userTasks = tasksRes.data || [];
+    }
+
+    // Mission submissions
+    const { data: missionSubs } = await supabase
+      .from('mission_submissions')
+      .select('mission_id, mission_title, grade, feedback, submitted_at, graded_at')
+      .eq('exonaut_id', user.id)
+      .order('submitted_at', { ascending: false })
+      .limit(10);
+
     // Format real-time context
-    const realtimeContext = formatRealtimeData(totalPoints, userBadges, leaderboard, announcements);
+    const realtimeContext = formatRealtimeData(
+      totalPoints, pointBreakdown, userBadges, leaderboard,
+      announcements, ritualLogs, kudosReceived, kudosGiven,
+      cohortProfiles || [], userProjects, userTasks, missionSubs || []
+    );
 
     // 7. Build context (fixed + real-time)
     const formattedKnowledge = formatKnowledge(knowledge, trackCode);

@@ -142,8 +142,8 @@ function App() {
     const exonautRoutes = ['dashboard', 'leaderboard', 'profile', 'mission', 'missions', 'credentials', 'projects', 'first-projects', 'project-tasks', 'messages', 'community', 'knowledge-base', 'launchpad', 'exonaut-guide', 'kudos', 'rituals', 'announce', 'notifications', 'alumni', 'settings'];
     const trackOpsRoutes = ['lead-home', 'lead-roster', 'lead-queue', 'lead-grade', 'lead-manual-credit', 'lead-announce', 'lead-removals', 'crown-pass'];
     const leadRoutes = ['lead-home', 'lead-roster', 'lead-queue', 'lead-grade', 'lead-manual-credit', 'lead-announce', 'lead-removals', 'lead-projects', 'lead-project-tasks', 'lead-profile', 'messages', 'community', 'knowledge-base', 'launchpad', 'kudos', 'notifications', 'settings'];
-    const commanderRoutes = ['cmdr-home', 'cmdr-profile', 'cmdr-leads', 'cmdr-projects', 'cmdr-project-builder', 'cmdr-action-register', 'cmdr-exonauts', 'cmdr-esc', 'cmdr-health', 'cmdr-eow', 'cmdr-crowns', 'cmdr-removals', 'cmdr-manual-credit', 'cmdr-announce', 'messages', 'community', 'knowledge-base', 'launchpad', 'kudos', 'notifications', 'settings'];
-    const adminRoutes = ['pa-cohorts', 'pa-missions', 'pa-projects', 'pa-action-register', 'pa-managers', 'pa-assign', 'pa-users', 'pa-console', 'pa-manual-credit', 'pa-removals', 'pa-announce', 'pa-profile', 'messages', 'community', 'knowledge-base', 'launchpad', 'kudos', 'notifications', 'settings'];
+    const commanderRoutes = ['cmdr-home', 'cmdr-profile', 'cmdr-leads', 'cmdr-projects', 'cmdr-project-builder', 'cmdr-action-register', 'cmdr-exonauts', 'cmdr-esc', 'cmdr-health', 'cmdr-eow', 'cmdr-crowns', 'cmdr-removals', 'cmdr-manual-credit', 'cmdr-recruitment', 'cmdr-announce', 'messages', 'community', 'knowledge-base', 'launchpad', 'kudos', 'notifications', 'settings'];
+    const adminRoutes = ['pa-cohorts', 'pa-missions', 'pa-projects', 'pa-action-register', 'pa-managers', 'pa-assign', 'pa-users', 'pa-console', 'pa-manual-credit', 'pa-recruitment', 'pa-removals', 'pa-announce', 'pa-profile', 'messages', 'community', 'knowledge-base', 'launchpad', 'kudos', 'notifications', 'settings'];
     const routeBase = (routeId || '').split(':')[0];
     if (role === 'lead') return leadRoutes.includes(routeBase);
     if (role === 'commander') return commanderRoutes.includes(routeBase);
@@ -247,6 +247,7 @@ function App() {
     'cmdr-crowns': ['COMMANDER', 'Crown Transfers'],
     'cmdr-removals': ['COMMANDER', 'Removal Approvals'],
     'cmdr-manual-credit': ['COMMANDER', 'Manual Activity Credit'],
+    'cmdr-recruitment': ['COMMANDER', 'Recruitment Pipeline'],
     'cmdr-announce': ['COMMANDER', 'Announcements'],
     // Platform Admin
     'pa-cohorts':  ['PLATFORM ADMIN', 'Cohort Management'],
@@ -258,6 +259,7 @@ function App() {
     'pa-users':    ['PLATFORM ADMIN', 'User Directory'],
     'pa-console':  ['PLATFORM ADMIN', 'System Console'],
     'pa-manual-credit': ['PLATFORM ADMIN', 'Manual Activity Credit'],
+    'pa-recruitment': ['PLATFORM ADMIN', 'Recruitment Pipeline'],
     'pa-removals': ['PLATFORM ADMIN', 'Removal Execution'],
     'pa-announce': ['PLATFORM ADMIN', 'Announcements'],
     'pa-profile':  ['PLATFORM ADMIN', 'Profile'],
@@ -340,6 +342,7 @@ function App() {
     else if (route === 'cmdr-crowns') page = <CommanderCrownTransfers />;
     else if (route === 'cmdr-removals') page = <CommanderRemovalsPage />;
     else if (route === 'cmdr-manual-credit') page = <ManualActivityCreditPage />;
+    else if (route === 'cmdr-recruitment') page = <RecruitmentReviewPage />;
     else if (route === 'cmdr-announce') page = <CommanderAnnounce />;
     else if (route === 'cmdr-profile') page = <RoleProfile roleKey="commander" />;
     else if (route === 'messages')    page = <MessagesPage />;
@@ -361,6 +364,7 @@ function App() {
     else if (route === 'pa-users')   page = <AdminUsers />;
     else if (route === 'pa-console') page = <AdminPanel />;
     else if (route === 'pa-manual-credit') page = <ManualActivityCreditPage />;
+    else if (route === 'pa-recruitment') page = <RecruitmentReviewPage />;
     else if (route === 'pa-removals') page = <AdminRemovalsPage />;
     else if (route === 'pa-announce') page = <AdminAnnounce />;
     else if (route === 'pa-profile') page = <RoleProfile roleKey="admin" />;
@@ -391,8 +395,7 @@ function App() {
       <ExtrasTweaksFab onClick={() => setTweaksOpen(v => !v)} />
       <ExtrasTweaksPanel open={tweaksOpen} onClose={() => setTweaksOpen(false)}
                    tweaks={mergedTweaks}
-                   setTweak={setTweak}
-                   onCelebrate={onCelebrate} />
+                   setTweak={setTweak} />
 
       {roleView !== 'login' && (
         <>
@@ -549,6 +552,7 @@ function CommanderSidebar({ current, onNavigate, onSignOut, mobileOpen = false, 
       title: 'Ops',
       links: [
         { id: 'cmdr-manual-credit', label: 'Manual Credit', icon: 'fa-clipboard-check' },
+        { id: 'cmdr-recruitment', label: 'Recruitment', icon: 'fa-user-plus' },
         { id: 'cmdr-removals', label: 'Removals', icon: 'fa-user-slash' },
         { id: 'cmdr-announce', label: 'Announcements', icon: 'fa-bullhorn' },
       ],

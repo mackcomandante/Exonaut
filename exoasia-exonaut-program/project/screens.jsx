@@ -590,7 +590,10 @@ function KudosFeed({ onGive }) {
   const { profile } = useCurrentUserProfile();
   const { profiles } = useUserProfiles();
   const meId = profile.id || ME_ID;
-  const myCohort = profile.cohortId || ME.cohort || 'c2627';
+  const activeCohort = window.getActiveCohort?.(profile) || COHORT;
+  const timeline = window.getCohortTimeline?.(activeCohort);
+  const currentWeek = timeline?.valid ? timeline.currentWeek : COHORT.week;
+  const myCohort = activeCohort?.id || profile.cohortId || ME.cohort || 'c2627';
   const feed = filter === 'all'
     ? kudos.all.filter(k => (k.cohortId || 'c2627') === myCohort)
     : kudos.all.filter(k => k.to === meId || k.from === meId);
@@ -615,7 +618,7 @@ function KudosFeed({ onGive }) {
           <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>Kudos</h1>
         </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <span className="t-mono" style={{ color: 'var(--off-white-40)', fontSize: 11 }}>WK {COHORT.week}</span>
+          <span className="t-mono" style={{ color: 'var(--off-white-40)', fontSize: 11 }}>WK {currentWeek}</span>
           <button className="btn btn-primary" onClick={onGive}>
             <i className="fa-solid fa-hand-sparkles" /> GIVE KUDOS
           </button>

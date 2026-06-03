@@ -237,7 +237,7 @@ function LegacyKudosModal({ onClose, onSent }) {
 }
 
 // ---- Tweaks panel ----
-function TweaksPanel({ open, onClose, tweaks, setTweak, onCelebrate }) {
+function TweaksPanel({ open, onClose, tweaks, setTweak }) {
   if (!open) return null;
   const row = (label, key, options) => (
     <div className="tweak-group">
@@ -266,30 +266,6 @@ function TweaksPanel({ open, onClose, tweaks, setTweak, onCelebrate }) {
         { v: 'platinum', l: 'Platinum' },
         { v: 'lavender', l: 'Lavender' },
       ])}
-      {row('Dashboard', 'dashVariant', [
-        { v: 'default',  l: 'HUD'      },
-        { v: 'editorial',l: 'Editorial' },
-      ])}
-      {row('Ritual style', 'ritualStyle', [
-        { v: 'cards',   l: 'Cards' },
-        { v: 'compact', l: 'Bar'   },
-      ])}
-      {row('Badge shape', 'badgeShape', [
-        { v: 'geom',    l: 'Geom'   },
-        { v: 'classic', l: 'Round'  },
-      ])}
-      <div className="tweaks-demo-btns">
-        <div className="t-label-muted" style={{ marginBottom: 6 }}>TRIGGER CELEBRATIONS</div>
-        <button className="btn btn-ghost btn-sm" onClick={() => onCelebrate('tier', { tier: 'elite' })}>
-          <i className="fa-solid fa-arrow-up-right-dots" /> TIER UPGRADE · ELITE
-        </button>
-        <button className="btn btn-ghost btn-sm" onClick={() => onCelebrate('badge', { badge: BADGES.find(b => b.code === 'MIL-GLD') })}>
-          <i className="fa-solid fa-medal" /> BADGE EARNED · GOLD
-        </button>
-        <button className="btn btn-ghost btn-sm" onClick={() => onCelebrate('rank')}>
-          <i className="fa-solid fa-trophy" /> RANK MILESTONE · TOP 10
-        </button>
-      </div>
     </div>
   );
 }
@@ -340,11 +316,13 @@ function KudosModal({ onClose, onSent, initialRecipientId = '' }) {
     };
   }, [profile.id, profile.fullName, profile.role]);
 
-  const myCohort = profile.cohortId || ME.cohort || 'c2627';
+  const activeCohort = window.getActiveCohort?.(profile) || COHORT;
+  const myCohort = activeCohort?.id || profile.cohortId || ME.cohort || 'c2627';
   const currentWeek = React.useMemo(() => {
-    const cohort = window.__cohortStore?.getAll?.().find(c => c.id === myCohort);
-    return window.EOW?.currentWeek ? window.EOW.currentWeek(cohort) : ((typeof COHORT !== 'undefined' ? COHORT.week : 1) || 1);
-  }, [myCohort]);
+    const timeline = window.getCohortTimeline?.(activeCohort);
+    if (timeline?.valid) return timeline.currentWeek;
+    return window.EOW?.currentWeek ? window.EOW.currentWeek(activeCohort) : ((typeof COHORT !== 'undefined' ? COHORT.week : 1) || 1);
+  }, [activeCohort, myCohort]);
   const weeklyUsed = kudos.weeklyUsage(me.id, myCohort, currentWeek);
 
   const pool = React.useMemo(() => {

@@ -3601,8 +3601,6 @@ img, svg { display: block; max-width: 100%; }
   font-weight: 700;
 }
 
-.tweaks-demo-btns { display: flex; flex-direction: column; gap: 6px; padding-top: 12px; border-top: 1px solid var(--hairline); }
-
 /* ============================================================
    CELEBRATIONS
    ============================================================ */
@@ -5920,6 +5918,35 @@ body[data-theme="dark"] .chatbot-command-palette {
   color: var(--ink);
   font-size: 12px;
   overflow-wrap: anywhere;
+}
+.chatbot-project-action-form {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.chatbot-project-action-form .new-action-grid {
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+.chatbot-project-action-form .input,
+.chatbot-project-action-form .select,
+.chatbot-project-action-form .textarea {
+  min-height: 42px;
+  font-size: 12px;
+}
+.chatbot-project-action-form .textarea {
+  min-height: 72px;
+}
+.chatbot-ritual-form {
+  display: grid;
+  gap: 8px;
+}
+.chatbot-ritual-form .textarea {
+  min-height: 78px;
+}
+.chatbot-ritual-form .input,
+.chatbot-ritual-form .textarea {
+  font-size: 12px;
 }
 .exo-action-attachment {
   display: grid;

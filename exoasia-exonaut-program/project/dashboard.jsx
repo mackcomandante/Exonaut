@@ -40,6 +40,16 @@ function HeroStats() {
   useManualCredits();
   const { projects, tasks, assignees } = useProjects();
   const earnedCount = liveBadges.filter(b => b.earned).length;
+  const badgeMilestones = Array.isArray(window.MILESTONES) ? window.MILESTONES : [];
+  const earnedMilestone = [...badgeMilestones].reverse().find(m => livePoints >= m.at);
+  const nextMilestone = badgeMilestones.find(m => livePoints < m.at);
+  const badgeMeta = earnedMilestone
+    ? `AUTO · ${earnedMilestone.name.toUpperCase()}`
+    : nextMilestone
+      ? `AUTO · NEXT ${nextMilestone.name.toUpperCase()}`
+      : earnedCount
+        ? 'AUTO · MILESTONE EARNED'
+        : 'AUTO · NO BADGES YET';
   useSubs();
   const myTrack = profile.trackCode || ME.track || 'AIS';
   const myCohort = activeCohort?.id || profile.cohortId || ME.cohort || 'c2627';
@@ -65,7 +75,7 @@ function HeroStats() {
         meta={`${tasks.filter(t => t.status !== 'approved').length} TASKS`} metaDir="flat" />
       <StatCell label="BADGES" icon="fa-medal"
         value={earnedCount} unit="of 22"
-        meta="AUTO · SILVER STRATEGIST" metaDir="up" />
+        meta={badgeMeta} metaDir={earnedMilestone ? 'up' : 'flat'} />
     </div>
   );
 }
@@ -112,9 +122,93 @@ function fallbackClientTouchDate() {
   return date;
 }
 
+function RecruitReferralModal({ profile, onClose }) {
+  const [draft, setDraft] = React.useState({
+    candidateName: '',
+    candidateEmail: '',
+    candidateLinkedin: '',
+    trackFit: profile.trackCode || 'AIS',
+    relationship: '',
+    reason: '',
+  });
+  const [saving, setSaving] = React.useState(false);
+  const [error, setError] = React.useState('');
+  const setField = (key, value) => setDraft(current => ({ ...current, [key]: value }));
+  const canSubmit = draft.candidateName.trim() && (draft.candidateEmail.trim() || draft.candidateLinkedin.trim());
+
+  async function submit() {
+    if (!canSubmit || saving) return;
+    setSaving(true);
+    setError('');
+    try {
+      await window.__recruitmentStore.submit(draft, profile);
+      onClose();
+    } catch (err) {
+      setError(err?.message || 'Could not submit recruit.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="card-panel" onClick={event => event.stopPropagation()} style={{ width: 'min(560px, calc(100vw - 32px))', padding: 0, overflow: 'hidden' }}>
+        <div style={{ padding: 20, borderBottom: '1px solid var(--hairline)', display: 'flex', justifyContent: 'space-between', gap: 16 }}>
+          <div>
+            <div className="t-mono" style={{ color: 'var(--ink-muted)', fontSize: 10 }}>RECRUITMENT PIPELINE</div>
+            <h2 style={{ margin: '4px 0 0' }}>Add a Recruit</h2>
+          </div>
+          <button className="chatbot-close" onClick={onClose} title="Close"><i className="fa-solid fa-xmark" /></button>
+        </div>
+        <div style={{ padding: 20, display: 'grid', gap: 12 }}>
+          {error && <div style={{ color: 'var(--coral)', fontSize: 12, fontWeight: 700 }}>{error}</div>}
+          <label className="admin-assignment-field">
+            <span className="admin-assignment-field-label">Candidate Name</span>
+            <input className="input" value={draft.candidateName} onChange={e => setField('candidateName', e.target.value)} placeholder="Full name" />
+          </label>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <label className="admin-assignment-field">
+              <span className="admin-assignment-field-label">Email</span>
+              <input className="input" value={draft.candidateEmail} onChange={e => setField('candidateEmail', e.target.value)} placeholder="name@email.com" />
+            </label>
+            <label className="admin-assignment-field">
+              <span className="admin-assignment-field-label">LinkedIn / Portfolio</span>
+              <input className="input" value={draft.candidateLinkedin} onChange={e => setField('candidateLinkedin', e.target.value)} placeholder="https://..." />
+            </label>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <label className="admin-assignment-field">
+              <span className="admin-assignment-field-label">Track Fit</span>
+              <select className="select" value={draft.trackFit} onChange={e => setField('trackFit', e.target.value)}>
+                {TRACKS.map(track => <option key={track.code} value={track.code}>{track.short || track.code}</option>)}
+              </select>
+            </label>
+            <label className="admin-assignment-field">
+              <span className="admin-assignment-field-label">Relationship</span>
+              <input className="input" value={draft.relationship} onChange={e => setField('relationship', e.target.value)} placeholder="Classmate, colleague, friend..." />
+            </label>
+          </div>
+          <label className="admin-assignment-field">
+            <span className="admin-assignment-field-label">Why are they a fit?</span>
+            <textarea className="textarea" rows={4} value={draft.reason} onChange={e => setField('reason', e.target.value)} placeholder="Short context for the reviewer." />
+          </label>
+        </div>
+        <div style={{ padding: '14px 20px', borderTop: '1px solid var(--hairline)', display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+          <button className="btn btn-ghost btn-sm" onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary btn-sm" disabled={!canSubmit || saving} style={{ opacity: canSubmit && !saving ? 1 : 0.45 }} onClick={submit}>
+            <i className="fa-solid fa-user-plus" /> {saving ? 'Submitting...' : 'Submit Recruit'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PillarGrid() {
   const { profile } = useCurrentUserProfile();
   const { breakdown, entries } = useUserPoints(profile.id);
+  const recruitmentState = window.useRecruitment();
+  const [recruitOpen, setRecruitOpen] = React.useState(false);
   const missions = useMissions();
   useManualCredits();
   const projectMissions = missions.filter(m => m.pillar === 'project' || m.pillar === 'missions').slice(0, 3);
@@ -130,6 +224,11 @@ function PillarGrid() {
     return clientDates[0] || fallbackClientTouchDate();
   }, [entries]);
   const lastClientTouchLabel = `${formatPillarDate(lastClientTouch)} · ${formatDaysAgo(lastClientTouch)}`;
+  const recruitSummary = React.useMemo(
+    () => window.__recruitmentStore.summaryForUser(profile.id),
+    [recruitmentState.referrals, profile.id]
+  );
+  const latestStage = recruitSummary.latest ? window.__recruitmentStore.STATUS_STAGES.find(stage => stage.id === recruitSummary.latest.status) : null;
   return (
     <div className="pillar-grid">
       <PillarCard idx="01" klass="p1" title="Missions" weight={40}
@@ -173,12 +272,19 @@ function PillarGrid() {
         current={breakdown.recruitment || 0} max={250} caption="25% WEIGHT">
         <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--off-white-40)', letterSpacing: '0.05em', marginBottom: 10 }}>PIPELINE STATUS</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 24, color: 'var(--lavender)', fontWeight: 700 }}>1</span>
-          <span style={{ fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700, color: 'var(--off-white-68)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>CANDIDATE SUBMITTED</span>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 24, color: 'var(--lavender)', fontWeight: 700 }}>{recruitSummary.submitted}</span>
+          <span style={{ fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700, color: 'var(--off-white-68)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+            {recruitSummary.submitted === 1 ? 'CANDIDATE SUBMITTED' : 'CANDIDATES SUBMITTED'}
+          </span>
         </div>
-        <button className="btn btn-ghost btn-sm" onClick={() => window.__openKudos?.()}>
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--off-white-40)', letterSpacing: '0.05em', marginBottom: 14 }}>
+          ACTIVE · {recruitSummary.active} · JOINED · {recruitSummary.joined}
+          {latestStage && ` · LATEST · ${latestStage.label.toUpperCase()}`}
+        </div>
+        <button className="btn btn-ghost btn-sm" onClick={() => setRecruitOpen(true)}>
           <i className="fa-solid fa-user-plus" /> ADD A RECRUIT
         </button>
+        {recruitOpen && <RecruitReferralModal profile={profile} onClose={() => setRecruitOpen(false)} />}
       </PillarCard>
     </div>
   );

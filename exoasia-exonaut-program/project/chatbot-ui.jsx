@@ -195,20 +195,26 @@
     if (!body) {
       if (normalized === 'messages') return ' [recipient] [message]';
       if (normalized === 'kudos') return ' [recipient] [kudos message]';
-      if (normalized === 'project') return ' [project name] [action title]';
-      if (normalized === 'ritual') return ' [ritual name] [description/link]';
+      if (normalized === 'project') return ' [project name] [topic]';
+      if (normalized === 'ritual') return ' [ritual name] [description]';
       if (normalized === 'thread') return ' [channel] [caption]';
     }
 
     if (normalized === 'messages') return selectedArgument && raw.endsWith(' ') ? ' [message]' : (bodyWords.length <= 2 ? ' [message]' : '');
     if (normalized === 'kudos') return selectedArgument && raw.endsWith(' ') ? ' [kudos message]' : (bodyWords.length <= 2 ? ' [kudos message]' : '');
-    if (normalized === 'project') return selectedArgument && raw.endsWith(' ') ? ' [action title]' : (bodyWords.length <= 2 ? ' [action title]' : '');
+    if (normalized === 'project') {
+      if (selectedArgument) {
+        const afterProject = cleanText(body.replace(new RegExp('^' + selectedArgument.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'), ''));
+        return afterProject ? '' : ' [topic]';
+      }
+      return bodyWords.length <= 1 ? ' [topic]' : '';
+    }
     if (normalized === 'thread') return bodyWords.length <= 1 ? ' [caption]' : '';
     if (normalized === 'ritual') {
       const ritual = findRitual(body);
-      if (!ritual) return bodyWords.length <= 2 ? ' [description/link]' : '';
+      if (!ritual) return bodyWords.length <= 2 ? ' [description]' : '';
       const remainder = removeRitualWords(body, ritual);
-      return remainder ? '' : ' [description/link]';
+      return remainder ? '' : ' [description]';
     }
     return '';
   }
@@ -222,10 +228,10 @@
       return { key: 'kudos', label: 'recipient', nextHint: 'kudos message' };
     }
     if (['project', 'action'].includes(normalized)) {
-      return { key: 'project', label: 'project name', nextHint: 'action title' };
+      return { key: 'project', label: 'project name', nextHint: 'topic' };
     }
     if (normalized === 'ritual') {
-      return { key: 'ritual', label: 'ritual name', nextHint: 'description/link' };
+      return { key: 'ritual', label: 'ritual name', nextHint: 'description' };
     }
     if (['thread', 'post'].includes(normalized)) {
       return { key: 'thread', label: 'channel', nextHint: 'caption' };
@@ -255,14 +261,24 @@
     return 'fa-user';
   }
 
+  function asSuggestionArray(value) {
+    if (Array.isArray(value)) return value;
+    if (Array.isArray(value?.projects)) return value.projects;
+    if (Array.isArray(value?.items)) return value.items;
+    if (Array.isArray(value?.data)) return value.data;
+    return [];
+  }
+
   function commandSuggestionSource(config, context) {
     if (!config) return [];
     if (config.key === 'project') {
-      if (!context.profile?.id) return window.__projectStore?.all?.() || [];
-      return (window.__projectStore?.visibleProjects?.(context.profile) || []).filter(project => project.status !== 'archived');
+      const source = context.profile?.id
+        ? window.__projectStore?.visibleProjects?.(context.profile)
+        : window.__projectStore?.all?.();
+      return asSuggestionArray(source).filter(project => project.status !== 'archived');
     }
     if (config.key === 'ritual') {
-      return typeof RITUALS === 'undefined' ? [] : RITUALS;
+      return typeof RITUALS === 'undefined' ? [] : asSuggestionArray(RITUALS).filter(r => r.id !== 'iotw');
     }
     if (config.key === 'thread') {
       return Object.keys(CHANNEL_COMMANDS).map(id => ({
@@ -271,7 +287,7 @@
         hint: (CHANNEL_COMMANDS[id] || []).slice(0, 2).join(', '),
       }));
     }
-    return (context.profiles || []).filter(item => item.id !== context.profile?.id);
+    return asSuggestionArray(context.profiles).filter(item => item.id !== context.profile?.id);
   }
 
   function firstSelectedCommandArgument(value) {
@@ -280,10 +296,10 @@
     const config = commandAutocompleteConfig(match[1]);
     if (!config) return null;
     const body = match[2] || '';
-    const items = commandSuggestionSource(config, {
+    const items = asSuggestionArray(commandSuggestionSource(config, {
       profile: {},
       profiles: Array.isArray(window.__profileDirectory) ? window.__profileDirectory : [],
-    });
+    }));
     return items
       .map(item => suggestionLabel(item, config.key))
       .filter(Boolean)
@@ -297,7 +313,7 @@
   function filterCommandSuggestions(items, query, type) {
     const q = cleanText(query).toLowerCase().replace(/^@/, '');
     const compact = q.replace(/[^a-z0-9]+/g, '');
-    return (items || []).filter(item => {
+    return asSuggestionArray(items).filter(item => {
       const label = suggestionLabel(item, type).toLowerCase();
       const meta = suggestionMeta(item, type).toLowerCase();
       const id = String(item.id || '').toLowerCase();
@@ -318,7 +334,7 @@
     if (!match) return null;
     const config = commandAutocompleteConfig(match[1]);
     if (!config) return null;
-    const source = commandSuggestionSource(config, context);
+    const source = asSuggestionArray(commandSuggestionSource(config, context));
     const body = match[2] || '';
     const selected = source.find(item => {
       const label = suggestionLabel(item, config.key).toLowerCase();
@@ -514,15 +530,16 @@
       const access = window.__projectStore.projectAccess(context.profile.id, found.item.id);
       const canManage = context.profile.role === 'admin' || context.profile.role === 'commander' || access === 'first' || access === 'lead';
       if (!canManage) return { error: 'You do not have permission to create actions for that project.' };
-      const actionTitle = cleanText((text.match(/\b(?:called|title|task|action)\s+([\s\S]+)$/i) || [])[1] || found.remaining);
-      if (!actionTitle) return { error: 'What action should I add?' };
+      const topic = cleanText(found.remaining || (text.match(/\b(?:topic|about|for)\s+([\s\S]+)$/i) || [])[1]);
+      if (!topic) return { error: 'What topic should I start this project action with?' };
       return {
         type: 'project-action',
         title: 'Add Project Action',
-        confirmLabel: 'Confirm Add Action',
+        confirmLabel: 'Save Action',
         project: found.item,
-        body: actionTitle,
-        details: [['Project', found.item.title], ['Action', actionTitle]],
+        topic,
+        body: '',
+        details: [['Project', found.item.title], ['Topic', topic]],
       };
     }
 
@@ -544,7 +561,7 @@
         body: description,
         url,
         file: context.attachment || null,
-        details: [['Ritual', ritual.name], ['Description', description || 'No description'], ['Link', url || 'None'], ['Attachment', context.attachment?.name || 'None'], ['Points', `+${ritual.points}`]],
+        details: [['Ritual', ritual.name], ['Description', description || 'Can be filled in confirmation'], ['Attachment', context.attachment?.name || 'None'], ['Points', `+${ritual.points}`]],
       };
     }
 
@@ -624,12 +641,13 @@
       return {
         type: 'project-action',
         title: 'Add Project Action',
-        confirmLabel: 'Confirm Add Action',
+        confirmLabel: 'Save Action',
         project: found.item,
-        body: cleanText(match[2]),
+        topic: cleanText(match[2]),
+        body: '',
         details: [
           ['Project', found.item.title],
-          ['Action', cleanText(match[2])],
+          ['Topic', cleanText(match[2])],
         ],
       };
     }
@@ -652,7 +670,6 @@
           details: [
             ['Ritual', ritual.name],
             ['Description', description || 'No description'],
-            ['Link', url || 'None'],
             ['Attachment', context.attachment?.name || 'None'],
             ['Points', `+${ritual.points}`],
           ],
@@ -709,18 +726,22 @@
       return 'Kudos sent.';
     }
     if (action.type === 'project-action') {
-      await window.__projectStore.saveTask({
+      const draft = action.draft || {};
+      if (!cleanText(draft.title)) throw new Error('Action / Particulars is required.');
+      const taskId = await window.__projectStore.saveTask({
         projectId: action.project.id,
         trackCode: action.project.trackCodes?.[0] || context.profile.trackCode || 'GENERAL',
         accountableId: action.project.firstOfficerId || context.profile.id,
-        topic: 'EX-O',
-        title: action.body,
-        brief: action.body,
-        status: 'todo',
-        nextStep: '',
-        blockers: '',
+        topic: cleanText(draft.topic || action.topic),
+        title: cleanText(draft.title),
+        brief: cleanText(draft.brief),
+        status: draft.status || 'not_started',
+        nextStep: cleanText(draft.nextStep),
+        blockers: cleanText(draft.blockers),
+        dueDate: draft.dueDate || '',
         displayOrder: Math.floor(Date.now() / 1000),
       });
+      if (draft.responsibleId) await window.__projectStore.assignTaskTeam(taskId, [draft.responsibleId]);
       return 'Project action added.';
     }
     if (action.type === 'ritual') {
@@ -757,9 +778,37 @@
   function AgentActionCard({ action, onConfirm, onCancel, busy }) {
     const [file, setFile] = React.useState(action.file || null);
     const [preview, setPreview] = React.useState('');
+    const [draft, setDraft] = React.useState({
+      topic: action.topic || action.body || '',
+      title: '',
+      brief: '',
+      status: 'not_started',
+      nextStep: '',
+      dueDate: '',
+      responsibleId: '',
+      blockers: '',
+    });
+    const [ritualDraft, setRitualDraft] = React.useState({
+      description: action.body || '',
+      url: action.url || '',
+    });
     const inputRef = React.useRef(null);
     const canAttach = action.type === 'ritual' || action.type === 'thread-post' || action.type === 'message';
     const isMessage = action.type === 'message';
+    const isProjectAction = action.type === 'project-action';
+    const isRitualAction = action.type === 'ritual';
+    const { profiles } = useUserProfiles();
+    const projectState = useProjects();
+    const projectMembers = (projectState.members || []).filter(member => member.projectId === action.project?.id);
+    const projectStatuses = window.__projectStore?.ACTION_STATUSES || [
+      { id: 'not_started', label: 'Not Started' },
+      { id: 'in_progress', label: 'In Progress' },
+      { id: 'for_review', label: 'For Review' },
+      { id: 'done', label: 'Done' },
+      { id: 'blocked', label: 'Blocked' },
+      { id: 'cancelled', label: 'Cancelled' },
+    ];
+    const nameOf = id => profiles.find(person => person.id === id)?.fullName || profiles.find(person => person.id === id)?.email || id;
 
     React.useEffect(() => {
       if (!file || !String(file.type || '').startsWith('image/')) {
@@ -783,6 +832,42 @@
             </div>
           ))}
         </div>
+        {isProjectAction && (
+          <div className="new-action-form chatbot-project-action-form">
+            <div className="new-action-grid">
+              <input className="input" placeholder="Topic" value={draft.topic} onChange={event => setDraft(value => ({ ...value, topic: event.target.value }))} />
+              <input className="input" placeholder="Action / Particulars" value={draft.title} onChange={event => setDraft(value => ({ ...value, title: event.target.value }))} />
+              <select className="select" value={draft.responsibleId} onChange={event => setDraft(value => ({ ...value, responsibleId: event.target.value }))}>
+                <option value="">Responsible user</option>
+                {projectMembers.map(member => <option key={member.userId} value={member.userId}>{nameOf(member.userId)}</option>)}
+              </select>
+              <select className="select" value={draft.status} onChange={event => setDraft(value => ({ ...value, status: event.target.value }))}>
+                {projectStatuses.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
+              </select>
+              <textarea className="textarea" placeholder="Description / details" value={draft.brief} onChange={event => setDraft(value => ({ ...value, brief: event.target.value }))} />
+              <textarea className="textarea" placeholder="Next step" value={draft.nextStep} onChange={event => setDraft(value => ({ ...value, nextStep: event.target.value }))} />
+              <input className="input" type="date" value={draft.dueDate} onChange={event => setDraft(value => ({ ...value, dueDate: event.target.value }))} />
+              <input className="input" placeholder="Initial blocker, if any" value={draft.blockers} onChange={event => setDraft(value => ({ ...value, blockers: event.target.value }))} />
+            </div>
+          </div>
+        )}
+        {isRitualAction && (
+          <div className="chatbot-ritual-form">
+            <textarea
+              className="textarea"
+              placeholder="Description"
+              value={ritualDraft.description}
+              onChange={event => setRitualDraft(value => ({ ...value, description: event.target.value }))}
+            />
+            <input
+              className="input"
+              placeholder="Link (required)"
+              value={ritualDraft.url}
+              onChange={event => setRitualDraft(value => ({ ...value, url: event.target.value }))}
+              required
+            />
+          </div>
+        )}
         {canAttach && (
           <div className="exo-action-attachment">
             <input
@@ -810,7 +895,7 @@
         )}
         <div className="exo-action-buttons">
           <button type="button" className="btn btn-ghost btn-sm" onClick={onCancel} disabled={busy}>Cancel</button>
-          <button type="button" className="btn btn-primary btn-sm" onClick={() => onConfirm(file)} disabled={busy}>
+          <button type="button" className="btn btn-primary btn-sm" onClick={() => onConfirm(isProjectAction ? { draft } : isRitualAction ? { file, ritualDraft } : file)} disabled={busy || (isProjectAction && !draft.title.trim()) || (isRitualAction && !ritualDraft.url.trim())}>
             {busy ? <i className="fa-solid fa-spinner fa-spin" /> : <i className="fa-solid fa-check" />}
             {busy ? 'Working...' : action.confirmLabel}
           </button>
@@ -970,10 +1055,15 @@
         actionMsg.onCancel = () => {
           setMessages(prev => prev.map(msg => msg.id === actionId ? { ...msg, action: null, content: 'Cancelled. Nothing was changed.' } : msg));
         };
-        actionMsg.onConfirm = async (file) => {
+        actionMsg.onConfirm = async (payload) => {
           setMessages(prev => prev.map(msg => msg.id === actionId ? { ...msg, busy: true } : msg));
           try {
-            const result = await executeAgentAction({ ...proposed, file: file || null }, { profile });
+            const nextAction = proposed.type === 'project-action'
+              ? { ...proposed, draft: payload?.draft || {} }
+              : proposed.type === 'ritual'
+                ? { ...proposed, body: payload?.ritualDraft?.description || '', url: payload?.ritualDraft?.url || '', file: payload?.file || null }
+                : { ...proposed, file: payload || null };
+            const result = await executeAgentAction(nextAction, { profile });
             setMessages(prev => prev.map(msg => msg.id === actionId ? { ...msg, action: null, busy: false, content: result } : msg));
           } catch (err) {
             setMessages(prev => prev.map(msg => msg.id === actionId ? { ...msg, busy: false, action: null, content: err?.message || 'EX-O could not complete that action.' } : msg));
