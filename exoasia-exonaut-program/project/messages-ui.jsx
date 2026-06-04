@@ -322,7 +322,7 @@ function MessagesPage({ intent, onIntentHandled }) {
                 <div className="messages-conversation-title">
                   <div>
                     <div className="t-heading" style={{ marginBottom: 2 }}>{activeThread.title}</div>
-                    <div className="t-micro">{activeThread.isGroup ? `${activeThread.participantIds.length} members` : activeThread.participantNames.join(' / ')}</div>
+                    <div className="t-micro">{activeThread.isGroup ? `${activeThread.participantIds.length} members` : activeThread.otherParticipantNames.join(' / ')}</div>
                   </div>
                   {activeThread.isGroup && (
                     <button type="button" className="message-group-details-btn" onClick={() => setDetailsOpen(true)} title="Group Details">

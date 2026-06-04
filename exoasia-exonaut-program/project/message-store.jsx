@@ -289,6 +289,9 @@
     const fallbackTitle = others.length
       ? others.map(profileName).join(', ')
       : 'Saved notes';
+    const displayTitle = thread.threadType === 'direct'
+      ? fallbackTitle
+      : (thread.title || fallbackTitle);
     const unreadCount = messages.filter(m =>
       m.senderId !== userId &&
       (!thread.lastReadAt || new Date(m.createdAt) > new Date(thread.lastReadAt))
@@ -296,7 +299,7 @@
     return {
       ...thread,
       participantIds,
-      title: thread.title || fallbackTitle,
+      title: displayTitle,
       participantNames: participantIds.map(profileName),
       participantAvatars: participantIds.map(profileAvatar),
       otherParticipantIds: others,
