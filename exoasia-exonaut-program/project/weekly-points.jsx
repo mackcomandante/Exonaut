@@ -93,6 +93,8 @@
   // into the cohort's declared total if provided.
   function currentWeek(cohort) {
     const c = cohort || (typeof COHORTS !== 'undefined' ? COHORTS.find(x => x.status === 'active') : null);
+    const timeline = c && window.getCohortTimeline?.(c);
+    if (timeline?.valid) return timeline.currentWeek;
     const cohortStart = c ? parseCohortDate(c.start || c.startDate) : null;
     if (cohortStart && cohortStart.getTime() > Date.now()) {
       return Math.max(1, (typeof COHORT !== 'undefined' ? COHORT.week : 1) || 1);

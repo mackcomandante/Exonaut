@@ -6,6 +6,7 @@
 
 (function () {
   const STORE_KEY = 'exo:cohort-store:v1';
+  const DEFAULT_HIDDEN_COHORT_IDS = new Set(['c2526', 'c2425']);
 
   function loadState() {
     try {
@@ -52,6 +53,7 @@
       end: row.end_date || '',
       color: row.color || '#C9E500',
       custom: row.custom !== false,
+      hidden: !!row.hidden,
     };
   }
 
@@ -65,6 +67,7 @@
       end_date: cohort.end || null,
       color: cohort.color || '#C9E500',
       custom: cohort.custom !== false,
+      hidden: !!cohort.hidden,
       created_by: createdBy || null,
     };
   }
@@ -82,6 +85,11 @@
     if (!window.__db) return;
     const { error } = await window.__db.from('cohorts').delete().eq('id', id);
     if (error) console.warn('Could not delete cohort remotely:', error.message || error);
+  }
+
+  async function hideSeedCohortRemote(cohort) {
+    if (!window.__db || !cohort?.id) return;
+    await saveCohortRemote({ ...cohort, custom: false, hidden: true });
   }
 
   async function renameCohortRemote(oldId, cohort, affectedUserIds) {
@@ -118,7 +126,7 @@
     if (!window.__db) return;
     const { data, error } = await window.__db
       .from('cohorts')
-      .select('id, name, code, status, start_date, end_date, color, custom')
+      .select('id, name, code, status, start_date, end_date, color, custom, hidden')
       .order('created_at', { ascending: true });
     if (error) {
       console.warn('Could not load cohorts:', error.message || error);
@@ -169,12 +177,25 @@
       const seed = (typeof COHORTS !== 'undefined') ? COHORTS : [];
       const patches = state.cohortPatches || {};
       const byId = new Map();
+      const remoteHidden = new Set([
+        ...DEFAULT_HIDDEN_COHORT_IDS,
+        ...(state.remoteCohorts || []).filter(c => c.hidden).map(c => c.id),
+      ]);
       seed.forEach(c => {
-        if (patches[c.id]?.hidden) return;
+        if (c.hidden || patches[c.id]?.hidden || remoteHidden.has(c.id)) return;
         byId.set(c.id, { ...c, ...(patches[c.id] || {}) });
       });
-      (state.createdCohorts || []).forEach(c => byId.set(c.id, { ...c, ...(patches[c.id] || {}) }));
-      (state.remoteCohorts || []).forEach(c => byId.set(c.id, { ...(byId.get(c.id) || {}), ...c, ...(patches[c.id] || {}) }));
+      (state.createdCohorts || []).forEach(c => {
+        if (c.hidden || patches[c.id]?.hidden || remoteHidden.has(c.id)) return;
+        byId.set(c.id, { ...c, ...(patches[c.id] || {}) });
+      });
+      (state.remoteCohorts || []).forEach(c => {
+        if (c.hidden || patches[c.id]?.hidden || remoteHidden.has(c.id)) {
+          byId.delete(c.id);
+          return;
+        }
+        byId.set(c.id, { ...(byId.get(c.id) || {}), ...c, ...(patches[c.id] || {}) });
+      });
       return Array.from(byId.values());
     },
     getById(id) {
@@ -230,7 +251,8 @@
       }
       persist(state);
       notify();
-      deleteCohortRemote(id);
+      if (cohort && idx === -1) hideSeedCohortRemote(cohort);
+      else deleteCohortRemote(id);
     },
     updateCohort(id, patch) {
       const nextId = (patch.id || id || '').trim();

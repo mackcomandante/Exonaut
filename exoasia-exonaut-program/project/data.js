@@ -14,8 +14,8 @@ const COHORT = {
 // Each USER below carries a `cohort` field pointing to a cohort id.
 const COHORTS = [
   { id: 'c2627', name: 'Batch 2026–2027', code: 'EXO-B-2627', status: 'active',   start: 'OCT 06 2026', end: 'JAN 29 2027', color: '#C9E500' },
-  { id: 'c2526', name: 'Batch 2025–2026', code: 'EXO-B-2526', status: 'alumni',   start: 'OCT 07 2025', end: 'JAN 30 2026', color: '#B095C5' },
-  { id: 'c2425', name: 'Batch 2024–2025', code: 'EXO-B-2425', status: 'alumni',   start: 'OCT 08 2024', end: 'JAN 31 2025', color: '#B095C5' },
+  { id: 'c2526', name: 'Batch 2025–2026', code: 'EXO-B-2526', status: 'alumni',   start: 'OCT 07 2025', end: 'JAN 30 2026', color: '#B095C5', hidden: true },
+  { id: 'c2425', name: 'Batch 2024–2025', code: 'EXO-B-2425', status: 'alumni',   start: 'OCT 08 2024', end: 'JAN 31 2025', color: '#B095C5', hidden: true },
 ];
 
 // 7 tracks from Exonaut Mission Briefs · Batch 2026–2027

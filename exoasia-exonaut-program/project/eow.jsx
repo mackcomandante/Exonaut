@@ -25,10 +25,10 @@ function eowDayName(date) {
 }
 
 // -------- Week stepper --------
-function EowWeekStepper({ weekNumber, totalWeeks, onChange, window: win }) {
+function EowWeekStepper({ weekNumber, totalWeeks, currentWeek, onChange, window: win }) {
   const canPrev = weekNumber > 1;
   const canNext = weekNumber < totalWeeks;
-  const isCurrent = weekNumber === EOW.currentWeek();
+  const isCurrent = weekNumber === currentWeek;
 
   const btn = (enabled, onClick, icon) => (
     <button onClick={enabled ? onClick : undefined} disabled={!enabled} style={{
@@ -58,7 +58,7 @@ function EowWeekStepper({ weekNumber, totalWeeks, onChange, window: win }) {
       </div>
       {btn(canNext, () => onChange(weekNumber + 1), 'fa-chevron-right')}
       {!isCurrent && (
-        <button className="commander-eow-jump" onClick={() => onChange(EOW.currentWeek())} style={{
+        <button className="commander-eow-jump" onClick={() => onChange(currentWeek)} style={{
           padding: '8px 12px', background: 'transparent',
           border: '1px solid var(--accent)', borderRadius: 2, color: 'var(--accent)',
           cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.08em', fontWeight: 700,
@@ -495,10 +495,15 @@ function CommanderEOW() {
   useUserProfiles();
   usePoints();
   useManualCredits();
-  const [weekNumber, setWeekNumber] = React.useState(() => EOW.currentWeek());
-  const [share, setShare] = React.useState(null);   // { entry, cohort, weekNumber, window }
   const selectedCohort = all.find(c => c.id === cohortId) || all[0] || (typeof COHORT !== 'undefined' ? COHORT : null);
+  const currentWeek = EOW.currentWeek(selectedCohort);
+  const [weekNumber, setWeekNumber] = React.useState(() => currentWeek);
+  const [share, setShare] = React.useState(null);   // { entry, cohort, weekNumber, window }
   const totalWeeks = window.getCohortWeekTotal?.(selectedCohort) || (typeof COHORT !== 'undefined' ? COHORT.weekTotal : 12) || 12;
+
+  React.useEffect(() => {
+    setWeekNumber(currentWeek);
+  }, [cohortId, currentWeek]);
 
   // Show all cohorts — but float the Commander's currently-selected cohort to the top.
   const cohorts = [...all].sort((a, b) => {
@@ -527,6 +532,7 @@ function CommanderEOW() {
         <EowWeekStepper
           weekNumber={weekNumber}
           totalWeeks={totalWeeks}
+          currentWeek={currentWeek}
           onChange={setWeekNumber}
           window={activeCohortWin}
         />
