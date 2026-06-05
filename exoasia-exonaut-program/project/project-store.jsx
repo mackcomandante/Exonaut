@@ -128,6 +128,7 @@
       completedAt: row.completed_at,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
+      pillar: row.pillar || 'missions',
     };
   }
 
@@ -319,6 +320,7 @@
       due_date: data.dueDate || null,
       sort_order: Number(data.sortOrder ?? classified.sortOrder),
       completed_at: status === 'done' ? (data.completedAt || new Date().toISOString()) : null,
+      pillar: data.pillar || existing?.pillar || 'missions',
     };
     const { error } = await window.__db.from('project_tasks').upsert(row, { onConflict: 'id' });
     if (error) throw error;
@@ -360,6 +362,51 @@
         });
       }
     }
+    if (statusChanged && status === 'done') {
+      const taskAssignees = state.assignees.filter(a => a.taskId === row.id);
+      const recipients = taskAssignees.map(a => a.userId);
+      if (recipients.length) {
+        const pillarValue = row.pillar || 'missions';
+        const ledgerRows = recipients.map(userId => ({
+          id: 'pts-ar-done-' + row.id + '-' + userId,
+          user_id: userId,
+          source_type: 'project',
+          source_id: row.id,
+          cohort_id: 'c2627',
+          track_code: row.track_code,
+          pillar: pillarValue,
+          points: 0.25,
+          note: row.title,
+          awarded_by: createdBy,
+        }));
+        await window.__db.from('point_ledger').upsert(ledgerRows, { onConflict: 'id' });
+        if (window.__pointsStore) {
+          recipients.forEach(userId => window.__pointsStore.award({
+            id: 'pts-ar-done-' + row.id + '-' + userId,
+            userId,
+            sourceType: 'project',
+            sourceId: row.id,
+            cohortId: 'c2627',
+            trackCode: row.track_code,
+            pillar: pillarValue,
+            points: 0.25,
+            note: row.title,
+            awardedBy: createdBy,
+          }));
+        }
+        if (window.__notifStore) {
+          recipients.forEach(userId => window.__notifStore.add({
+            toUserId: userId,
+            type: 'points',
+            title: '+0.25 pts · Action completed',
+            sub: row.title,
+            icon: 'fa-bolt',
+            metadata: { taskId: row.id },
+          }));
+        }
+      }
+    }
+
     if (!data.id && data.consultedId && window.__notifStore) {
       window.__notifStore.add({
         toUserId: data.consultedId,
@@ -648,7 +695,7 @@
         source_id: taskId,
         cohort_id: 'c2627',
         track_code: task.trackCode,
-        pillar: 'missions',
+        pillar: task.pillar || 'missions',
         points: task.points,
         note: task.title,
         awarded_by: reviewer,
@@ -687,7 +734,7 @@
             sourceId: taskId,
             cohortId: 'c2627',
             trackCode: task.trackCode,
-            pillar: 'missions',
+            pillar: task.pillar || 'missions',
             points: task.points,
             note: task.title,
             awardedBy: reviewer,
@@ -1298,6 +1345,10 @@ function ActionRegister({ project, actions, members, assignees, profiles, canMan
 
   return (
     <section className="card-panel action-register-panel">
+      <div className="action-pillar-guide">
+        <i className="fa-solid fa-circle-info" />
+        <span><strong>Pillar guide:</strong> select <em>Mission</em> for anything related to building the product, <em>Client</em> for client-facing deliverables. Completing a task earns <strong>+0.25 pts</strong>.</span>
+      </div>
       <div className="action-toolbar">
         <label className="action-search"><i className="fa-solid fa-magnifying-glass" /><input placeholder="Search actions..." value={search} onChange={event => setSearch(event.target.value)} /></label>
         <select className="select" value={status} onChange={event => setStatus(event.target.value)}><option value="all">All statuses</option>{window.__projectStore.ACTION_STATUSES.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select>
@@ -1315,7 +1366,7 @@ function ActionRegister({ project, actions, members, assignees, profiles, canMan
           <span className="action-selection-count">{actions.length} actions in this project</span>
         </div>
         <table className="action-table">
-          <thead><tr><th>#</th><th>Topic</th><th>Action / Particulars</th><th>Status</th><th>Next Step</th><th>Due</th><th>Responsible</th><th>Blockers</th><th>Links</th><th>Updated</th></tr></thead>
+          <thead><tr><th>#</th><th>Topic</th><th>Action / Particulars</th><th>Status</th><th>Next Step</th><th>Due</th><th>Responsible</th><th>Blockers</th><th>Links</th><th>Updated</th><th>Pillar</th></tr></thead>
           <tbody>
             {filtered.map((action, index) => {
               const owners = assignees.filter(item => item.taskId === action.id).map(item => nameOf(item.userId));
@@ -1329,6 +1380,19 @@ function ActionRegister({ project, actions, members, assignees, profiles, canMan
                   <td data-label="Blockers">{action.blockers ? <span className="blocker-note"><i className="fa-solid fa-triangle-exclamation" /> {action.blockers}</span> : '-'}</td>
                   <td data-label="Links">{action.referenceLinks.length ? <span className="link-count"><i className="fa-solid fa-paperclip" /> {action.referenceLinks.length}</span> : '-'}</td>
                   <td data-label="Updated">{prettyDate(action.updatedAt || action.createdAt)}</td>
+                  <td data-label="Pillar" onClick={e => e.stopPropagation()}>
+                    <select
+                      className="select pillar-inline-select"
+                      value={action.pillar || 'missions'}
+                      onChange={async e => {
+                        e.stopPropagation();
+                        await window.__projectStore.saveTask({ ...action, pillar: e.target.value });
+                      }}
+                    >
+                      <option value="missions">Mission</option>
+                      <option value="client">Client</option>
+                    </select>
+                  </td>
                 </tr>
               );
             })}
@@ -1378,7 +1442,7 @@ function ClearActionsModal({ project, actions, onClose }) {
 }
 
 function NewActionForm({ project, members, profiles, canManage, onClose }) {
-  const [draft, setDraft] = React.useState({ topic: '', title: '', brief: '', status: 'not_started', nextStep: '', dueDate: '', responsibleId: '', blockers: '' });
+  const [draft, setDraft] = React.useState({ topic: '', title: '', brief: '', status: 'not_started', nextStep: '', dueDate: '', responsibleId: '', blockers: '', pillar: 'missions' });
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState('');
   const nameOf = id => profiles.find(person => person.id === id)?.fullName || profiles.find(person => person.id === id)?.email || id;
@@ -1390,7 +1454,7 @@ function NewActionForm({ project, members, profiles, canManage, onClose }) {
     setSaving(true);
     setError('');
     try {
-      const taskId = await window.__projectStore.saveTask({ projectId: project.id, trackCode: project.trackCodes[0] || 'GENERAL', accountableId: project.firstOfficerId, topic: draft.topic.trim(), title: draft.title.trim(), brief: draft.brief.trim(), status: draft.status, nextStep: draft.nextStep.trim(), blockers: draft.blockers.trim(), dueDate: draft.dueDate, displayOrder: Math.floor(Date.now() / 1000) });
+      const taskId = await window.__projectStore.saveTask({ projectId: project.id, trackCode: project.trackCodes[0] || 'GENERAL', accountableId: project.firstOfficerId, topic: draft.topic.trim(), title: draft.title.trim(), brief: draft.brief.trim(), status: draft.status, nextStep: draft.nextStep.trim(), blockers: draft.blockers.trim(), dueDate: draft.dueDate, displayOrder: Math.floor(Date.now() / 1000), pillar: draft.pillar });
       if (draft.responsibleId) await window.__projectStore.assignTaskTeam(taskId, [draft.responsibleId]);
       onClose();
     } catch (err) {
@@ -1414,6 +1478,7 @@ function NewActionForm({ project, members, profiles, canManage, onClose }) {
         <input className="input" placeholder="Action / Particulars" value={draft.title} onChange={event => setDraft(value => ({ ...value, title: event.target.value }))} />
         <select className="select" value={draft.responsibleId} onChange={event => setDraft(value => ({ ...value, responsibleId: event.target.value }))}><option value="">Responsible user</option>{members.map(member => <option key={member.userId} value={member.userId}>{nameOf(member.userId)}</option>)}</select>
         <select className="select" value={draft.status} onChange={event => setDraft(value => ({ ...value, status: event.target.value }))}>{window.__projectStore.ACTION_STATUSES.filter(item => canManage || !['done', 'cancelled'].includes(item.id)).map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select>
+        <select className="select" value={draft.pillar} onChange={event => setDraft(value => ({ ...value, pillar: event.target.value }))}><option value="missions">Mission — build related</option><option value="client">Client — client facing</option></select>
         <textarea className="textarea" placeholder="Description / details" value={draft.brief} onChange={event => setDraft(value => ({ ...value, brief: event.target.value }))} />
         <textarea className="textarea" placeholder="Next step" value={draft.nextStep} onChange={event => setDraft(value => ({ ...value, nextStep: event.target.value }))} />
         <input className="input" type="date" value={draft.dueDate} onChange={event => setDraft(value => ({ ...value, dueDate: event.target.value }))} />
@@ -1636,7 +1701,7 @@ function ProjectActivity({ actions, activity, profiles }) {
 function ActionModal({ action, project, members, profiles, assignees, comments, activity, canManage, canEditActions, onClose }) {
   const [mode, setMode] = React.useState('view');
   const [team, setTeam] = React.useState(assignees.map(assignment => assignment.userId));
-  const [edit, setEdit] = React.useState({ topic: action.topic, title: action.title, brief: action.brief, status: action.status, nextStep: action.nextStep, dueDate: action.dueDate || '', blockers: action.blockers, referenceLinks: action.referenceLinks.join('\n'), progressNote: action.progressNote });
+  const [edit, setEdit] = React.useState({ topic: action.topic, title: action.title, brief: action.brief, status: action.status, nextStep: action.nextStep, dueDate: action.dueDate || '', blockers: action.blockers, referenceLinks: action.referenceLinks.join('\n'), progressNote: action.progressNote, pillar: action.pillar || 'missions' });
   const [comment, setComment] = React.useState('');
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState('');
@@ -1654,7 +1719,7 @@ function ActionModal({ action, project, members, profiles, assignees, comments, 
     setSaving(true);
     setError('');
     try {
-      await window.__projectStore.saveTask({ ...action, ...edit, referenceLinks: edit.referenceLinks.split(/\n|,/).map(value => value.trim()).filter(Boolean), id: action.id, projectId: action.projectId, trackCode: action.trackCode });
+      await window.__projectStore.saveTask({ ...action, ...edit, referenceLinks: edit.referenceLinks.split(/\n|,/).map(value => value.trim()).filter(Boolean), id: action.id, projectId: action.projectId, trackCode: action.trackCode, pillar: edit.pillar });
       await window.__projectStore.assignTaskTeam(action.id, team);
       setMode('view');
     } catch (err) {
@@ -1695,6 +1760,7 @@ function ActionModal({ action, project, members, profiles, assignees, comments, 
                 <div className="action-summary-block"><span>Next step</span><p>{action.nextStep || 'Not set'}</p></div>
                 <div className="action-summary-block"><span>Due date</span><p>{prettyDate(action.dueDate)}</p></div>
                 <div className="action-summary-block"><span>Responsible</span><p>{responsible}</p></div>
+                <div className="action-summary-block"><span>Pillar</span><p className={'pillar-badge pillar-' + (action.pillar || 'missions')}>{action.pillar === 'client' ? 'Client' : 'Mission'}</p></div>
                 <div className="action-summary-block"><span>Project lead</span><p>{nameOf(project.firstOfficerId)}</p></div>
                 <div className="action-summary-block action-summary-wide"><span>Blockers</span><p className={action.blockers ? 'modal-blocker' : ''}>{action.blockers || 'No blockers recorded.'}</p></div>
                 <div className="action-summary-block action-summary-wide"><span>Latest progress update</span><p>{action.progressNote || 'No progress update recorded.'}</p></div>
@@ -1710,7 +1776,7 @@ function ActionModal({ action, project, members, profiles, assignees, comments, 
                 <input className="input" placeholder="Topic" value={edit.topic} onChange={event => setEdit(value => ({ ...value, topic: event.target.value }))} />
                 <input className="input" value={edit.title} onChange={event => setEdit(value => ({ ...value, title: event.target.value }))} />
                 <textarea className="textarea" placeholder="Description / details" value={edit.brief} onChange={event => setEdit(value => ({ ...value, brief: event.target.value }))} />
-                <div className="action-modal-field-grid"><label>Status<select className="select" value={edit.status} onChange={event => setEdit(value => ({ ...value, status: event.target.value }))}>{statusOptions.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label><label>Due date<input className="input" type="date" value={edit.dueDate} onChange={event => setEdit(value => ({ ...value, dueDate: event.target.value }))} /></label></div>
+                <div className="action-modal-field-grid"><label>Status<select className="select" value={edit.status} onChange={event => setEdit(value => ({ ...value, status: event.target.value }))}>{statusOptions.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label><label>Due date<input className="input" type="date" value={edit.dueDate} onChange={event => setEdit(value => ({ ...value, dueDate: event.target.value }))} /></label><label>Pillar<select className="select" value={edit.pillar} onChange={event => setEdit(value => ({ ...value, pillar: event.target.value }))}><option value="missions">Mission — build related</option><option value="client">Client — client facing</option></select></label></div>
                 <label>Responsible<select multiple className="select assignee-select" value={team} onChange={event => setTeam(Array.from(event.target.selectedOptions).map(option => option.value))}>{members.map(member => <option key={member.userId} value={member.userId}>{nameOf(member.userId)}</option>)}</select></label>
                 <label>Next step<textarea className="textarea" value={edit.nextStep} onChange={event => setEdit(value => ({ ...value, nextStep: event.target.value }))} /></label>
                 <label>Blockers<textarea className="textarea" value={edit.blockers} onChange={event => setEdit(value => ({ ...value, blockers: event.target.value }))} /></label>

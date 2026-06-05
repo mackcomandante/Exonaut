@@ -1890,7 +1890,7 @@ img, svg { display: block; max-width: 100%; }
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
-.action-table { border-collapse: separate; border-spacing: 0; min-width: 1120px; table-layout: fixed; width: 100%; }
+.action-table { border-collapse: separate; border-spacing: 0; min-width: 1260px; table-layout: fixed; width: 100%; }
 .action-table th {
   border-bottom: 1px solid var(--hairline);
   color: var(--ink-faint);
@@ -1910,6 +1910,7 @@ img, svg { display: block; max-width: 100%; }
 .action-table th:nth-child(8), .action-table td:nth-child(8) { width: 140px; }
 .action-table th:nth-child(9), .action-table td:nth-child(9) { width: 80px; }
 .action-table th:nth-child(10), .action-table td:nth-child(10) { width: 130px; }
+.action-table th:nth-child(11), .action-table td:nth-child(11) { width: 120px; }
 .action-table td {
   border-bottom: 1px solid var(--hairline);
   color: var(--ink-muted);
@@ -1954,6 +1955,43 @@ img, svg { display: block; max-width: 100%; }
 .blocker-note { display: block; max-width: 100%; overflow: hidden; overflow-wrap: anywhere; text-overflow: ellipsis; white-space: nowrap; }
 .link-count { color: var(--accent); }
 .action-empty { color: var(--ink-muted); padding: 30px 16px; text-align: center; }
+.action-pillar-guide {
+  align-items: flex-start;
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  border-left: 3px solid var(--accent);
+  border-radius: 2px;
+  color: var(--ink-muted);
+  display: flex;
+  font-size: 12px;
+  gap: 10px;
+  line-height: 1.5;
+  margin-bottom: 12px;
+  padding: 10px 14px;
+}
+.action-pillar-guide i { color: var(--accent); flex-shrink: 0; margin-top: 2px; }
+.action-pillar-guide strong { color: var(--ink); }
+.pillar-inline-select {
+  background: transparent;
+  border: 1px solid var(--hairline);
+  border-radius: 3px;
+  color: var(--ink-muted);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 3px 6px;
+  width: 100%;
+}
+.pillar-inline-select:focus { border-color: var(--accent); outline: none; }
+.pillar-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 2px 8px;
+  border-radius: 3px;
+  text-transform: uppercase;
+}
+.pillar-missions { background: color-mix(in srgb, var(--lime) 12%, transparent); color: var(--lime); }
+.pillar-client { background: color-mix(in srgb, var(--platinum) 12%, transparent); color: var(--platinum); }
 .project-overview {
   display: grid;
   gap: 14px;

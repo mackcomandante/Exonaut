@@ -832,20 +832,16 @@ function CommanderLeads() {
 }
 
 function CommanderProjectProgress({ onNavigate }) {
-  const { projects, tasks, assignees } = useProjects();
+  const { projects, tasks, members, assignees } = useProjects();
   const { profiles } = useUserProfiles();
   const { ledger } = usePoints();
   const [selectedProject, setSelectedProject] = React.useState(null);
   const nameOf = id => profiles.find(p => p.id === id)?.fullName || profiles.find(p => p.id === id)?.email || 'Unassigned';
   const visibleProjects = projects.filter(p => p.status !== 'archived');
   const taskRows = project => tasks.filter(t => t.projectId === project.id);
+  const isCompletedTask = task => ['approved', 'done', 'completed'].includes(task.status);
   const participantCount = project => {
-    const taskIds = new Set(taskRows(project).map(t => t.id));
-    return new Set(assignees.filter(a => taskIds.has(a.taskId)).map(a => a.userId)).size;
-  };
-  const secondOfficers = project => {
-    const ids = [...new Set(taskRows(project).map(t => t.secondOfficerId).filter(Boolean))];
-    return ids.length ? ids.map(nameOf).join(', ') : 'Unassigned';
+    return new Set(members.filter(member => member.projectId === project.id).map(member => member.userId)).size;
   };
   const pointsForProject = project => {
     const taskIds = new Set(taskRows(project).map(t => t.id));
@@ -871,23 +867,19 @@ function CommanderProjectProgress({ onNavigate }) {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 18 }}>
           <KPI label="FIRST OFFICER" value={nameOf(selected.firstOfficerId)} accent="platinum" sub="PROJECT LEAD" />
           <KPI label="TRACKS" value={(selected.trackCodes || []).length} accent="platinum" sub={(selected.trackCodes || []).map(c => TRACKS.find(t => t.code === c)?.short || c).join(' / ') || '-'} />
-          <KPI label="TASKS" value={`${projectTasks.filter(t => t.status === 'approved').length}/${projectTasks.length}`} accent="lime" sub="COMPLETED" />
+          <KPI label="TASKS" value={`${projectTasks.filter(isCompletedTask).length}/${projectTasks.length}`} accent="lime" sub="COMPLETED" />
           <KPI label="PENDING" value={projectTasks.filter(t => t.status === 'submitted').length} accent="amber" sub="AWAITING APPROVAL" />
           <KPI label="PARTICIPANTS" value={participantCount(selected)} accent="lime" sub={`${pointsForProject(selected)} POINTS`} />
         </div>
-        <div className="card-panel" style={{ marginBottom: 18 }}>
-          <div className="t-label-muted">SECOND OFFICERS / TRACK LEADS</div>
-          <div className="t-heading" style={{ fontSize: 14, textTransform: 'none', letterSpacing: 0, marginTop: 8 }}>{secondOfficers(selected)}</div>
-        </div>
         <div className="lb-table commander-project-task-table">
-          <div className="lb-header" style={{ gridTemplateColumns: '1.5fr 100px 1fr 100px 90px 90px' }}>
-            <div>TASK</div><div>TRACK</div><div>SECOND OFFICER</div><div>TEAM</div><div>POINTS</div><div>STATUS</div>
+          <div className="lb-header" style={{ gridTemplateColumns: '1.5fr 100px 100px 90px 90px' }}>
+            <div>TASK</div><div>TRACK</div><div>TEAM</div><div>POINTS</div><div>STATUS</div>
           </div>
           {projectTasks.map(task => {
             const team = assignees.filter(a => a.taskId === task.id);
             return (
-              <div key={task.id} className="lb-row commander-project-task-row" style={{ gridTemplateColumns: '1.5fr 100px 1fr 100px 90px 90px' }}>
-                <div>{task.title}</div><div>{TRACKS.find(t => t.code === task.trackCode)?.short || task.trackCode}</div><div>{nameOf(task.secondOfficerId)}</div><div>{team.length}</div><div>{task.points}</div>
+              <div key={task.id} className="lb-row commander-project-task-row" style={{ gridTemplateColumns: '1.5fr 100px 100px 90px 90px' }}>
+                <div>{task.title}</div><div>{TRACKS.find(t => t.code === task.trackCode)?.short || task.trackCode}</div><div>{team.length}</div><div>{task.points}</div>
                 <span className={'status-pill ' + (task.status === 'approved' ? 'status-approved' : task.status === 'submitted' ? 'status-submitted' : 'status-not-started')}>{task.status}</span>
               </div>
             );
@@ -901,17 +893,17 @@ function CommanderProjectProgress({ onNavigate }) {
     <div className="enter">
       <div className="section-head"><div><div className="t-label" style={{ marginBottom: 8, color: 'var(--amber)' }}>COMMANDER - PROJECT OVERSIGHT</div><h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>Project Progress</h1></div></div>
       <div className="lb-table commander-project-table">
-        <div className="lb-header" style={{ gridTemplateColumns: '1.35fr .9fr 1fr 1fr 85px 85px 85px 95px' }}>
-          <div>PROJECT</div><div>TRACKS</div><div>FIRST OFFICER</div><div>SECOND OFFICERS</div><div>TASKS</div><div>PENDING</div><div>TEAM</div><div>STATUS</div>
+        <div className="lb-header" style={{ gridTemplateColumns: '1.35fr .9fr 1fr 85px 85px 85px 95px' }}>
+          <div>PROJECT</div><div>TRACKS</div><div>FIRST OFFICER</div><div>TASKS</div><div>PENDING</div><div>TEAM</div><div>STATUS</div>
         </div>
         {visibleProjects.map(project => {
           const projectTasks = taskRows(project);
-          const approved = projectTasks.filter(t => t.status === 'approved').length;
+          const approved = projectTasks.filter(isCompletedTask).length;
           const pending = projectTasks.filter(t => t.status === 'submitted').length;
           return (
-            <div key={project.id} className="lb-row commander-project-row" style={{ gridTemplateColumns: '1.35fr .9fr 1fr 1fr 85px 85px 85px 95px', cursor: 'pointer' }} onClick={() => setSelectedProject(project.id)}>
+            <div key={project.id} className="lb-row commander-project-row" style={{ gridTemplateColumns: '1.35fr .9fr 1fr 85px 85px 85px 95px', cursor: 'pointer' }} onClick={() => setSelectedProject(project.id)}>
               <div><div className="t-heading" style={{ fontSize: 12, textTransform: 'none', letterSpacing: 0 }}>{project.title}</div><div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)' }}>DUE {project.dueDate || '-'}</div></div>
-              <div>{project.trackCodes.map(c => TRACKS.find(t => t.code === c)?.short || c).join(' / ')}</div><div>{nameOf(project.firstOfficerId)}</div><div>{secondOfficers(project)}</div><div>{approved}/{projectTasks.length}</div><div>{pending}</div><div className="lb-points">{participantCount(project)}</div>
+              <div>{project.trackCodes.map(c => TRACKS.find(t => t.code === c)?.short || c).join(' / ')}</div><div>{nameOf(project.firstOfficerId)}</div><div>{approved}/{projectTasks.length}</div><div>{pending}</div><div className="lb-points">{participantCount(project)}</div>
               <span className={'status-pill ' + (project.status === 'completed' ? 'status-approved' : 'status-submitted')}>{project.status}</span>
             </div>
           );
