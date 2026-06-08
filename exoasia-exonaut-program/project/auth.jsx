@@ -21,6 +21,7 @@ function LoginScreen({ onSignIn }) {
         provider: 'google',
         options: {
           redirectTo: window.location.origin + window.location.pathname,
+          scopes: 'openid email profile https://www.googleapis.com/auth/userinfo.email',
           queryParams: { access_type: 'offline', prompt: 'select_account' },
         },
       });
@@ -639,6 +640,7 @@ function RoleAuthScreen({ onAuthComplete, tweaks, setTweak }) {
         provider: 'google',
         options: {
           redirectTo: window.location.origin + window.location.pathname,
+          scopes: 'openid email profile https://www.googleapis.com/auth/userinfo.email',
           queryParams: {
             access_type: 'offline',
             prompt: 'select_account',
