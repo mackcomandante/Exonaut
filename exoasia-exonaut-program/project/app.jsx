@@ -311,7 +311,7 @@ function App() {
     else if (route === 'announce')    page = <AnnouncementsPage />;
     else if (route === 'notifications') page = <NotificationsPage />;
     else if (route === 'alumni')      page = <AlumniPage />;
-    else if (route === 'settings')    page = <SettingsPage />;
+    else if (route === 'settings')    page = <SettingsPage onSignOut={signOut} />;
     else if (hasTrackOps && route === 'lead-home') page = <LeadHome onNavigate={navigate} />;
     else if (hasTrackOps && route === 'lead-roster') page = <LeadRoster />;
     else if (hasTrackOps && route === 'lead-queue') page = <LeadQueue onNavigate={navigate} />;
@@ -339,7 +339,7 @@ function App() {
     else if (route === 'launchpad') page = <LaunchpadPage />;
     else if (route === 'kudos')       page = <KudosFeed onGive={() => setKudosOpen(true)} />;
     else if (route === 'notifications') page = <NotificationsPage />;
-    else if (route === 'settings')    page = <SettingsPage />;
+    else if (route === 'settings')    page = <SettingsPage onSignOut={signOut} />;
     else if (gradeMatch)              page = <LeadGrade subId={subId} onBack={() => navigate('lead-queue')} />;
     else                              page = <LeadHome onNavigate={navigate} />;
   } else if (roleView === 'commander') {
@@ -365,7 +365,7 @@ function App() {
     else if (route === 'launchpad') page = <LaunchpadPage />;
     else if (route === 'kudos')       page = <KudosFeed onGive={() => setKudosOpen(true)} />;
     else if (route === 'notifications') page = <NotificationsPage />;
-    else if (route === 'settings')    page = <SettingsPage />;
+    else if (route === 'settings')    page = <SettingsPage onSignOut={signOut} />;
     else                              page = <CommanderHome onNavigate={navigate} />;
   } else if (roleView === 'admin') {
     sidebar = <PlatformAdminSidebar current={route} onNavigate={navigateFromSidebar} onSignOut={signOut} mobileOpen={mobileNavOpen} onMobileClose={() => setMobileNavOpen(false)} />;
@@ -387,7 +387,7 @@ function App() {
     else if (route === 'launchpad') page = <LaunchpadPage />;
     else if (route === 'kudos')      page = <KudosFeed onGive={() => setKudosOpen(true)} />;
     else if (route === 'notifications') page = <NotificationsPage />;
-    else if (route === 'settings')   page = <SettingsPage />;
+    else if (route === 'settings')   page = <SettingsPage onSignOut={signOut} />;
     else                             page = <AdminCohorts />;
   }
 

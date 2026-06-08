@@ -120,7 +120,6 @@ function MentionTextarea({ value, onChange, members, rows = 4, placeholder, clas
             <button type="button" key={member.id} className="board-mention-option" onClick={() => selectMember(member)}>
               <AvatarWithRing name={member.fullName || member.email} avatarUrl={member.avatarUrl} size={25} tier={member.tierBadge} />
               <span>{member.fullName || member.email}</span>
-              <small>@{member.handle}</small>
             </button>
           ))}
         </div>
@@ -196,7 +195,6 @@ function CommunityBoard({ channel, onChannelChange, sort, search, composerOpen, 
             <AvatarWithRing name={me.fullName} avatarUrl={me.avatarUrl} size={29} tier={tierForBoardMember(me, profileMembers)} />
             <div>
               <strong>{me.fullName}</strong>
-              <span>@{profileHandle(me)}</span>
             </div>
           </div>
         </div>
@@ -265,7 +263,6 @@ function PostCard({ post, board, me, members, onOpenProfile }) {
         </button>
         <div className="board-post-author">
           <button type="button" className="board-author-name" onClick={() => onOpenProfile?.(author.id)}>{author.name}</button>
-          <span>@{author.handle}</span>
           <RoleChip role={author.role} />
           <time>{board.timeAgo(post.createdAt)}</time>
         </div>
@@ -332,8 +329,8 @@ function CommentCard({ comment, postId, board, me, members, depth, onOpenProfile
       </button>
       {replying && (
         <div className="board-reply-editor">
-          <div className="board-replying">Replying to @{author.handle}</div>
-          <MentionTextarea value={reply} onChange={setReply} members={members} rows={2} placeholder={'Reply to @' + author.handle} />
+          <div className="board-replying">Replying to {author.name}</div>
+          <MentionTextarea value={reply} onChange={setReply} members={members} rows={2} placeholder={'Reply to ' + author.name} />
           <div>
             <button className="btn btn-ghost btn-sm" onClick={() => { setReplying(false); setReply(''); }}>Cancel</button>
             <button className="btn btn-primary btn-sm" disabled={!reply.trim()} onClick={submitReply}>Reply</button>

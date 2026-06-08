@@ -138,65 +138,76 @@ function Profile({ onOpenMission, onTriggerBadge }) {
       </div>
 
       {editing && (
-        <div className="card-panel" style={{ maxWidth: 620, marginBottom: 24, display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <label>
-            <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.12em', marginBottom: 6, fontWeight: 700 }}>FULL NAME</div>
-            <input className="input" value={draft.fullName} onChange={(e) => setDraft(d => ({ ...d, fullName: e.target.value }))} />
-          </label>
-          <label>
-            <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.12em', marginBottom: 6, fontWeight: 700 }}>BIO</div>
-            <textarea className="textarea" rows={4} value={draft.bio} onChange={(e) => setDraft(d => ({ ...d, bio: e.target.value }))} />
-          </label>
-          <label>
-            <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.12em', marginBottom: 6, fontWeight: 700 }}>LINKEDIN URL</div>
-            <input className="input" value={draft.linkedinUrl} onChange={(e) => setDraft(d => ({ ...d, linkedinUrl: e.target.value }))} />
-          </label>
-          <label>
-            <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.12em', marginBottom: 6, fontWeight: 700 }}>DATA ROOM URL</div>
-            <input className="input" placeholder="https://drive.google.com/drive/folders/..." value={draft.dataRoomUrl} onChange={(e) => setDraft(d => ({ ...d, dataRoomUrl: e.target.value }))} />
-          </label>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <label>
-              <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.12em', marginBottom: 6, fontWeight: 700 }}>SCHOOL</div>
-              <input className="input" value={draft.school} onChange={(e) => setDraft(d => ({ ...d, school: e.target.value }))} />
-            </label>
-            <label>
-              <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.12em', marginBottom: 6, fontWeight: 700 }}>EXPERTISE</div>
-              <input className="input" value={draft.expertise} onChange={(e) => setDraft(d => ({ ...d, expertise: e.target.value }))} />
-            </label>
-          </div>
-          <label>
-            <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.12em', marginBottom: 6, fontWeight: 700 }}>PROFILE PHOTO</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <AvatarWithRing name={draft.fullName || displayName} avatarUrl={draft.avatarPreview || draft.avatarUrl} size={58} tier={tier} />
-              <input
-                className="input"
-                type="file"
-                accept="image/*"
-                onChange={(e) => {
-                  const file = e.target.files?.[0] || null;
-                  setDraft(d => ({
-                    ...d,
-                    avatarFile: file,
-                    avatarPreview: file ? URL.createObjectURL(file) : '',
-                  }));
-                }}
-              />
+        <div className="modal-scrim" onClick={event => { if (event.target === event.currentTarget && !saving) setEditing(false); }} style={{ zIndex: 220 }}>
+          <div className="modal-body" role="dialog" aria-modal="true" aria-label="Edit profile" onClick={event => event.stopPropagation()} style={{ width: 'min(760px, 94vw)', maxHeight: 'calc(100vh - 48px)' }}>
+            <button className="modal-close" onClick={() => !saving && setEditing(false)} aria-label="Close edit profile" disabled={saving}>
+              <i className="fa-solid fa-xmark" />
+            </button>
+            <div className="modal-head" style={{ marginBottom: 18, paddingRight: 38 }}>
+              <div className="t-label" style={{ marginBottom: 6 }}>PROFILE SETTINGS</div>
+              <h2 className="t-heading" style={{ margin: 0, fontSize: 24 }}>Edit Profile</h2>
             </div>
-            {draft.avatarUrl && !draft.avatarFile && (
-              <button type="button" className="btn btn-ghost btn-sm" style={{ marginTop: 8 }} onClick={() => setDraft(d => ({ ...d, avatarUrl: '', avatarFile: null, avatarPreview: '' }))}>
-                Remove current photo
-              </button>
-            )}
-          </label>
-          {saveError && <div className="t-body" style={{ color: 'var(--red)', fontSize: 12 }}>{saveError}</div>}
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button className="btn btn-primary" onClick={saveEdit} disabled={saving}>
-              <i className="fa-solid fa-check" /> {saving ? 'SAVING...' : 'SAVE CHANGES'}
-            </button>
-            <button className="btn btn-ghost btn-sm" onClick={() => setEditing(false)} disabled={saving}>
-              CANCEL
-            </button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <label>
+                <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.12em', marginBottom: 6, fontWeight: 700 }}>FULL NAME</div>
+                <input className="input" value={draft.fullName} onChange={(e) => setDraft(d => ({ ...d, fullName: e.target.value }))} />
+              </label>
+              <label>
+                <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.12em', marginBottom: 6, fontWeight: 700 }}>BIO</div>
+                <textarea className="textarea" rows={4} value={draft.bio} onChange={(e) => setDraft(d => ({ ...d, bio: e.target.value }))} />
+              </label>
+              <label>
+                <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.12em', marginBottom: 6, fontWeight: 700 }}>LINKEDIN URL</div>
+                <input className="input" value={draft.linkedinUrl} onChange={(e) => setDraft(d => ({ ...d, linkedinUrl: e.target.value }))} />
+              </label>
+              <label>
+                <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.12em', marginBottom: 6, fontWeight: 700 }}>DATA ROOM URL</div>
+                <input className="input" placeholder="https://drive.google.com/drive/folders/..." value={draft.dataRoomUrl} onChange={(e) => setDraft(d => ({ ...d, dataRoomUrl: e.target.value }))} />
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <label>
+                  <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.12em', marginBottom: 6, fontWeight: 700 }}>SCHOOL</div>
+                  <input className="input" value={draft.school} onChange={(e) => setDraft(d => ({ ...d, school: e.target.value }))} />
+                </label>
+                <label>
+                  <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.12em', marginBottom: 6, fontWeight: 700 }}>EXPERTISE</div>
+                  <input className="input" value={draft.expertise} onChange={(e) => setDraft(d => ({ ...d, expertise: e.target.value }))} />
+                </label>
+              </div>
+              <label>
+                <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.12em', marginBottom: 6, fontWeight: 700 }}>PROFILE PHOTO</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <AvatarWithRing name={draft.fullName || displayName} avatarUrl={draft.avatarPreview || draft.avatarUrl} size={58} tier={tier} />
+                  <input
+                    className="input"
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0] || null;
+                      setDraft(d => ({
+                        ...d,
+                        avatarFile: file,
+                        avatarPreview: file ? URL.createObjectURL(file) : '',
+                      }));
+                    }}
+                  />
+                </div>
+                {draft.avatarUrl && !draft.avatarFile && (
+                  <button type="button" className="btn btn-ghost btn-sm" style={{ marginTop: 8 }} onClick={() => setDraft(d => ({ ...d, avatarUrl: '', avatarFile: null, avatarPreview: '' }))}>
+                    Remove current photo
+                  </button>
+                )}
+              </label>
+              {saveError && <div className="t-body" style={{ color: 'var(--red)', fontSize: 12 }}>{saveError}</div>}
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button className="btn btn-primary" onClick={saveEdit} disabled={saving}>
+                  <i className="fa-solid fa-check" /> {saving ? 'SAVING...' : 'SAVE CHANGES'}
+                </button>
+                <button className="btn btn-ghost btn-sm" onClick={() => setEditing(false)} disabled={saving}>
+                  CANCEL
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

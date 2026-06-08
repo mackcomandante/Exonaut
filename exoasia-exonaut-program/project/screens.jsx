@@ -1507,9 +1507,90 @@ function AlumniPage() {
 }
 
 // ========== SETTINGS ==========
-function SettingsPage() {
-  const [prefs, setPrefs] = React.useState({ emailMissions: true, emailWeekly: true, inApp: true, privacy: 'cohort' });
+function SettingsPage({ onSignOut }) {
+  const { profile } = useCurrentUserProfile();
+  const SETTINGS_KEY = 'exo:settings:' + (profile.id || 'local');
+  const defaultPrefs = { emailMissions: true, emailWeekly: true, inApp: true, privacy: 'cohort' };
+  const [prefs, setPrefs] = React.useState(() => {
+    try { return { ...defaultPrefs, ...(JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}) }; }
+    catch (e) { return defaultPrefs; }
+  });
+  const [status, setStatus] = React.useState('');
+  const [authProvider, setAuthProvider] = React.useState('password');
+  const settingsKeyRef = React.useRef(SETTINGS_KEY);
   const { isDark, toggleTheme } = useThemeMode();
+  React.useEffect(() => {
+    let active = true;
+    async function loadAuthProvider() {
+      try {
+        if (!window.__db?.auth?.getSession) return;
+        const result = await window.__db.auth.getSession();
+        const user = result?.data?.session?.user;
+        if (!active || !user) return;
+        const providers = (user.identities || []).map(identity => identity.provider).filter(Boolean);
+        const provider = providers.includes('google')
+          ? 'google'
+          : (user.app_metadata?.provider || providers[0] || 'password');
+        setAuthProvider(provider || 'password');
+      } catch (e) {}
+    }
+    loadAuthProvider();
+    return () => { active = false; };
+  }, [profile.id]);
+  React.useEffect(() => {
+    if (settingsKeyRef.current !== SETTINGS_KEY) {
+      settingsKeyRef.current = SETTINGS_KEY;
+      try { setPrefs({ ...defaultPrefs, ...(JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}) }); }
+      catch (e) { setPrefs(defaultPrefs); }
+      return;
+    }
+    try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(prefs)); } catch (e) {}
+    window.__exoSettings = { ...(window.__exoSettings || {}), [profile.id || 'local']: prefs };
+  }, [SETTINGS_KEY, prefs, profile.id]);
+  const updatePref = (key, value) => {
+    setPrefs(current => ({ ...current, [key]: typeof value === 'function' ? value(current[key]) : value }));
+    setStatus('Settings saved');
+  };
+  const requestPasswordReset = async () => {
+    setStatus('');
+    if (authProvider === 'google') {
+      setStatus('This account signs in with Google. Password is managed by Google.');
+      return;
+    }
+    const email = profile.email || '';
+    if (!email) {
+      setStatus('No email found for this account.');
+      return;
+    }
+    try {
+      if (!window.__db?.auth?.resetPasswordForEmail) throw new Error('Password reset is unavailable.');
+      const redirectTo = window.location.origin + window.location.pathname;
+      const result = await window.__db.auth.resetPasswordForEmail(email, { redirectTo });
+      if (result.error) throw result.error;
+      setStatus('Password reset email sent to ' + email + '.');
+    } catch (err) {
+      setStatus((err && err.message) || 'Could not send password reset email.');
+    }
+  };
+  const exportData = () => {
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      profile,
+      settings: prefs,
+      theme: localStorage.getItem('exo:theme') || 'light',
+      route: localStorage.getItem('exo:route') || '',
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'exonaut-account-data.json';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setStatus('Account data exported.');
+  };
   return (
     <div className="enter">
       <div className="section-head">
@@ -1529,7 +1610,7 @@ function SettingsPage() {
           ].map(x => (
             <label key={x.k} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid var(--off-white-07)' }}>
               <span style={{ fontFamily: 'var(--font-display)', fontSize: 13, color: 'var(--off-white)' }}>{x.label}</span>
-              <div onClick={() => setPrefs(p => ({ ...p, [x.k]: !p[x.k] }))}
+              <div role="switch" aria-checked={!!prefs[x.k]} tabIndex={0} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); updatePref(x.k, value => !value); } }} onClick={() => updatePref(x.k, value => !value)}
                    style={{ width: 40, height: 22, borderRadius: 11, background: prefs[x.k] ? 'var(--accent)' : 'var(--off-white-15)', cursor: 'pointer', position: 'relative', transition: 'background 200ms' }}>
                 <div style={{ position: 'absolute', top: 2, left: prefs[x.k] ? 20 : 2, width: 18, height: 18, borderRadius: '50%', background: 'var(--bg-deep)', transition: 'left 200ms' }} />
               </div>
@@ -1537,7 +1618,7 @@ function SettingsPage() {
           ))}
           <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0' }}>
             <span style={{ fontFamily: 'var(--font-display)', fontSize: 13, color: 'var(--off-white)' }}>Dark mode</span>
-            <div onClick={toggleTheme}
+            <div role="switch" aria-checked={isDark} tabIndex={0} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleTheme(); setStatus('Theme updated'); } }} onClick={() => { toggleTheme(); setStatus('Theme updated'); }}
                  style={{ width: 40, height: 22, borderRadius: 11, background: isDark ? 'var(--accent)' : 'var(--off-white-15)', cursor: 'pointer', position: 'relative', transition: 'background 200ms' }}>
               <div style={{ position: 'absolute', top: 2, left: isDark ? 20 : 2, width: 18, height: 18, borderRadius: '50%', background: 'var(--bg-deep)', transition: 'left 200ms', display: 'grid', placeItems: 'center', fontSize: 8, color: 'var(--ink)' }}>
                 <i className={'fa-solid ' + (isDark ? 'fa-moon' : 'fa-sun')} />
@@ -1554,7 +1635,7 @@ function SettingsPage() {
               { v: 'cohort', l: 'Cohort only', d: 'Batch 2026 Exonauts + admins' },
               { v: 'private', l: 'Private', d: 'Admins only' },
             ].map(x => (
-              <div key={x.v} onClick={() => setPrefs(p => ({ ...p, privacy: x.v }))}
+              <div key={x.v} role="button" tabIndex={0} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); updatePref('privacy', x.v); } }} onClick={() => updatePref('privacy', x.v)}
                    style={{ padding: 14, border: '1px solid ' + (prefs.privacy === x.v ? 'var(--accent)' : 'var(--off-white-07)'), borderRadius: 4, cursor: 'pointer', background: prefs.privacy === x.v ? 'var(--accent-wash)' : 'transparent' }}>
                 <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13, color: prefs.privacy === x.v ? 'var(--accent-deep)' : 'var(--off-white)' }}>{x.l}</div>
                 <div className="t-body" style={{ fontSize: 12, marginTop: 2 }}>{x.d}</div>
@@ -1567,10 +1648,18 @@ function SettingsPage() {
       <div className="card-panel" style={{ marginTop: 20 }}>
         <div className="t-label" style={{ marginBottom: 14 }}>ACCOUNT</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-          <button className="btn btn-ghost" style={{ justifyContent: 'center' }}><i className="fa-solid fa-key" /> CHANGE PASSWORD</button>
-          <button className="btn btn-ghost" style={{ justifyContent: 'center' }}><i className="fa-solid fa-download" /> EXPORT MY DATA</button>
-          <button className="btn btn-danger" style={{ justifyContent: 'center' }}><i className="fa-solid fa-right-from-bracket" /> SIGN OUT</button>
+          {authProvider === 'google'
+            ? <button className="btn btn-ghost" type="button" disabled style={{ justifyContent: 'center', opacity: 0.78, cursor: 'default' }}><i className="fa-brands fa-google" /> GOOGLE SIGN-IN CONNECTED</button>
+            : <button className="btn btn-ghost" onClick={requestPasswordReset} style={{ justifyContent: 'center' }}><i className="fa-solid fa-key" /> CHANGE PASSWORD</button>}
+          <button className="btn btn-ghost" onClick={exportData} style={{ justifyContent: 'center' }}><i className="fa-solid fa-download" /> EXPORT MY DATA</button>
+          <button className="btn btn-danger" onClick={onSignOut} style={{ justifyContent: 'center' }}><i className="fa-solid fa-right-from-bracket" /> SIGN OUT</button>
         </div>
+        {authProvider === 'google' && (
+          <div className="t-body" style={{ marginTop: 12, fontSize: 12 }}>
+            This account signs in with Google. Password is managed by Google, not Exonaut.
+          </div>
+        )}
+        {status && <div className="t-body" style={{ marginTop: 14, color: status.toLowerCase().includes('could not') || status.toLowerCase().includes('no email') ? 'var(--red)' : 'var(--accent)' }}>{status}</div>}
       </div>
     </div>
   );
