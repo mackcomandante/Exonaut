@@ -13,6 +13,24 @@ function LoginScreen({ onSignIn }) {
     setTimeout(() => { setLoading(false); onSignIn(); }, 650);
   };
 
+  const handleGoogleAuth = async () => {
+    setLoading(true);
+    try {
+      if (!window.__db || !window.__db.auth) throw new Error('Supabase is not loaded.');
+      const result = await window.__db.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin + window.location.pathname,
+          queryParams: { access_type: 'offline', prompt: 'select_account' },
+        },
+      });
+      if (result.error) throw result.error;
+    } catch (err) {
+      setLoading(false);
+      console.error(err);
+    }
+  };
+
   return (
     <div className="hud-bg" style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 32, position: 'relative' }}>
       <div style={{ position: 'relative', zIndex: 2, width: 'min(440px, 100%)' }} className="enter">
@@ -54,7 +72,9 @@ function LoginScreen({ onSignIn }) {
 
           <div style={{ marginTop: 24, paddingTop: 20, borderTop: '1px solid var(--off-white-07)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)', letterSpacing: '0.08em' }}>OR</span>
-            <button className="btn btn-ghost btn-sm"><i className="fa-brands fa-google" /> GOOGLE OAUTH</button>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={handleGoogleAuth} disabled={loading}>
+              <i className="fa-brands fa-google" /> GOOGLE OAUTH
+            </button>
           </div>
         </div>
 
@@ -529,6 +549,36 @@ function RoleAuthScreen({ onAuthComplete, tweaks, setTweak }) {
 
   const isSignup = mode === 'signup';
 
+  async function ensureAuthProfile(user) {
+    if (!user) return null;
+    const metadata = user.user_metadata || {};
+    const fullName = metadata.full_name || metadata.name || user.email || 'Exonaut';
+    const profileResult = await window.__db
+      .from('user_profiles')
+      .select('role, full_name, cohort_id, track_code')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (profileResult.error) throw profileResult.error;
+    if (profileResult.data) return profileResult.data;
+
+    const insertResult = await window.__db
+      .from('user_profiles')
+      .upsert({
+        id: user.id,
+        email: user.email || '',
+        full_name: fullName,
+        role: metadata.role || selectedRole,
+        cohort_id: ME.cohort || 'c2627',
+        track_code: ME.track || 'AIS',
+      }, { onConflict: 'id' })
+      .select('role, full_name, cohort_id, track_code')
+      .single();
+
+    if (insertResult.error) throw insertResult.error;
+    return insertResult.data || {};
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     if (!email || !password || (isSignup && !fullName.trim())) return;
@@ -558,15 +608,7 @@ function RoleAuthScreen({ onAuthComplete, tweaks, setTweak }) {
         return;
       }
 
-      const profileResult = await window.__db
-        .from('user_profiles')
-        .select('role, full_name, cohort_id, track_code')
-        .eq('id', user.id)
-        .single();
-
-      if (profileResult.error) throw profileResult.error;
-
-      const profile = profileResult.data || {};
+      const profile = await ensureAuthProfile(user);
       const authRole = profile.role ||
                        (user.user_metadata && user.user_metadata.role) ||
                        (user.app_metadata && user.app_metadata.role);
@@ -583,6 +625,30 @@ function RoleAuthScreen({ onAuthComplete, tweaks, setTweak }) {
     } catch (err) {
       setLoading(false);
       setAuthError((err && err.message) || 'Authentication failed. Check your credentials.');
+    }
+  }
+
+  async function handleGoogleAuth() {
+    setAuthError('');
+    setLoading(true);
+    try {
+      if (!window.__db || !window.__db.auth) {
+        throw new Error('Supabase is not loaded. Open the app through the local server and check your internet connection.');
+      }
+      const result = await window.__db.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin + window.location.pathname,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'select_account',
+          },
+        },
+      });
+      if (result.error) throw result.error;
+    } catch (err) {
+      setLoading(false);
+      setAuthError((err && err.message) || 'Google authentication failed.');
     }
   }
 
@@ -669,7 +735,9 @@ function RoleAuthScreen({ onAuthComplete, tweaks, setTweak }) {
 
           <div style={{ marginTop: 24, paddingTop: 20, borderTop: '1px solid var(--off-white-07)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)', letterSpacing: '0.08em' }}>OR</span>
-            <button className="btn btn-ghost btn-sm"><i className="fa-brands fa-google" /> GOOGLE OAUTH</button>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={handleGoogleAuth} disabled={loading}>
+              <i className="fa-brands fa-google" /> GOOGLE OAUTH
+            </button>
           </div>
         </div>
 

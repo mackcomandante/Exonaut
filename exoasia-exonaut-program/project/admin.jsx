@@ -405,7 +405,6 @@ function PlatformAdminSidebar({ current, onNavigate, onSignOut, mobileOpen = fal
     {
       label: 'Administration',
       links: [
-        { id: 'pa-removals', label: 'Removals',           icon: 'fa-user-slash' },
         { id: 'pa-console',  label: 'System Console',     icon: 'fa-shield-halved' },
       ],
     },

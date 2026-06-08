@@ -99,6 +99,8 @@ function Profile({ onOpenMission, onTriggerBadge }) {
     }
   }
 
+  const ExitProtocolCard = window.ExonautResignCard;
+
   return (
     <div className="enter">
       {/* HERO */}
@@ -274,6 +276,7 @@ function Profile({ onOpenMission, onTriggerBadge }) {
                 </div>
               </div>
             ))}
+            {typeof ExitProtocolCard === 'function' && <ExitProtocolCard />}
           </div>
           {/* Recent Missions */}
           <div>

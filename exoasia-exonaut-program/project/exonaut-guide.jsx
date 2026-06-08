@@ -54,6 +54,8 @@ const EXONAUT_GUIDE_CONTACTS = [
   { name: 'Felipe', role: 'Admin Team', phone: '09612308866' },
 ];
 
+const SIR_MACK_BOOKING_URL = 'https://link.gamechangerfunnel.com/widget/booking/L6l6siGhUd4ras8fMWHd';
+
 function ExonautGuidePage() {
   const { profile } = useCurrentUserProfile();
   const storageKey = `exo:guide:${profile.id || ME_ID}`;
@@ -122,6 +124,32 @@ function ExonautGuidePage() {
             </a>
           </div>
         ))}
+      </div>
+
+      <div className="section-head" style={{ marginTop: 26 }}>
+        <h2>Resignation Protocol</h2>
+        <span className="section-meta">OFFICIAL PROGRAM EXIT PROCESS</span>
+      </div>
+      <div className="card-panel" style={{ padding: 20, borderLeft: '2px solid var(--lavender)' }}>
+        <div className="t-body" style={{ fontSize: 13, color: 'var(--off-white-68)', lineHeight: 1.6, marginBottom: 16 }}>
+          If you are considering resigning from the Exonaut Program, follow the official protocol below. Starting the protocol does not finalize your resignation; you must wait for Sir Mack's final signal before fully leaving.
+        </div>
+        <div style={{ display: 'grid', gap: 10, marginBottom: 16 }}>
+          {[
+            'Book a call with Sir Mack to discuss your reasons and concerns for resigning.',
+            'If Sir Mack confirms that your reasons are valid, send your updated resignation email to him.',
+            'Include a turnover proposal for your current projects/tasks and the designated Exonaut who will receive the handoff.',
+            'Wait for Sir Mack\'s final signal before fully leaving the company/program.',
+          ].map((item, index) => (
+            <div key={item} className="card-flat" style={{ padding: 12, display: 'grid', gridTemplateColumns: '28px 1fr', gap: 10, alignItems: 'start' }}>
+              <div className="t-mono" style={{ color: 'var(--lavender)', fontWeight: 800 }}>{index + 1}</div>
+              <div className="t-body" style={{ fontSize: 12, color: 'var(--off-white)' }}>{item}</div>
+            </div>
+          ))}
+        </div>
+        <a className="btn btn-primary btn-sm" href={SIR_MACK_BOOKING_URL} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
+          <i className="fa-solid fa-calendar-check" /> BOOK A CALL WITH SIR MACK
+        </a>
       </div>
     </div>
   );

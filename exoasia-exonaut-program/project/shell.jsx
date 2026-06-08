@@ -99,7 +99,6 @@ function Sidebar({ current, onNavigate, onSignOut, mobileOpen = false, onMobileC
     { id: 'lead-roster',    label: 'Roster',        icon: 'fa-users' },
     { id: 'lead-manual-credit', label: 'Manual Credit', icon: 'fa-clipboard-check' },
     { id: 'lead-announce',  label: 'Announce', icon: 'fa-bullhorn' },
-    { id: 'lead-removals',  label: 'Removals',      icon: 'fa-user-slash' },
     { id: 'crown-pass',     label: 'Pass Crown',    icon: 'fa-crown' },
   ];
 

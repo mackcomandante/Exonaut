@@ -3195,13 +3195,13 @@ function BadgeCertificateModal({ badge, profile, onClose }) {
 
   return (
     <div className="modal-scrim" onClick={e => { if (e.target === e.currentTarget) onClose(); }} style={{ zIndex: 9999 }}>
-      <div className="modal-body" onClick={e => e.stopPropagation()} style={{ width: 'min(900px, 94vw)', maxWidth: 900 }}>
-        <div className="modal-head">
+      <div className="modal-body cert-preview-modal" onClick={e => e.stopPropagation()} style={{ width: 'min(900px, 94vw)', maxWidth: 900 }}>
+        <div className="modal-head cert-preview-head">
           <div>
             <div className="t-label" style={{ color }}>BADGE CERTIFICATE</div>
             <h2 className="t-heading" style={{ margin: '4px 0 0' }}>{badge.name}</h2>
           </div>
-          <button type="button" className="btn btn-ghost btn-sm" onClick={onClose} aria-label="Close certificate">
+          <button type="button" className="modal-close cert-preview-close" onClick={onClose} aria-label="Close">
             <i className="fa-solid fa-xmark" />
           </button>
         </div>

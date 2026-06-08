@@ -57,7 +57,26 @@ function useCurrentUserProfile() {
         .maybeSingle();
       if (profileError) throw profileError;
 
-      const nextProfile = profileToClient(data, user);
+      let row = data;
+      if (!row) {
+        const metadata = user.user_metadata || {};
+        const insertResult = await window.__db
+          .from('user_profiles')
+          .upsert({
+            id: user.id,
+            email: user.email || '',
+            full_name: metadata.full_name || metadata.name || user.email || 'Exonaut',
+            role: metadata.role || 'exonaut',
+            cohort_id: ME.cohort || 'c2627',
+            track_code: ME.track || 'AIS',
+          }, { onConflict: 'id' })
+          .select('id, email, full_name, role, cohort_id, track_code, bio, linkedin_url, data_room_url, school, expertise, avatar_url')
+          .single();
+        if (insertResult.error) throw insertResult.error;
+        row = insertResult.data;
+      }
+
+      const nextProfile = profileToClient(row, user);
       ME.id = nextProfile.id;
       ME.name = nextProfile.fullName;
       ME.track = nextProfile.trackCode;

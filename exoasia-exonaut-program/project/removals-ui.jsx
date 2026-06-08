@@ -1,25 +1,49 @@
-// ============================================================================
-// Removal / Resignation workflow UI
-//
-// 4 role surfaces:
-//   - ExonautResignCard       → lets exonaut submit / track resignation (Profile)
-//   - LeadRemovalsPanel       → lead's inbox: exonaut resignations to endorse
-//                                + history of their own initiated removals
-//   - LeadEndorseModal        → modal used from LeadRoster row action
-//   - CommanderRemovalsPage   → commander's approvals queue (endorsed → approved/denied)
-//   - AdminRemovalsPage       → admin's execution queue (approved → executed)
-// ============================================================================
+// Resignation Protocol UI.
+// Uses the existing removal_requests store/table, but the user-facing workflow is:
+// Exonaut starts protocol -> Sir Mack call -> turnover plan -> Sir Mack final signal.
 
-// ---------- Helpers ----------
-function RemovalStatusPill({ status }) {
-  const meta = REMOVAL_STATUS_META[status] || { label: status, color: 'var(--off-white-68)', icon: 'fa-circle' };
+const RESIGNATION_BOOKING_URL = 'https://link.gamechangerfunnel.com/widget/booking/L6l6siGhUd4ras8fMWHd';
+
+function relTime(ts) {
+  if (!ts) return 'just now';
+  const diff = Date.now() - Number(ts);
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return mins + 'm ago';
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return hours + 'h ago';
+  return Math.floor(hours / 24) + 'd ago';
+}
+
+function resignationStatusMeta(status) {
+  return (window.REMOVAL_STATUS_META || {})[status] || { label: status, color: 'var(--off-white-68)', icon: 'fa-circle' };
+}
+
+function parseTurnoverPlan(req) {
+  try {
+    const parsed = JSON.parse(req?.endorseNote || '{}');
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function profileNameFor(userId, profiles = []) {
+  const p = (profiles || []).find(item => item.id === userId);
+  const u = (typeof USERS !== 'undefined' ? USERS : []).find(item => item.id === userId);
+  return p?.fullName || p?.email || u?.name || userId || 'Exonaut';
+}
+
+function ResignationStatusPill({ status }) {
+  const meta = resignationStatusMeta(status);
   return (
     <span className="t-mono" style={{
       display: 'inline-flex', alignItems: 'center', gap: 5,
-      fontSize: 9, letterSpacing: '0.1em', fontWeight: 700,
-      color: meta.color, padding: '3px 6px',
-      background: 'color-mix(in oklab, currentColor 12%, transparent)',
-      border: '1px solid ' + meta.color, borderRadius: 2,
+      fontSize: 9, letterSpacing: '0.1em', fontWeight: 800,
+      color: meta.color, padding: '4px 7px',
+      background: 'color-mix(in srgb, currentColor 12%, transparent)',
+      border: '1px solid ' + meta.color, borderRadius: 4,
+      textTransform: 'uppercase',
     }}>
       <i className={'fa-solid ' + meta.icon} style={{ fontSize: 8 }} />
       {meta.label}
@@ -27,739 +51,513 @@ function RemovalStatusPill({ status }) {
   );
 }
 
-function relTime(ts) {
-  if (!ts) return '—';
-  const d = Date.now() - ts;
-  const h = Math.floor(d / 3_600_000);
-  if (h < 1) return `${Math.floor(d / 60_000)}m ago`;
-  if (h < 48) return `${h}h ago`;
-  return `${Math.floor(h / 24)}d ago`;
-}
-
-function RemovalRequestCard({ req, actions, accent = 'var(--amber)' }) {
-  const { profiles } = useUserProfiles();
-  const profileUser = (profiles || []).find(u => u.id === req.userId);
-  const profileLead = (profiles || []).find(u => u.id === req.leadId);
-  const legacyUser = (typeof USERS !== 'undefined' ? USERS : []).find(u => u.id === req.userId);
-  const legacyLead = (typeof LEADS !== 'undefined' ? LEADS : []).find(l => l.id === req.leadId);
-  const user = profileUser
-    ? { id: profileUser.id, name: profileUser.fullName || profileUser.email, avatarUrl: profileUser.avatarUrl, tier: 'entry', track: profileUser.trackCode }
-    : legacyUser;
-  const lead = profileLead
-    ? { id: profileLead.id, name: profileLead.fullName || profileLead.email }
-    : legacyLead;
-  const track = (typeof TRACKS !== 'undefined' ? TRACKS : []).find(t => t.code === (user?.track));
-  const reasonLabel = window.__removalStore.reasonLabel(req.reason);
-  const sourceLabel = req.source === 'exonaut' ? 'RESIGNATION' : 'REMOVAL';
-
-  return (
-    <div className="card-panel" style={{ borderLeft: `2px solid ${accent}`, padding: 18, marginBottom: 12 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
-        <div className="t-mono" style={{ fontSize: 9, color: accent, letterSpacing: '0.15em', fontWeight: 700 }}>
-          {sourceLabel} · {reasonLabel.toUpperCase()}
-        </div>
-        <RemovalStatusPill status={req.status} />
-      </div>
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-        {user && <AvatarWithRing name={user.name} size={40} tier={user.tier} />}
-        <div style={{ flex: 1 }}>
-          <div className="t-heading" style={{ fontSize: 15, textTransform: 'none', letterSpacing: 0, margin: 0, color: 'var(--off-white)' }}>
-            {user?.name || req.userId}
-          </div>
-          <div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)', letterSpacing: '0.08em', marginTop: 3 }}>
-            {track?.short || '—'} · MGR {lead?.name || '—'} · Submitted {relTime(req.createdAt)}
-          </div>
-        </div>
-      </div>
-
-      {req.notes && (
-        <div style={{ padding: '10px 12px', background: 'var(--off-white-07)', borderRadius: 2, marginBottom: 12 }}>
-          <div className="t-mono" style={{ fontSize: 8, color: 'var(--off-white-40)', letterSpacing: '0.1em', marginBottom: 4 }}>NOTES</div>
-          <div className="t-body" style={{ fontSize: 12, color: 'var(--off-white)', lineHeight: 1.5 }}>{req.notes}</div>
-        </div>
-      )}
-
-      {req.endorsedAt && req.source === 'exonaut' && (
-        <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-68)', letterSpacing: '0.06em', marginBottom: 6 }}>
-          <i className="fa-solid fa-user-shield" style={{ marginRight: 6, color: 'var(--platinum)' }} />
-          ENDORSED BY LEAD · {relTime(req.endorsedAt)}
-          {req.endorseNote && <div style={{ marginTop: 4, fontStyle: 'italic', color: 'var(--off-white-68)' }}>"{req.endorseNote}"</div>}
-        </div>
-      )}
-      {req.reviewedAt && req.status !== 'denied' && (
-        <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-68)', letterSpacing: '0.06em', marginBottom: 6 }}>
-          <i className="fa-solid fa-tower-observation" style={{ marginRight: 6, color: 'var(--amber)' }} />
-          APPROVED BY COMMANDER · {relTime(req.reviewedAt)}
-          {req.reviewNote && <div style={{ marginTop: 4, fontStyle: 'italic', color: 'var(--off-white-68)' }}>"{req.reviewNote}"</div>}
-        </div>
-      )}
-      {req.status === 'denied' && (
-        <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-68)', letterSpacing: '0.06em', marginBottom: 6 }}>
-          <i className="fa-solid fa-ban" style={{ marginRight: 6, color: 'var(--red)' }} />
-          DENIED · {relTime(req.reviewedAt)}
-          {req.denyNote && <div style={{ marginTop: 4, fontStyle: 'italic' }}>"{req.denyNote}"</div>}
-        </div>
-      )}
-      {req.executedAt && (
-        <div className="t-mono" style={{ fontSize: 9, color: 'var(--red)', letterSpacing: '0.06em', marginBottom: 6 }}>
-          <i className="fa-solid fa-user-slash" style={{ marginRight: 6 }} />
-          EXECUTED BY ADMIN · {relTime(req.executedAt)}
-        </div>
-      )}
-
-      {actions && <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>{actions}</div>}
-    </div>
-  );
-}
-
-// ---------- Shared modal frame ----------
-function RemovalModal({ title, eyebrow, eyebrowColor = 'var(--amber)', onClose, children, primaryLabel, onPrimary, primaryDisabled, primaryColor = 'var(--red)' }) {
-  return (
-    <div onClick={onClose} style={{
-      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)',
-      zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
-    }}>
-      <div onClick={(e) => e.stopPropagation()} className="card-panel" style={{
-        width: 'min(520px, 100%)', padding: 0, borderColor: eyebrowColor, maxHeight: '90vh', overflow: 'auto',
-      }}>
-        <div style={{ padding: '20px 24px 14px', borderBottom: '1px solid var(--off-white-07)', position: 'relative' }}>
-          <div className="t-mono" style={{ fontSize: 9, color: eyebrowColor, letterSpacing: '0.12em', fontWeight: 700, marginBottom: 6 }}>{eyebrow}</div>
-          <h2 className="t-title" style={{ fontSize: 22, margin: 0 }}>{title}</h2>
-          <div onClick={onClose} style={{ position: 'absolute', top: 14, right: 14, width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--off-white-40)' }}>
-            <i className="fa-solid fa-xmark" />
-          </div>
-        </div>
-        <div style={{ padding: 24 }}>{children}</div>
-        <div style={{ padding: '14px 24px 20px', display: 'flex', gap: 8, justifyContent: 'flex-end', borderTop: '1px solid var(--off-white-07)' }}>
-          <button onClick={onClose} style={{
-            padding: '9px 16px', background: 'transparent', border: '1px solid var(--off-white-15)',
-            borderRadius: 2, color: 'var(--off-white-68)', cursor: 'pointer',
-            fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.08em', fontWeight: 700, textTransform: 'uppercase',
-          }}>Cancel</button>
-          {onPrimary && (
-            <button onClick={onPrimary} disabled={primaryDisabled} style={{
-              padding: '9px 16px', background: primaryDisabled ? 'var(--off-white-15)' : primaryColor,
-              border: 'none', borderRadius: 2, color: primaryDisabled ? 'var(--off-white-40)' : 'var(--deep-black)',
-              cursor: primaryDisabled ? 'not-allowed' : 'pointer',
-              fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.08em', fontWeight: 700, textTransform: 'uppercase',
-            }}>{primaryLabel}</button>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ========================================================================
-// LEAD — endorse removal modal (invoked from LeadRoster row action)
-// ========================================================================
-function LeadEndorseModal({ user, onClose }) {
-  const { profile } = useCurrentUserProfile();
-  useCrownState();
-  const crown = window.__crownStore.getUserCrown(profile.id);
-  const { endorseByLead } = useRemovals();
-  const [reason, setReason] = React.useState('');
-  const [notes, setNotes] = React.useState('');
-  const canSubmit = reason && notes.trim().length >= 20;
-
-  async function submit() {
-    if (!canSubmit) return;
-    try {
-      await endorseByLead({
-        userId: user.id,
-        leadId: profile.id,
-        cohortId: user.cohort || user.cohortId || getUserCohort(user.id),
-        reason,
-        notes: notes.trim(),
-      });
-      onClose();
-    } catch (err) {
-      alert((err && err.message) || 'Could not submit removal request.');
-    }
-  }
-
-  return (
-    <RemovalModal
-      title={`Endorse Removal · ${user.name}`}
-      eyebrow="LEAD · ENDORSE REMOVAL FOR CAUSE"
-      eyebrowColor="var(--red)"
-      primaryColor="var(--red)"
-      primaryLabel="Endorse → Send to Commander"
-      primaryDisabled={!canSubmit}
-      onPrimary={submit}
-      onClose={onClose}
-    >
-      <div className="t-body" style={{ fontSize: 12, color: 'var(--off-white-68)', marginBottom: 16, lineHeight: 1.5 }}>
-        Endorsement goes to <strong style={{ color: 'var(--amber)' }}>Commander</strong> for approval. If approved, Platform Admin will execute the removal. All reasons must be documented.
-      </div>
-
-      <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.1em', marginBottom: 8 }}>REASON *</div>
-      <div style={{ display: 'grid', gap: 6, marginBottom: 16 }}>
-        {REMOVAL_REASONS.map(r => (
-          <label key={r.id} style={{
-            padding: '10px 12px', border: '1px solid ' + (reason === r.id ? 'var(--red)' : 'var(--off-white-15)'),
-            borderRadius: 2, cursor: 'pointer', display: 'flex', alignItems: 'flex-start', gap: 10,
-            background: reason === r.id ? 'rgba(230,60,60,0.08)' : 'transparent',
-          }}>
-            <input type="radio" name="rm-reason" checked={reason === r.id} onChange={() => setReason(r.id)} style={{ marginTop: 2, accentColor: 'var(--red)' }} />
-            <div style={{ flex: 1 }}>
-              <div className="t-heading" style={{ fontSize: 12, textTransform: 'none', letterSpacing: 0, margin: 0, color: 'var(--off-white)' }}>{r.label}</div>
-              <div className="t-body" style={{ fontSize: 11, color: 'var(--off-white-68)', marginTop: 2 }}>{r.desc}</div>
-            </div>
-          </label>
-        ))}
-      </div>
-
-      <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.1em', marginBottom: 6 }}>
-        JUSTIFICATION * <span style={{ color: notes.trim().length < 20 ? 'var(--red)' : 'var(--lime)' }}>({notes.trim().length}/20 min)</span>
-      </div>
-      <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={4}
-        placeholder="Document specific incidents, dates, remediation attempts, and witnesses if any…"
-        style={{
-          width: '100%', padding: 10, background: 'var(--deep-black)', color: 'var(--off-white)',
-          border: '1px solid var(--off-white-15)', borderRadius: 2, fontFamily: 'var(--font-display)',
-          fontSize: 12, outline: 'none', resize: 'vertical',
-        }} />
-    </RemovalModal>
-  );
-}
-
-// ========================================================================
-// LEAD — inbox panel (separate page; sidebar link)
-// Shows exonaut resignations awaiting lead endorsement + lead's initiated removals
-// ========================================================================
-function LeadRemovalsPanel() {
-  const { profile } = useCurrentUserProfile();
-  useCrownState();
-  const crown = window.__crownStore.getUserCrown(profile.id);
-  const removals = useRemovals();
-  const LEAD_ID = profile.id;
-  const lead = { id: profile.id, name: profile.fullName || profile.email, track: crown?.trackCode || profile.trackCode };
-
-  const myRequests = removals.all.filter(r => r.leadId === LEAD_ID);
-  const awaitingMe = myRequests.filter(r => r.status === 'pending' && r.source === 'exonaut');
-  const inFlight = myRequests.filter(r => r.status === 'endorsed' || r.status === 'approved');
-  const terminal = myRequests.filter(r => r.status === 'denied' || r.status === 'executed');
-
-  const [review, setReview] = React.useState(null); // { req, action: 'endorse' | 'deny' }
-
-  return (
-    <div className="enter">
-      <div className="section-head">
-        <div>
-          <div className="t-label" style={{ marginBottom: 8, color: 'var(--platinum)' }}>MANAGER · REMOVAL ACTIONS</div>
-          <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>Removals & Resignations</h1>
-          <div className="t-body" style={{ marginTop: 6 }}>
-            {awaitingMe.length} resignation{awaitingMe.length === 1 ? '' : 's'} awaiting your endorsement · {inFlight.length} in review pipeline
-          </div>
-        </div>
-      </div>
-
-      {/* Awaiting the Lead */}
-      <h3 className="t-heading" style={{ fontSize: 14, margin: '0 0 10px 0', color: 'var(--amber)' }}>
-        <i className="fa-solid fa-user-clock" style={{ marginRight: 8 }} />
-        AWAITING YOUR ENDORSEMENT · {awaitingMe.length}
-      </h3>
-      {awaitingMe.length === 0 ? (
-        <div className="card-panel" style={{ padding: 24, textAlign: 'center', marginBottom: 24 }}>
-          <div className="t-body" style={{ fontSize: 12, color: 'var(--off-white-68)' }}>Inbox empty. No exonaut resignations awaiting your review.</div>
-        </div>
-      ) : (
-        awaitingMe.map(r => (
-          <RemovalRequestCard key={r.id} req={r} accent="var(--amber)" actions={[
-            <button key="endorse" className="btn btn-primary btn-sm" onClick={() => setReview({ req: r, action: 'endorse' })}>
-              <i className="fa-solid fa-check" /> ENDORSE TO COMMANDER
-            </button>,
-            <button key="deny" className="btn btn-ghost btn-sm" onClick={() => setReview({ req: r, action: 'deny' })}>
-              <i className="fa-solid fa-xmark" /> DENY
-            </button>,
-          ]} />
-        ))
-      )}
-
-      {/* In-flight (endorsed by me or already approved) */}
-      {inFlight.length > 0 && (
-        <>
-          <h3 className="t-heading" style={{ fontSize: 14, margin: '28px 0 10px 0', color: 'var(--lavender)' }}>
-            <i className="fa-solid fa-hourglass-half" style={{ marginRight: 8 }} />
-            IN REVIEW PIPELINE · {inFlight.length}
-          </h3>
-          {inFlight.map(r => (
-            <RemovalRequestCard key={r.id} req={r} accent="var(--lavender)" />
-          ))}
-        </>
-      )}
-
-      {/* History */}
-      {terminal.length > 0 && (
-        <>
-          <h3 className="t-heading" style={{ fontSize: 14, margin: '28px 0 10px 0', color: 'var(--off-white-68)' }}>
-            <i className="fa-solid fa-clock-rotate-left" style={{ marginRight: 8 }} />
-            HISTORY · {terminal.length}
-          </h3>
-          {terminal.map(r => (
-            <RemovalRequestCard key={r.id} req={r} accent="var(--off-white-40)" />
-          ))}
-        </>
-      )}
-
-      {review && <LeadReviewModal req={review.req} action={review.action} onClose={() => setReview(null)} />}
-    </div>
-  );
-}
-
-function LeadReviewModal({ req, action, onClose }) {
-  const { profile } = useCurrentUserProfile();
-  const { leadEndorse, leadDeny } = useRemovals();
-  const [note, setNote] = React.useState('');
-  const { profiles } = useUserProfiles();
-  const profileUser = (profiles || []).find(u => u.id === req.userId);
-  const legacyUser = (typeof USERS !== 'undefined' ? USERS : []).find(u => u.id === req.userId);
-  const user = profileUser ? { name: profileUser.fullName || profileUser.email } : legacyUser;
-  const isEndorse = action === 'endorse';
-
-  async function submit() {
-    try {
-      if (isEndorse) await leadEndorse(req.id, profile.id, note.trim());
-      else await leadDeny(req.id, profile.id, note.trim());
-      onClose();
-    } catch (err) {
-      alert((err && err.message) || 'Could not update removal request.');
-    }
-  }
-
-  return (
-    <RemovalModal
-      title={`${isEndorse ? 'Endorse' : 'Deny'} Resignation · ${user?.name}`}
-      eyebrow={isEndorse ? 'MANAGER · ENDORSE TO COMMANDER' : 'MANAGER · DENY RESIGNATION'}
-      eyebrowColor={isEndorse ? 'var(--lime)' : 'var(--red)'}
-      primaryColor={isEndorse ? 'var(--lime)' : 'var(--red)'}
-      primaryLabel={isEndorse ? 'Endorse → Send to Commander' : 'Deny Resignation'}
-      onPrimary={submit}
-      onClose={onClose}
-    >
-      <div className="t-body" style={{ fontSize: 12, color: 'var(--off-white-68)', marginBottom: 12, lineHeight: 1.5 }}>
-        {isEndorse
-          ? 'Endorsement passes this to the Commander for approval, then to Admin for execution.'
-          : 'Denying rejects the resignation. The exonaut will remain in the program; consider discussing in person first.'}
-      </div>
-      <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.1em', marginBottom: 6 }}>
-        {isEndorse ? 'ENDORSEMENT NOTE (OPTIONAL)' : 'DENIAL REASON'}
-      </div>
-      <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} autoFocus
-        placeholder={isEndorse ? 'Add context for the Commander…' : 'Explain why this resignation is being denied…'}
-        style={{
-          width: '100%', padding: 10, background: 'var(--deep-black)', color: 'var(--off-white)',
-          border: '1px solid var(--off-white-15)', borderRadius: 2, fontFamily: 'var(--font-display)',
-          fontSize: 12, outline: 'none', resize: 'vertical',
-        }} />
-    </RemovalModal>
-  );
-}
-
-// ========================================================================
-// COMMANDER — approvals page
-// Shows endorsed requests; commander approves or denies.
-// ========================================================================
-function CommanderRemovalsPage() {
-  const removals = useRemovals();
-  const [tab, setTab] = React.useState('endorsed');
-  const [review, setReview] = React.useState(null); // { req, action }
-
-  const awaiting = removals.endorsed;
-  const approved = removals.approved;
-  const denied = removals.denied;
-  const executed = removals.executed;
-
-  const list = tab === 'endorsed' ? awaiting
-             : tab === 'approved' ? approved
-             : tab === 'denied' ? denied : executed;
-
-  const tabs = [
-    { id: 'endorsed', label: 'Awaiting You',  count: awaiting.length, color: 'var(--amber)' },
-    { id: 'approved', label: 'Approved',      count: approved.length, color: 'var(--lime)' },
-    { id: 'denied',   label: 'Denied',        count: denied.length,   color: 'var(--off-white-40)' },
-    { id: 'executed', label: 'Executed',      count: executed.length, color: 'var(--red)' },
+function ResignationProtocolSteps({ current }) {
+  const steps = [
+    { id: 'pending', label: 'Book call' },
+    { id: 'endorsed', label: 'Turnover plan' },
+    { id: 'approved', label: 'Final signal' },
+    { id: 'executed', label: 'Exit approved' },
   ];
-
+  const order = { pending: 0, endorsed: 1, approved: 2, executed: 3, denied: -1 };
+  const idx = order[current] ?? 0;
   return (
-    <div className="enter">
-      <div className="section-head">
-        <div>
-          <div className="t-label" style={{ marginBottom: 8, color: 'var(--red)' }}>COMMANDER · REMOVAL APPROVALS</div>
-          <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>Removals Queue</h1>
-          <div className="t-body" style={{ marginTop: 6 }}>
-            {awaiting.length} endorsement{awaiting.length === 1 ? '' : 's'} awaiting your review. Approve to route to Platform Admin for execution.
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 8, margin: '14px 0' }}>
+      {steps.map((step, i) => (
+        <div key={step.id} className="card-flat" style={{
+          padding: '9px 10px',
+          borderColor: current === 'denied' ? 'var(--off-white-15)' : (i <= idx ? 'var(--accent)' : 'var(--off-white-15)'),
+          opacity: current === 'denied' && i > 0 ? 0.45 : 1,
+        }}>
+          <div className="t-mono" style={{ fontSize: 8, color: i <= idx && current !== 'denied' ? 'var(--accent)' : 'var(--off-white-40)', letterSpacing: '0.08em' }}>
+            STEP {i + 1}
+          </div>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 12, fontWeight: 800, color: 'var(--off-white)', marginTop: 3 }}>
+            {step.label}
           </div>
         </div>
-      </div>
-
-      <div className="admin-action-tabs" style={{ display: 'flex', gap: 6, marginBottom: 20, borderBottom: '1px solid var(--off-white-07)' }}>
-        {tabs.map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)} style={{
-            padding: '10px 14px', background: 'transparent',
-            border: 'none', borderBottom: '2px solid ' + (tab === t.id ? t.color : 'transparent'),
-            color: tab === t.id ? t.color : 'var(--off-white-68)',
-            fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.08em', fontWeight: 700,
-            cursor: 'pointer',
-          }}>{t.label.toUpperCase()} <span style={{ marginLeft: 6, opacity: 0.6 }}>{t.count}</span></button>
-        ))}
-      </div>
-
-      {list.length === 0 ? (
-        <div className="card-panel" style={{ padding: 48, textAlign: 'center' }}>
-          <i className="fa-solid fa-inbox" style={{ fontSize: 28, color: 'var(--off-white-40)', marginBottom: 10 }} />
-          <div className="t-body" style={{ fontSize: 12, color: 'var(--off-white-68)' }}>No requests in this queue.</div>
-        </div>
-      ) : list.map(r => (
-        <RemovalRequestCard key={r.id} req={r}
-          accent={tab === 'endorsed' ? 'var(--amber)' : tab === 'approved' ? 'var(--lime)' : tab === 'executed' ? 'var(--red)' : 'var(--off-white-40)'}
-          actions={tab === 'endorsed' ? [
-            <button key="approve" className="btn btn-primary btn-sm" onClick={() => setReview({ req: r, action: 'approve' })}>
-              <i className="fa-solid fa-check" /> APPROVE → ADMIN
-            </button>,
-            <button key="deny" className="btn btn-ghost btn-sm" onClick={() => setReview({ req: r, action: 'deny' })}>
-              <i className="fa-solid fa-xmark" /> DENY
-            </button>,
-          ] : null}
-        />
       ))}
-
-      {review && <CommanderReviewModal req={review.req} action={review.action} onClose={() => setReview(null)} />}
     </div>
   );
 }
 
-function CommanderReviewModal({ req, action, onClose }) {
-  const { profile } = useCurrentUserProfile();
-  const { approve, deny } = useRemovals();
-  const [note, setNote] = React.useState('');
-  const { profiles } = useUserProfiles();
-  const profileUser = (profiles || []).find(u => u.id === req.userId);
-  const legacyUser = (typeof USERS !== 'undefined' ? USERS : []).find(u => u.id === req.userId);
-  const user = profileUser ? { name: profileUser.fullName || profileUser.email } : legacyUser;
-  const isApprove = action === 'approve';
-
-  async function submit() {
-    try {
-      if (isApprove) await approve(req.id, profile.id, note.trim());
-      else await deny(req.id, profile.id, note.trim());
-      onClose();
-    } catch (err) {
-      alert((err && err.message) || 'Could not update removal request.');
-    }
-  }
-
+function ProtocolNotice() {
   return (
-    <RemovalModal
-      title={`${isApprove ? 'Approve' : 'Deny'} · ${user?.name}`}
-      eyebrow={isApprove ? 'COMMANDER · APPROVE → ROUTE TO ADMIN' : 'COMMANDER · DENY REQUEST'}
-      eyebrowColor={isApprove ? 'var(--lime)' : 'var(--red)'}
-      primaryColor={isApprove ? 'var(--lime)' : 'var(--red)'}
-      primaryLabel={isApprove ? 'Approve → Send to Admin' : 'Deny Request'}
-      onPrimary={submit}
-      onClose={onClose}
-    >
-      <div className="t-body" style={{ fontSize: 12, color: 'var(--off-white-68)', marginBottom: 12, lineHeight: 1.5 }}>
-        {isApprove
-          ? 'Approval routes this to Platform Admin for execution. The exonaut remains active until Admin executes.'
-          : 'Denying terminates this request. The exonaut remains in the program.'}
+    <div className="card-flat" style={{ padding: 14, marginBottom: 14, borderColor: 'var(--lavender)' }}>
+      <div className="t-heading" style={{ fontSize: 13, color: 'var(--lavender)', margin: '0 0 6px' }}>
+        <i className="fa-solid fa-circle-info" style={{ marginRight: 6 }} />
+        This starts the protocol. It does not finalize your resignation.
       </div>
-      <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.1em', marginBottom: 6 }}>
-        {isApprove ? 'APPROVAL NOTE (OPTIONAL)' : 'DENIAL REASON'}
+      <div className="t-body" style={{ fontSize: 12, color: 'var(--off-white-68)', lineHeight: 1.55 }}>
+        The official first step is booking a call with Sir Mack to discuss your reasons and concerns. If Sir Mack confirms the reason is valid, you will submit an updated resignation email and turnover proposal before waiting for his final signal.
       </div>
-      <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} autoFocus
-        placeholder={isApprove ? 'Note for Admin & audit trail…' : 'Reason for denial…'}
-        style={{
-          width: '100%', padding: 10, background: 'var(--deep-black)', color: 'var(--off-white)',
-          border: '1px solid var(--off-white-15)', borderRadius: 2, fontFamily: 'var(--font-display)',
-          fontSize: 12, outline: 'none', resize: 'vertical',
-        }} />
-    </RemovalModal>
-  );
-}
-
-// ========================================================================
-// ADMIN — execution page
-// Shows approved requests; admin runs final execution.
-// ========================================================================
-function AdminRemovalsPage() {
-  const removals = useRemovals();
-  const [tab, setTab] = React.useState('approved');
-  const [confirming, setConfirming] = React.useState(null);
-
-  const approved = removals.approved;
-  const executed = removals.executed;
-  const denied = removals.denied;
-  const pipeline = [...removals.pending, ...removals.endorsed];
-
-  const list = tab === 'approved' ? approved
-             : tab === 'executed' ? executed
-             : tab === 'denied' ? denied : pipeline;
-
-  const tabs = [
-    { id: 'approved', label: 'Ready to Execute', count: approved.length, color: 'var(--sky)' },
-    { id: 'pipeline', label: 'In Pipeline',      count: pipeline.length, color: 'var(--lavender)' },
-    { id: 'executed', label: 'Executed',         count: executed.length, color: 'var(--red)' },
-    { id: 'denied',   label: 'Denied',           count: denied.length,   color: 'var(--off-white-40)' },
-  ];
-
-  return (
-    <div className="enter">
-      <div className="section-head">
-        <div>
-          <div className="t-label" style={{ marginBottom: 8, color: 'var(--sky)' }}>PLATFORM ADMIN · EXECUTE REMOVALS</div>
-          <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>Removals Execution</h1>
-          <div className="t-body" style={{ marginTop: 6 }}>
-            {approved.length} commander-approved removal{approved.length === 1 ? '' : 's'} awaiting execution. Executing detaches the exonaut from their cohort across all views.
-          </div>
-        </div>
-      </div>
-
-      <div className="admin-action-tabs" style={{ display: 'flex', gap: 6, marginBottom: 20, borderBottom: '1px solid var(--off-white-07)' }}>
-        {tabs.map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)} style={{
-            padding: '10px 14px', background: 'transparent',
-            border: 'none', borderBottom: '2px solid ' + (tab === t.id ? t.color : 'transparent'),
-            color: tab === t.id ? t.color : 'var(--off-white-68)',
-            fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.08em', fontWeight: 700,
-            cursor: 'pointer',
-          }}>{t.label.toUpperCase()} <span style={{ marginLeft: 6, opacity: 0.6 }}>{t.count}</span></button>
-        ))}
-      </div>
-
-      {list.length === 0 ? (
-        <div className="card-panel" style={{ padding: 48, textAlign: 'center' }}>
-          <i className="fa-solid fa-inbox" style={{ fontSize: 28, color: 'var(--off-white-40)', marginBottom: 10 }} />
-          <div className="t-body" style={{ fontSize: 12, color: 'var(--off-white-68)' }}>No requests in this queue.</div>
-        </div>
-      ) : list.map(r => (
-        <RemovalRequestCard key={r.id} req={r}
-          accent={r.status === 'approved' ? 'var(--sky)' : r.status === 'executed' ? 'var(--red)' : r.status === 'denied' ? 'var(--off-white-40)' : 'var(--lavender)'}
-          actions={r.status === 'approved' ? [
-            <button key="exec" className="btn btn-primary btn-sm" style={{ background: 'var(--red)', color: 'var(--deep-black)' }}
-              onClick={() => setConfirming(r)}>
-              <i className="fa-solid fa-user-slash" /> EXECUTE REMOVAL
-            </button>,
-          ] : null}
-        />
-      ))}
-
-      {confirming && <AdminExecuteConfirm req={confirming} onClose={() => setConfirming(null)} />}
     </div>
   );
 }
 
-function AdminExecuteConfirm({ req, onClose }) {
-  const { profile } = useCurrentUserProfile();
-  const { execute } = useRemovals();
-  const { profiles } = useUserProfiles();
-  const profileUser = (profiles || []).find(u => u.id === req.userId);
-  const legacyUser = (typeof USERS !== 'undefined' ? USERS : []).find(u => u.id === req.userId);
-  const user = profileUser ? { name: profileUser.fullName || profileUser.email } : legacyUser;
-  const [confirm, setConfirm] = React.useState('');
-  const expected = (user?.name || '').trim();
-  const canExecute = !!expected && confirm.trim().toLowerCase() === expected.toLowerCase();
-  async function submit() {
-    try {
-      await execute(req.id, profile.id);
-      onClose();
-    } catch (err) {
-      alert((err && err.message) || 'Could not execute removal.');
-    }
-  }
-
-  return (
-    <RemovalModal
-      title="Execute Removal"
-      eyebrow="PLATFORM ADMIN · FINAL ACTION · IRREVERSIBLE"
-      eyebrowColor="var(--red)"
-      primaryColor="var(--red)"
-      primaryLabel="Execute Removal"
-      primaryDisabled={!canExecute}
-      onPrimary={submit}
-      onClose={onClose}
-    >
-      <div style={{ padding: 14, background: 'rgba(230,60,60,0.08)', border: '1px solid var(--red)', borderRadius: 2, marginBottom: 14 }}>
-        <div className="t-heading" style={{ fontSize: 13, color: 'var(--red)', margin: 0, letterSpacing: '0.04em' }}>
-          <i className="fa-solid fa-triangle-exclamation" style={{ marginRight: 6 }} /> This action removes the exonaut from the cohort.
-        </div>
-        <div className="t-body" style={{ fontSize: 12, color: 'var(--off-white)', marginTop: 6, lineHeight: 1.5 }}>
-          <strong>{user?.name}</strong> will be detached from <strong>{(window.__cohortStore.getAll().find(c => c.id === req.cohortId) || {}).name}</strong>.
-          They will no longer appear in rosters, cohort views, or leaderboards. The audit trail is preserved in the Executed tab.
-        </div>
-      </div>
-
-      <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.1em', marginBottom: 6 }}>
-        TYPE THE EXONAUT'S NAME TO CONFIRM: <span style={{ color: 'var(--off-white)' }}>{expected}</span>
-      </div>
-      <input value={confirm} onChange={(e) => setConfirm(e.target.value)} autoFocus
-        placeholder={expected}
-        style={{
-          width: '100%', padding: 10, background: 'var(--deep-black)', color: 'var(--off-white)',
-          border: '1px solid ' + (canExecute ? 'var(--red)' : 'var(--off-white-15)'),
-          borderRadius: 2, fontFamily: 'var(--font-display)', fontSize: 13, outline: 'none',
-        }} />
-    </RemovalModal>
-  );
-}
-
-// ========================================================================
-// EXONAUT — resignation submission card (embed in Profile or Settings)
-// ========================================================================
 function ExonautResignCard() {
   const { profile } = useCurrentUserProfile();
   const removals = useRemovals();
   const [showForm, setShowForm] = React.useState(false);
-  const myId = profile.id;
+  const myId = profile.id || ME_ID;
   const existing = removals.activeForUser(myId);
 
-  // If there's an open request, show status instead of form
-  if (existing) {
-    const meta = REMOVAL_STATUS_META[existing.status];
-    return (
-      <div className="card-panel" style={{ borderLeft: `2px solid ${meta.color}`, padding: 18, marginBottom: 16 }}>
-        <div className="t-mono" style={{ fontSize: 9, color: meta.color, letterSpacing: '0.15em', fontWeight: 700, marginBottom: 10 }}>
-          <i className={'fa-solid ' + meta.icon} style={{ marginRight: 6 }} />
-          RESIGNATION SUBMITTED · {meta.label}
-        </div>
-        <div className="t-heading" style={{ fontSize: 14, textTransform: 'none', letterSpacing: 0, margin: '0 0 6px 0' }}>
-          {existing.source === 'exonaut' ? 'Your resignation is in review' : 'A removal action is open for your account'}
-        </div>
-        <div className="t-body" style={{ fontSize: 12, color: 'var(--off-white-68)', lineHeight: 1.5, marginBottom: 10 }}>
-          Reason: <strong>{window.__removalStore.reasonLabel(existing.reason)}</strong> · Submitted {relTime(existing.createdAt)}
-        </div>
-        <div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-68)', letterSpacing: '0.08em', marginBottom: 12 }}>
-          {existing.status === 'pending' && 'WAITING ON: MANAGER (LEAD)'}
-          {existing.status === 'endorsed' && 'WAITING ON: COMMANDER'}
-          {existing.status === 'approved' && 'WAITING ON: PLATFORM ADMIN (FINAL)'}
-        </div>
-        {existing.status === 'pending' && existing.source === 'exonaut' && (
-          <button className="btn btn-ghost btn-sm" onClick={async () => {
-            if (confirm('Withdraw your resignation? You will remain in the program.')) {
-              try {
-                await removals.withdrawByExonaut(existing.id, myId);
-              } catch (err) {
-                alert((err && err.message) || 'Could not withdraw resignation.');
-              }
-            }
-          }}>
-            <i className="fa-solid fa-rotate-left" /> WITHDRAW RESIGNATION
-          </button>
-        )}
-      </div>
-    );
-  }
+  if (existing) return <ExonautResignationTracker req={existing} profile={profile} />;
 
   return (
     <>
-      <div className="card-panel" style={{ padding: 18, marginBottom: 16, borderLeft: '2px solid var(--off-white-40)' }}>
-        <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.15em', fontWeight: 700, marginBottom: 8 }}>
+      <div className="card-panel" style={{ padding: 18, marginBottom: 16, borderLeft: '2px solid var(--lavender)' }}>
+        <div className="t-mono" style={{ fontSize: 9, color: 'var(--lavender)', letterSpacing: '0.15em', fontWeight: 800, marginBottom: 8 }}>
           PROGRAM EXIT
         </div>
-        <div className="t-heading" style={{ fontSize: 14, textTransform: 'none', letterSpacing: 0, margin: '0 0 6px 0' }}>
-          Need to resign from the program?
+        <div className="t-heading" style={{ fontSize: 15, textTransform: 'none', letterSpacing: 0, margin: '0 0 6px' }}>
+          Considering resignation?
         </div>
-        <div className="t-body" style={{ fontSize: 12, color: 'var(--off-white-68)', lineHeight: 1.5, marginBottom: 12 }}>
-          Submit a resignation to your Track Manager. They will endorse it to the Commander, and Platform Admin will finalize. You may withdraw while it is still pending.
+        <div className="t-body" style={{ fontSize: 12, color: 'var(--off-white-68)', lineHeight: 1.55, marginBottom: 12 }}>
+          Start the official resignation protocol here. The first required step is booking a call with Sir Mack.
         </div>
         <button className="btn btn-ghost btn-sm" onClick={() => setShowForm(true)}>
-          <i className="fa-solid fa-door-open" /> RESIGN FROM PROGRAM
+          <i className="fa-solid fa-door-open" /> START RESIGNATION PROTOCOL
         </button>
       </div>
-
       {showForm && <ExonautResignModal onClose={() => setShowForm(false)} />}
     </>
   );
 }
 
-function ExonautResignModal({ onClose }) {
-  const { profile } = useCurrentUserProfile();
-  useCrownState();
-  const { submitByExonaut } = useRemovals();
-  const [reason, setReason] = React.useState('');
-  const [notes, setNotes] = React.useState('');
-  const [confirmed, setConfirmed] = React.useState(false);
-  const canSubmit = reason && notes.trim().length >= 20 && confirmed;
-  const myId = profile.id;
-  const me = (typeof USERS !== 'undefined' ? USERS : []).find(u => u.id === myId);
-  const myTrack = profile.trackCode || me?.track;
-  const activeCrown = window.__crownStore.getActiveCrownForTrack(myTrack);
+function ExonautResignationTracker({ req, profile }) {
+  const removals = useRemovals();
+  const meta = resignationStatusMeta(req.status);
+  const turnover = parseTurnoverPlan(req);
+  return (
+    <div className="card-panel" style={{ borderLeft: `2px solid ${meta.color}`, padding: 18, marginBottom: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 10 }}>
+        <div className="t-mono" style={{ fontSize: 9, color: meta.color, letterSpacing: '0.15em', fontWeight: 800 }}>
+          <i className={'fa-solid ' + meta.icon} style={{ marginRight: 6 }} />
+          RESIGNATION PROTOCOL
+        </div>
+        <ResignationStatusPill status={req.status} />
+      </div>
+
+      <div className="t-heading" style={{ fontSize: 15, textTransform: 'none', letterSpacing: 0, margin: '0 0 6px' }}>
+        {req.status === 'pending' && 'Awaiting your call with Sir Mack'}
+        {req.status === 'endorsed' && 'Turnover plan required'}
+        {req.status === 'approved' && 'Awaiting Sir Mack final signal'}
+        {req.status === 'denied' && 'Closed - continuing program'}
+        {req.status === 'executed' && 'Final exit approved'}
+      </div>
+      <div className="t-body" style={{ fontSize: 12, color: 'var(--off-white-68)', lineHeight: 1.55 }}>
+        Reason: <strong>{window.__removalStore.reasonLabel(req.reason)}</strong> · Started {relTime(req.createdAt)}
+      </div>
+      <ResignationProtocolSteps current={req.status} />
+
+      {req.status === 'pending' && (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <a className="btn btn-primary btn-sm" href={RESIGNATION_BOOKING_URL} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
+            <i className="fa-solid fa-calendar-check" /> BOOK CALL WITH SIR MACK
+          </a>
+          <button className="btn btn-ghost btn-sm" onClick={async () => {
+            if (!confirm('Withdraw your resignation protocol request?')) return;
+            try { await removals.withdrawByExonaut(req.id, profile.id || ME_ID); }
+            catch (err) { alert(err?.message || 'Could not withdraw request.'); }
+          }}>
+            <i className="fa-solid fa-rotate-left" /> WITHDRAW
+          </button>
+        </div>
+      )}
+
+      {req.status === 'endorsed' && <TurnoverPlanForm req={req} profile={profile} />}
+
+      {req.status === 'approved' && (
+        <div className="card-flat" style={{ padding: 14, marginTop: 12 }}>
+          <div className="t-mono" style={{ fontSize: 9, color: 'var(--sky)', letterSpacing: '0.1em', fontWeight: 800, marginBottom: 6 }}>
+            TURNOVER PLAN SUBMITTED
+          </div>
+          <TurnoverPlanSummary plan={turnover} />
+          <div className="t-body" style={{ fontSize: 12, color: 'var(--off-white-68)', marginTop: 10 }}>
+            Wait for Sir Mack's final signal before fully leaving the company/program.
+          </div>
+        </div>
+      )}
+
+      {req.status === 'denied' && req.denyNote && (
+        <div className="card-flat" style={{ padding: 12, marginTop: 12 }}>
+          <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.1em', marginBottom: 5 }}>SIR MACK NOTE</div>
+          <div className="t-body" style={{ fontSize: 12, color: 'var(--off-white-68)' }}>{req.denyNote}</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TurnoverPlanForm({ req, profile }) {
+  const removals = useRemovals();
   const { profiles } = useUserProfiles();
-  const leadProfile = (profiles || []).find(p => p.id === activeCrown?.userId);
-  const myLead = leadProfile
-    ? { id: leadProfile.id, name: leadProfile.fullName || leadProfile.email }
-    : (typeof LEADS !== 'undefined' ? LEADS.find(l => l.track === myTrack) : null);
+  const rows = typeof useSupabaseExonautRows === 'function' ? useSupabaseExonautRows() : [];
+  const candidates = rows
+    .filter(u => u.id !== (profile.id || ME_ID))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const [emailSent, setEmailSent] = React.useState(false);
+  const [handoffUserId, setHandoffUserId] = React.useState('');
+  const [turnoverNotes, setTurnoverNotes] = React.useState('');
+  const [finalWorkingDate, setFinalWorkingDate] = React.useState('');
+  const [busy, setBusy] = React.useState(false);
+  const selected = candidates.find(u => u.id === handoffUserId);
+  const canSubmit = emailSent && handoffUserId && turnoverNotes.trim().length >= 20;
 
   async function submit() {
-    if (!canSubmit) return;
+    if (!canSubmit || busy) return;
+    setBusy(true);
     try {
-      await submitByExonaut({
-        userId: myId,
-        cohortId: profile.cohortId || getUserCohort(myId),
-        leadId: activeCrown?.userId || null,
-        reason,
-        notes: notes.trim(),
+      await removals.submitTurnoverPlan(req.id, profile.id || ME_ID, {
+        emailSent,
+        handoffUserId,
+        handoffName: selected?.name || profileNameFor(handoffUserId, profiles),
+        turnoverNotes: turnoverNotes.trim(),
+        finalWorkingDate,
       });
-      onClose();
     } catch (err) {
-      alert((err && err.message) || 'Could not submit resignation.');
+      alert(err?.message || 'Could not submit turnover plan.');
+      setBusy(false);
     }
   }
 
   return (
-    <RemovalModal
-      title="Submit Resignation"
-      eyebrow="EXONAUT · PROGRAM EXIT REQUEST"
-      eyebrowColor="var(--lavender)"
-      primaryColor="var(--lavender)"
-      primaryLabel="Submit to Manager"
-      primaryDisabled={!canSubmit}
-      onPrimary={submit}
-      onClose={onClose}
-    >
-      <div className="t-body" style={{ fontSize: 12, color: 'var(--off-white-68)', marginBottom: 14, lineHeight: 1.5 }}>
-        Your resignation goes to <strong style={{ color: 'var(--platinum)' }}>{myLead?.name}</strong> (your Track Manager) for endorsement, then Commander, then Admin for final execution.
-      </div>
-
-      <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.1em', marginBottom: 8 }}>REASON *</div>
-      <div style={{ display: 'grid', gap: 6, marginBottom: 14 }}>
-        {RESIGN_REASONS.map(r => (
-          <label key={r.id} style={{
-            padding: '10px 12px', border: '1px solid ' + (reason === r.id ? 'var(--lavender)' : 'var(--off-white-15)'),
-            borderRadius: 2, cursor: 'pointer', display: 'flex', alignItems: 'flex-start', gap: 10,
-            background: reason === r.id ? 'rgba(180,160,230,0.08)' : 'transparent',
-          }}>
-            <input type="radio" name="resign-reason" checked={reason === r.id} onChange={() => setReason(r.id)} style={{ marginTop: 2, accentColor: 'var(--lavender)' }} />
-            <div style={{ flex: 1 }}>
-              <div className="t-heading" style={{ fontSize: 12, textTransform: 'none', letterSpacing: 0, margin: 0, color: 'var(--off-white)' }}>{r.label}</div>
-              <div className="t-body" style={{ fontSize: 11, color: 'var(--off-white-68)', marginTop: 2 }}>{r.desc}</div>
-            </div>
-          </label>
-        ))}
-      </div>
-
-      <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.1em', marginBottom: 6 }}>
-        MESSAGE TO MANAGER * <span style={{ color: notes.trim().length < 20 ? 'var(--red)' : 'var(--lime)' }}>({notes.trim().length}/20 min)</span>
-      </div>
-      <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={4}
-        placeholder="Share context so your Manager understands your decision…"
-        style={{
-          width: '100%', padding: 10, background: 'var(--deep-black)', color: 'var(--off-white)',
-          border: '1px solid var(--off-white-15)', borderRadius: 2, fontFamily: 'var(--font-display)',
-          fontSize: 12, outline: 'none', resize: 'vertical', marginBottom: 12,
-        }} />
-
-      <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer', padding: 10, background: 'var(--off-white-07)', borderRadius: 2 }}>
-        <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} style={{ marginTop: 2, accentColor: 'var(--lavender)' }} />
-        <div className="t-body" style={{ fontSize: 11, color: 'var(--off-white-68)', lineHeight: 1.45 }}>
-          I understand that once executed by Admin, I will lose access to cohort resources, my leaderboard standing, and all in-program benefits. I can withdraw while my request is still pending.
+    <div className="card-flat" style={{ padding: 14, marginTop: 12, borderColor: 'var(--lavender)' }}>
+      {req.denyNote && (
+        <div style={{ padding: 10, border: '1px solid var(--amber)', background: 'rgba(244,197,66,0.08)', borderRadius: 4, marginBottom: 12 }}>
+          <div className="t-mono" style={{ fontSize: 8, color: 'var(--amber)', letterSpacing: '0.1em', marginBottom: 4 }}>CHANGES REQUESTED</div>
+          <div className="t-body" style={{ fontSize: 12, color: 'var(--off-white)' }}>{req.denyNote}</div>
         </div>
+      )}
+      <div className="t-heading" style={{ fontSize: 14, margin: '0 0 10px' }}>Submit turnover plan</div>
+      <label style={{ display: 'flex', gap: 9, alignItems: 'flex-start', marginBottom: 12, cursor: 'pointer' }}>
+        <input type="checkbox" checked={emailSent} onChange={event => setEmailSent(event.target.checked)} style={{ marginTop: 2, accentColor: 'var(--lavender)' }} />
+        <span className="t-body" style={{ fontSize: 12, color: 'var(--off-white-68)' }}>
+          I have sent my updated resignation email to Sir Mack.
+        </span>
       </label>
-    </RemovalModal>
+      <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.1em', marginBottom: 6 }}>PROPOSED HANDOFF EXONAUT</div>
+      <select className="input" value={handoffUserId} onChange={event => setHandoffUserId(event.target.value)} style={{ marginBottom: 12 }}>
+        <option value="">Select Exonaut</option>
+        {candidates.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+      </select>
+      <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.1em', marginBottom: 6 }}>
+        PROJECTS / TASKS TURNOVER NOTES <span style={{ color: turnoverNotes.trim().length < 20 ? 'var(--red)' : 'var(--lime)' }}>({turnoverNotes.trim().length}/20 min)</span>
+      </div>
+      <textarea className="textarea" rows={4} value={turnoverNotes} onChange={event => setTurnoverNotes(event.target.value)}
+        placeholder="List current projects, open tasks, links, context, and what the handoff Exonaut needs to continue." style={{ marginBottom: 12 }} />
+      <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.1em', marginBottom: 6 }}>FINAL WORKING DATE (OPTIONAL)</div>
+      <input className="input" type="date" value={finalWorkingDate} onChange={event => setFinalWorkingDate(event.target.value)} style={{ marginBottom: 12 }} />
+      <button className="btn btn-primary btn-sm" disabled={!canSubmit || busy} onClick={submit}>
+        <i className={'fa-solid ' + (busy ? 'fa-spinner fa-spin' : 'fa-paper-plane')} /> SUBMIT TURNOVER PLAN
+      </button>
+    </div>
   );
 }
+
+function TurnoverPlanSummary({ plan }) {
+  return (
+    <div className="t-body" style={{ fontSize: 12, color: 'var(--off-white-68)', lineHeight: 1.55 }}>
+      <div>Email sent: <strong>{plan.emailSent ? 'Yes' : 'No'}</strong></div>
+      <div>Handoff Exonaut: <strong>{plan.handoffName || plan.handoffUserId || 'Not specified'}</strong></div>
+      {plan.finalWorkingDate && <div>Final working date: <strong>{plan.finalWorkingDate}</strong></div>}
+      {plan.turnoverNotes && (
+        <div style={{ marginTop: 8, whiteSpace: 'pre-wrap' }}>{plan.turnoverNotes}</div>
+      )}
+    </div>
+  );
+}
+
+function ExonautResignModal({ onClose }) {
+  const { profile } = useCurrentUserProfile();
+  const { submitByExonaut } = useRemovals();
+  const [reason, setReason] = React.useState('');
+  const [notes, setNotes] = React.useState('');
+  const [callBooked, setCallBooked] = React.useState(false);
+  const [callDate, setCallDate] = React.useState('');
+  const [confirmed, setConfirmed] = React.useState(false);
+  const canSubmit = reason && callBooked && notes.trim().length >= 20 && confirmed;
+
+  async function submit() {
+    if (!canSubmit) return;
+    try {
+      const context = [
+        callDate ? `Booked call: ${callDate}` : 'Booked call: confirmed',
+        '',
+        notes.trim(),
+      ].join('\n');
+      await submitByExonaut({
+        userId: profile.id || ME_ID,
+        cohortId: profile.cohortId || getUserCohort(profile.id || ME_ID),
+        leadId: 'cmdr-mack',
+        reason,
+        notes: context,
+      });
+      onClose();
+    } catch (err) {
+      alert(err?.message || 'Could not start resignation protocol.');
+    }
+  }
+
+  return (
+    <div className="modal-scrim" onClick={onClose}>
+      <div className="modal-body" onClick={event => event.stopPropagation()} role="dialog" aria-modal="true" aria-label="Start resignation protocol">
+        <button className="modal-close" onClick={onClose} aria-label="Close"><i className="fa-solid fa-xmark" /></button>
+        <div className="t-label" style={{ color: 'var(--lavender)', marginBottom: 8 }}>EXONAUT · RESIGNATION PROTOCOL</div>
+        <h2 className="t-title" style={{ fontSize: 28, margin: '0 0 12px' }}>Start Resignation Protocol</h2>
+        <ProtocolNotice />
+        <a className="btn btn-primary" href={RESIGNATION_BOOKING_URL} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', width: '100%', justifyContent: 'center', marginBottom: 12 }}>
+          <i className="fa-solid fa-calendar-check" /> BOOK CALL WITH SIR MACK
+        </a>
+        <label style={{ display: 'flex', gap: 9, alignItems: 'flex-start', marginBottom: 12, cursor: 'pointer' }}>
+          <input type="checkbox" checked={callBooked} onChange={event => setCallBooked(event.target.checked)} style={{ marginTop: 2, accentColor: 'var(--lavender)' }} />
+          <span className="t-body" style={{ fontSize: 12, color: 'var(--off-white-68)' }}>I have booked a call with Sir Mack.</span>
+        </label>
+        <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.1em', marginBottom: 6 }}>CALL DATE / TIME (OPTIONAL)</div>
+        <input className="input" value={callDate} onChange={event => setCallDate(event.target.value)} placeholder="Example: July 2, 2026, 3:00 PM" style={{ marginBottom: 12 }} />
+        <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.1em', marginBottom: 8 }}>REASON *</div>
+        <div style={{ display: 'grid', gap: 6, marginBottom: 14 }}>
+          {(window.RESIGN_REASONS || []).map(r => (
+            <label key={r.id} style={{
+              padding: '10px 12px',
+              border: '1px solid ' + (reason === r.id ? 'var(--lavender)' : 'var(--off-white-15)'),
+              borderRadius: 4,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: 10,
+              background: reason === r.id ? 'rgba(180,160,230,0.08)' : 'transparent',
+            }}>
+              <input type="radio" name="resign-reason" checked={reason === r.id} onChange={() => setReason(r.id)} style={{ marginTop: 2, accentColor: 'var(--lavender)' }} />
+              <div style={{ flex: 1 }}>
+                <div className="t-heading" style={{ fontSize: 12, textTransform: 'none', letterSpacing: 0, margin: 0 }}>{r.label}</div>
+                <div className="t-body" style={{ fontSize: 11, color: 'var(--off-white-68)', marginTop: 2 }}>{r.desc}</div>
+              </div>
+            </label>
+          ))}
+        </div>
+        <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.1em', marginBottom: 6 }}>
+          CONTEXT FOR SIR MACK * <span style={{ color: notes.trim().length < 20 ? 'var(--red)' : 'var(--lime)' }}>({notes.trim().length}/20 min)</span>
+        </div>
+        <textarea className="textarea" value={notes} onChange={event => setNotes(event.target.value)} rows={4}
+          placeholder="Briefly share your reasons and concerns so Sir Mack has context before the call." style={{ marginBottom: 12 }} />
+        <label style={{ display: 'flex', gap: 9, alignItems: 'flex-start', marginBottom: 14, cursor: 'pointer', padding: 10, background: 'var(--off-white-07)', borderRadius: 4 }}>
+          <input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)} style={{ marginTop: 2, accentColor: 'var(--lavender)' }} />
+          <span className="t-body" style={{ fontSize: 11, color: 'var(--off-white-68)', lineHeight: 1.45 }}>
+            I understand this only starts the protocol. I must wait for Sir Mack's final signal before fully leaving.
+          </span>
+        </label>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+          <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary" disabled={!canSubmit} onClick={submit}>Start Protocol</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CommanderRemovalsPage() {
+  const removals = useRemovals();
+  const [review, setReview] = React.useState(null);
+  const active = [...removals.pending, ...removals.endorsed, ...removals.approved];
+  const history = [...removals.denied, ...removals.executed];
+
+  return (
+    <div className="enter">
+      <div className="section-head">
+        <div>
+          <div className="t-label" style={{ marginBottom: 8, color: 'var(--lavender)' }}>COMMANDER · SIR MACK</div>
+          <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>Resignation Protocol</h1>
+          <div className="t-body" style={{ marginTop: 6 }}>
+            {active.length} active request{active.length === 1 ? '' : 's'} awaiting call review, turnover, or final signal.
+          </div>
+        </div>
+      </div>
+
+      <h3 className="t-heading" style={{ fontSize: 14, margin: '0 0 10px', color: 'var(--lavender)' }}>
+        ACTIVE REQUESTS · {active.length}
+      </h3>
+      {active.length === 0 ? (
+        <div className="card-panel" style={{ padding: 42, textAlign: 'center', marginBottom: 24 }}>
+          <i className="fa-solid fa-inbox" style={{ fontSize: 28, color: 'var(--off-white-40)', marginBottom: 10 }} />
+          <div className="t-body" style={{ fontSize: 12, color: 'var(--off-white-68)' }}>No active resignation protocol requests.</div>
+        </div>
+      ) : active.map(req => (
+        <CommanderResignationCard key={req.id} req={req} onAction={setReview} />
+      ))}
+
+      {history.length > 0 && (
+        <>
+          <h3 className="t-heading" style={{ fontSize: 14, margin: '28px 0 10px', color: 'var(--off-white-68)' }}>
+            HISTORY · {history.length}
+          </h3>
+          {history.map(req => <CommanderResignationCard key={req.id} req={req} />)}
+        </>
+      )}
+
+      {review && <CommanderProtocolModal data={review} onClose={() => setReview(null)} />}
+    </div>
+  );
+}
+
+function CommanderResignationCard({ req, onAction }) {
+  const { profiles } = useUserProfiles();
+  const name = profileNameFor(req.userId, profiles);
+  const meta = resignationStatusMeta(req.status);
+  const turnover = parseTurnoverPlan(req);
+  return (
+    <div className="card-panel" style={{ padding: 18, marginBottom: 12, borderLeft: '2px solid ' + meta.color }}>
+      <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>
+            <div className="t-heading" style={{ fontSize: 15, margin: 0, textTransform: 'none', letterSpacing: 0 }}>{name}</div>
+            <ResignationStatusPill status={req.status} />
+          </div>
+          <div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)', letterSpacing: '0.07em', marginBottom: 10 }}>
+            {window.__removalStore.reasonLabel(req.reason)} · Started {relTime(req.createdAt)}
+          </div>
+          {req.notes && (
+            <div className="card-flat" style={{ padding: 12, marginBottom: 10 }}>
+              <div className="t-mono" style={{ fontSize: 8, color: 'var(--off-white-40)', letterSpacing: '0.1em', marginBottom: 5 }}>EXONAUT CONTEXT</div>
+              <div className="t-body" style={{ fontSize: 12, color: 'var(--off-white)', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>{req.notes}</div>
+            </div>
+          )}
+          {req.status === 'approved' && (
+            <div className="card-flat" style={{ padding: 12, marginBottom: 10 }}>
+              <div className="t-mono" style={{ fontSize: 8, color: 'var(--sky)', letterSpacing: '0.1em', marginBottom: 5 }}>TURNOVER PLAN</div>
+              <TurnoverPlanSummary plan={turnover} />
+            </div>
+          )}
+          {req.denyNote && req.status === 'endorsed' && (
+            <div className="t-body" style={{ fontSize: 12, color: 'var(--amber)', marginBottom: 10 }}>
+              Changes requested: {req.denyNote}
+            </div>
+          )}
+        </div>
+        {onAction && (
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            {req.status === 'pending' && (
+              <>
+                <button className="btn btn-primary btn-sm" onClick={() => onAction({ req, action: 'turnover' })}>
+                  <i className="fa-solid fa-clipboard-list" /> REQUEST TURNOVER
+                </button>
+                <button className="btn btn-ghost btn-sm" onClick={() => onAction({ req, action: 'continue' })}>
+                  <i className="fa-solid fa-circle-check" /> CLOSE - CONTINUE
+                </button>
+              </>
+            )}
+            {req.status === 'approved' && (
+              <>
+                <button className="btn btn-primary btn-sm" onClick={() => onAction({ req, action: 'final' })}>
+                  <i className="fa-solid fa-check-double" /> APPROVE FINAL EXIT
+                </button>
+                <button className="btn btn-ghost btn-sm" onClick={() => onAction({ req, action: 'changes' })}>
+                  <i className="fa-solid fa-pen" /> REQUEST CHANGES
+                </button>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function CommanderProtocolModal({ data, onClose }) {
+  const { profile } = useCurrentUserProfile();
+  const removals = useRemovals();
+  const { profiles } = useUserProfiles();
+  const [note, setNote] = React.useState('');
+  const name = profileNameFor(data.req.userId, profiles);
+  const copy = {
+    turnover: {
+      title: 'Request Turnover Plan',
+      eyebrow: 'SIR MACK · VALID REASON',
+      body: 'This confirms the reason can proceed. The Exonaut will be asked to send the resignation email and submit a turnover proposal.',
+      button: 'Request Turnover Plan',
+      color: 'var(--lavender)',
+    },
+    continue: {
+      title: 'Close - Continue Program',
+      eyebrow: 'SIR MACK · CALL OUTCOME',
+      body: 'Close this request because the Exonaut will continue in the program.',
+      button: 'Close Request',
+      color: 'var(--off-white-68)',
+    },
+    final: {
+      title: 'Approve Final Exit',
+      eyebrow: 'SIR MACK · FINAL SIGNAL',
+      body: 'This is the final signal. The Exonaut will be removed from active cohort views.',
+      button: 'Approve Final Exit',
+      color: 'var(--red)',
+    },
+    changes: {
+      title: 'Request Turnover Changes',
+      eyebrow: 'SIR MACK · TURNOVER REVIEW',
+      body: 'Send the turnover plan back to the Exonaut for changes.',
+      button: 'Request Changes',
+      color: 'var(--amber)',
+    },
+  }[data.action];
+
+  async function submit() {
+    try {
+      if (data.action === 'turnover') await removals.requestTurnoverPlan(data.req.id, profile.id, note.trim());
+      if (data.action === 'continue') await removals.closeContinuing(data.req.id, profile.id, note.trim());
+      if (data.action === 'final') await removals.approveFinalExit(data.req.id, profile.id, note.trim());
+      if (data.action === 'changes') await removals.requestTurnoverChanges(data.req.id, profile.id, note.trim());
+      onClose();
+    } catch (err) {
+      alert(err?.message || 'Could not update resignation request.');
+    }
+  }
+
+  return (
+    <div className="modal-scrim" onClick={onClose}>
+      <div className="modal-body" onClick={event => event.stopPropagation()} role="dialog" aria-modal="true">
+        <button className="modal-close" onClick={onClose} aria-label="Close"><i className="fa-solid fa-xmark" /></button>
+        <div className="t-label" style={{ color: copy.color, marginBottom: 8 }}>{copy.eyebrow}</div>
+        <h2 className="t-title" style={{ fontSize: 28, margin: '0 0 8px' }}>{copy.title}</h2>
+        <div className="t-body" style={{ fontSize: 12, color: 'var(--off-white-68)', lineHeight: 1.55, marginBottom: 12 }}>
+          {copy.body} Request for <strong>{name}</strong>.
+        </div>
+        <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.1em', marginBottom: 6 }}>NOTE</div>
+        <textarea className="textarea" value={note} onChange={event => setNote(event.target.value)} rows={4}
+          placeholder="Optional note for the audit trail and Exonaut." style={{ marginBottom: 14 }} />
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+          <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary" style={{ background: copy.color }} onClick={submit}>{copy.button}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LeadRemovalsPanel() {
+  return (
+    <div className="enter">
+      <div className="card-panel" style={{ padding: 32 }}>
+        <div className="t-label" style={{ marginBottom: 8 }}>RESIGNATION PROTOCOL</div>
+        <h1 className="t-title" style={{ fontSize: 34, margin: '0 0 10px' }}>Commander-only workflow</h1>
+        <div className="t-body" style={{ color: 'var(--off-white-68)' }}>
+          Resignations are handled directly by Sir Mack through the Commander queue.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AdminRemovalsPage() {
+  return <CommanderRemovalsPage />;
+}
+
+function RemovalStatusPill(props) { return <ResignationStatusPill {...props} />; }
+function RemovalRequestCard() { return null; }
+function RemovalModal() { return null; }
+function LeadEndorseModal() { return null; }
+function LeadReviewModal() { return null; }
+function CommanderReviewModal() { return null; }
+function AdminExecuteConfirm() { return null; }
 
 Object.assign(window, {
   RemovalStatusPill, RemovalRequestCard, RemovalModal,

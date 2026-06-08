@@ -69,18 +69,105 @@
         }
       }
     },
+    // Returns the stored award record for a given week, or null
+    getIotwWinner(weekNum) {
+      try {
+        const raw = localStorage.getItem('exo:iotw:awarded:w' + weekNum);
+        return raw ? JSON.parse(raw) : null;
+      } catch { return null; }
+    },
   };
+
+  // True once it's Friday 6:00 PM or later
+  function isFridayCutoff() {
+    const now = new Date();
+    return now.getDay() === 5 && now.getHours() >= 18;
+  }
+
+  // Resolve the active cohort object
+  function getActiveCohort(cohortId) {
+    const all = [
+      ...(window.COHORTS || []),
+      ...(window.__cohortStore ? window.__cohortStore.getAll() : []),
+    ];
+    return all.find(c => c.id === cohortId) || all.find(c => c.status === 'active') || all[0] || null;
+  }
+
+  // Award the weekly winner and auto-post to the community board as Commander.
+  // Runs at most once per (cohortId, weekNum) pair — guarded by localStorage.
+  async function awardInternOfWeek(cohortId, weekNum) {
+    if (!isFridayCutoff()) return;
+    if (!window.EOW) return;
+
+    const awardedKey = 'exo:iotw:awarded:w' + weekNum;
+    if (localStorage.getItem(awardedKey)) return; // already done this week
+
+    const cohort = getActiveCohort(cohortId);
+    if (!cohort) return;
+
+    const winners = window.EOW.topOfWeek(cohort.id, weekNum, 1);
+    if (!winners.length) return;
+
+    const winner = winners[0];
+    __ritualStore.autoLogInternOfWeek(winner.user.id, weekNum);
+
+    // Persist the award so the ritual card lights up on reload
+    localStorage.setItem(awardedKey, JSON.stringify({
+      userId:     winner.user.id,
+      userName:   winner.user.name,
+      weekPoints: winner.weekPoints,
+      breakdown:  winner.breakdown,
+      ts:         Date.now(),
+    }));
+
+    // Commander auto-post to the community thread
+    if (window.__boardStore) {
+      const win   = window.EOW.weekWindow(cohort, weekNum);
+      const track = (window.TRACKS || []).find(t => t.code === (winner.user.track || ''));
+      const trackLabel = track ? ` from the ${track.name} track` : '';
+      await window.__boardStore.createThread({
+        title:      `🏆 Intern of the Week · Week ${String(weekNum).padStart(2, '0')} — ${winner.user.name}`,
+        body:       [
+          `🏆 **Intern of the Week — Week ${weekNum}**`,
+          '',
+          `Congratulations to **${winner.user.name}**${trackLabel}!`,
+          '',
+          `They earned **+${winner.weekPoints} points** this week (${win.label}) — the highest in the cohort.`,
+          '',
+          `Head to your Rituals page to download your certificate and share it on LinkedIn. Keep pushing! 🚀`,
+          '',
+          `#InternOfTheWeek #ExonautProgram #Exoasia`,
+        ].join('\n'),
+        channel:    'general',
+        authorId:   'cmdr-mack',
+        authorName: 'Mack Comandante',
+        authorRole: 'commander',
+      });
+    }
+  }
 
   function useRituals(userId, weekNum) {
     const [tick, setTick] = React.useState(0);
+
+    // Legacy: auto-log IotW if user tops the all-time leaderboard
     React.useEffect(() => {
       if (!userId || !weekNum) return;
       const totals = (window.USERS || []).map(u => ({ id: u.id, points: window.computeTotal ? window.computeTotal(u.id, []) : u.points || 0 }));
       const top = totals.sort((a, b) => b.points - a.points)[0];
       if (top?.id === userId) __ritualStore.autoLogInternOfWeek(userId, weekNum);
     }, [userId, weekNum]);
+
+    // Friday 6PM cutoff — check on mount and every 60 s
+    React.useEffect(() => {
+      if (!userId || !weekNum) return;
+      const cohortId = (typeof ME !== 'undefined' && ME?.cohort) || 'c2627';
+      awardInternOfWeek(cohortId, weekNum);
+      const iv = setInterval(() => awardInternOfWeek(cohortId, weekNum), 60000);
+      return () => clearInterval(iv);
+    }, [userId, weekNum]);
+
     const weekData = __ritualStore.getWeek(userId, weekNum);
-    const refresh = React.useCallback(() => setTick(t => t + 1), []);
+    const refresh  = React.useCallback(() => setTick(t => t + 1), []);
     return { weekData, refresh };
   }
 

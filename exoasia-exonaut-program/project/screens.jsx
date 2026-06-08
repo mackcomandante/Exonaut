@@ -587,6 +587,7 @@ function resolveAuthor(authorId, authorName) {
 function KudosFeed({ onGive }) {
   const [filter, setFilter] = React.useState('all');
   const kudos = useKudos();
+  const pointsState = usePoints();
   const { profile } = useCurrentUserProfile();
   const { profiles } = useUserProfiles();
   const meId = profile.id || ME_ID;
@@ -604,9 +605,22 @@ function KudosFeed({ onGive }) {
       if (!raw || raw.includes('@')) return '';
       return raw.split(' · ')[0].split(' | ')[0].replace(/\s*\[[^\]]+\]\s*/g, '').trim();
     };
+    const tierFor = (person) => {
+      if (person && person.role && person.role !== 'exonaut') return 'corps';
+      const seed = (typeof USERS !== 'undefined' ? USERS : []).find(x => x.id === userId);
+      const ledgerPoints = (pointsState.ledger || [])
+        .filter(entry => entry.userId === userId)
+        .reduce((sum, entry) => sum + Number(entry.points || 0), 0);
+      const storedPoints = Number(person?.points ?? seed?.points ?? 0);
+      const points = ledgerPoints || storedPoints;
+      if (window.getTierKeyForPoints) return window.getTierKeyForPoints(points);
+      return points >= 900 ? 'apex' : points >= 600 ? 'elite' : points >= 300 ? 'prime' : points >= 100 ? 'builder' : (seed?.tier || 'entry');
+    };
     const p = (profiles || []).find(x => x.id === userId);
-    if (p) return { name: cleanName(storedName) || p.fullName || 'Exonaut', tier: p.role === 'exonaut' ? 'elite' : 'corps', avatarUrl: p.avatarUrl || '' };
-    if (cleanName(storedName)) return { name: cleanName(storedName), tier: 'elite', avatarUrl: '' };
+    if (p) return { name: cleanName(storedName) || p.fullName || 'Exonaut', tier: tierFor(p), avatarUrl: p.avatarUrl || '' };
+    const seed = (typeof USERS !== 'undefined' ? USERS : []).find(x => x.id === userId);
+    if (seed) return { name: cleanName(storedName) || seed.name || 'Exonaut', tier: tierFor(seed), avatarUrl: seed.avatarUrl || '' };
+    if (cleanName(storedName)) return { name: cleanName(storedName), tier: 'entry', avatarUrl: '' };
     return resolveAuthor(userId, null);
   }
 
@@ -1449,12 +1463,12 @@ function AlumniPage() {
     <div className="enter">
       <div className="section-head">
         <div>
-          <div className="t-label" style={{ marginBottom: 8, color: 'var(--lavender)' }}>EXONAUT CORPS</div>
+          <div className="t-label" style={{ marginBottom: 8, color: 'var(--accent)' }}>EXONAUT CORPS</div>
           <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>Alumni Portal</h1>
         </div>
       </div>
-      <div className="card-panel" style={{ padding: 48, textAlign: 'center', background: 'rgba(176,149,197,0.06)', borderColor: 'rgba(176,149,197,0.2)' }}>
-        <i className="fa-solid fa-clock-rotate-left" style={{ fontSize: 48, color: 'var(--lavender)', marginBottom: 20 }} />
+      <div className="card-panel" style={{ padding: 48, textAlign: 'center', background: 'var(--accent-wash)', borderColor: 'var(--accent-border-soft)' }}>
+        <i className="fa-solid fa-clock-rotate-left" style={{ fontSize: 48, color: 'var(--accent)', marginBottom: 20 }} />
         <h2 className="t-title" style={{ fontSize: 28, margin: '0 0 12px 0' }}>Your Corps Membership Activates on Launch Day</h2>
         <div className="t-body" style={{ maxWidth: 540, margin: '0 auto 24px', fontSize: 17 }}>
           On <span style={{ color: 'var(--ink)' }}>{demoDay}</span>, your profile, badges, and mission history become permanent. You'll gain access to the alumni directory, Hall of Exonauts, and Corps-only opportunities.
@@ -1917,7 +1931,7 @@ function KnowledgeBasePage() {
       {error && <div className="board-alert"><i className="fa-solid fa-circle-exclamation" />{error}</div>}
       {loading && !loaded && <div className="board-empty">Loading Teach Backs...</div>}
       {!loading && teachBacks.length === 0 && (
-        <div className="card-panel board-empty">
+        <div className="card-panel board-empty knowledge-empty">
           <i className="fa-solid fa-book-open" />
           <div>No Teach Backs have been added to the Knowledge Base yet.</div>
         </div>

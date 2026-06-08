@@ -1,8 +1,9 @@
 // Dashboard screen — hero stats, pillars, rituals, missions, activity
 
 function StatCell({ label, icon, value, unit, meta, metaDir, lime }) {
+  const statKey = label.toLowerCase().replace(/[^a-z0-9]+/g, '-');
   return (
-    <div className="stat-cell">
+    <div className={'stat-cell stat-cell-' + statKey}>
       <div className="stat-label"><i className={'fa-solid ' + icon} />{label}</div>
       <div className={'stat-value' + (lime ? ' lime' : '')}>
         <span>{value}</span>
@@ -64,7 +65,7 @@ function HeroStats() {
         value={`#${liveRank}`} unit={`of ${rankedRows.length || cohortMembers.length || COHORT.size}`}
         meta="+3 vs LAST WK" metaDir="up" />
       <StatCell label="TIER" icon="fa-shield-halved"
-        value={tierProgress.current.short} unit={`·\u00A0${tierProgress.pointsOver} over`}
+        value={tierProgress.current.short}
         meta={tierProgress.next ? `${tierProgress.pointsToNext} TO ${tierProgress.next.short}` : 'TOP TIER'} metaDir="flat" />
       <StatCell label="TRACK" icon="fa-bullseye"
         value={completed} unit={`of ${trackMissions.length}`}

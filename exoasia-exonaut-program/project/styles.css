@@ -2286,6 +2286,11 @@ img, svg { display: block; max-width: 100%; }
 .avatar-ring-prime   { color: var(--silver); }
 .avatar-ring-elite   { color: var(--gold); }
 .avatar-ring-apex    { color: var(--platinum); box-shadow: 0 0 0 4px var(--cyan-wash); }
+.avatar-ring-corps   { color: var(--violet); }
+.avatar-ring-bronze  { color: var(--bronze); }
+.avatar-ring-silver  { color: var(--silver); }
+.avatar-ring-gold    { color: var(--gold); }
+.avatar-ring-platinum { color: var(--platinum); }
 
 /* ============================================================
    SIDEBAR
@@ -2628,6 +2633,7 @@ img, svg { display: block; max-width: 100%; }
   box-shadow: var(--shadow-card);
   transition: all 200ms ease;
   overflow: hidden;
+  container-type: inline-size;
 }
 .stat-cell:hover { box-shadow: var(--shadow-card-hover); transform: translateY(-3px); }
 
@@ -2656,13 +2662,21 @@ img, svg { display: block; max-width: 100%; }
   color: var(--ink);
   line-height: 1;
   display: flex; align-items: baseline; gap: 6px;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
+  min-width: 0;
 }
 .stat-cell .stat-value.lime { color: var(--ink); }
+.stat-cell .stat-value > span:first-child {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .stat-cell .stat-value .unit {
   font-size: 13px;
   color: var(--ink-muted);
   font-weight: 500;
+  flex-shrink: 0;
 }
 .stat-cell .stat-meta {
   margin-top: 10px;
@@ -2674,6 +2688,28 @@ img, svg { display: block; max-width: 100%; }
 }
 .stat-cell .stat-meta .up { color: #1A8A5C; }
 .stat-cell .stat-meta .down { color: #C73A3A; }
+
+@container (max-width: 190px) {
+  .stat-cell .stat-value {
+    font-size: 30px;
+  }
+}
+
+@container (max-width: 155px) {
+  .stat-cell .stat-value {
+    font-size: 26px;
+  }
+}
+
+.stat-cell-tier .stat-value {
+  font-size: clamp(24px, 17cqw, 34px);
+  white-space: nowrap;
+}
+
+.stat-cell-tier .stat-value > span:first-child {
+  overflow: visible;
+  text-overflow: clip;
+}
 
 /* ============================================================
    PILLAR CARDS
@@ -3523,6 +3559,24 @@ img, svg { display: block; max-width: 100%; }
   background: var(--bg-maroon);
 }
 .modal-close:hover { color: var(--ink); background: var(--hairline); }
+.cert-preview-modal {
+  padding-top: 30px;
+}
+.cert-preview-head {
+  align-items: flex-start;
+  display: flex;
+  gap: 18px;
+  justify-content: space-between;
+  margin-bottom: 18px;
+  min-height: 46px;
+  padding-right: 46px;
+}
+.cert-preview-close {
+  top: 24px;
+  right: 24px;
+  background: var(--bg-darkest);
+  border: 1px solid var(--hairline-strong);
+}
 
 /* ============================================================
    TOAST
@@ -4189,6 +4243,16 @@ body[data-density="compact"] .pillar-card { padding: 16px; }
   color: var(--ink-soft);
 }
 .board-empty i { color: var(--lavender); font-size: 31px; }
+.knowledge-empty {
+  border-color: var(--accent-border-soft);
+  background: color-mix(in srgb, var(--accent) 4%, var(--card-base));
+}
+.knowledge-empty i {
+  color: var(--accent);
+}
+.knowledge-empty div {
+  color: var(--ink);
+}
 .board-alert {
   display: flex;
   gap: 9px;

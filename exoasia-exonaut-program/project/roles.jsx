@@ -192,7 +192,6 @@ function LeadHome({ onNavigate }) {
 function LeadRoster() {
   const { profile } = useCurrentUserProfile();
   const exonautRows = useSupabaseExonautRows();
-  const [removalUser, setRemovalUser] = React.useState(null);
   const leadTrack = profile.trackCode || 'AIS';
   const myExonauts = exonautRows.filter(u =>
     u.track === leadTrack && (!profile.cohortId || u.cohort === profile.cohortId)
@@ -228,20 +227,11 @@ function LeadRoster() {
                 <button className="btn btn-ghost btn-sm" title="Award pts"><i className="fa-solid fa-bolt" /></button>
                 <button className="btn btn-ghost btn-sm" title="Kudos"><i className="fa-solid fa-hand-sparkles" /></button>
                 <button className="btn btn-ghost btn-sm" title="Profile"><i className="fa-solid fa-eye" /></button>
-                <button className="btn btn-ghost btn-sm danger-action" title="Endorse removal" onClick={() => setRemovalUser(u)}>
-                  <i className="fa-solid fa-user-slash" />
-                </button>
               </div>
             </div>
           );
         })}
       </div>
-      {removalUser && (
-        <LeadEndorseModal
-          user={removalUser}
-          onClose={() => setRemovalUser(null)}
-        />
-      )}
     </div>
   );
 }

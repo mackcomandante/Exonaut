@@ -22,6 +22,8 @@
     { id: 'other', label: 'Other (explain)', desc: 'Other reason - please explain in the message' },
   ];
 
+  const BOOKING_URL = 'https://link.gamechangerfunnel.com/widget/booking/L6l6siGhUd4ras8fMWHd';
+
   const state = { requests: [], loaded: false };
   const listeners = new Set();
 
@@ -240,10 +242,17 @@
       }
     },
 
-    async leadEndorse(requestId, leadId, note) {
+    async requestTurnoverPlan(requestId, commanderId, note) {
       const r = state.requests.find(x => x.id === requestId);
       if (!r || r.status !== 'pending') return null;
-      const next = { ...r, status: 'endorsed', endorsedBy: leadId || r.leadId, endorsedAt: Date.now(), endorseNote: note || '' };
+      const next = {
+        ...r,
+        status: 'endorsed',
+        endorsedBy: commanderId || r.leadId,
+        endorsedAt: Date.now(),
+        reviewNote: note || '',
+        denyNote: null,
+      };
       upsertLocal(next);
       try {
         const saved = await persistUpdate(next);
@@ -254,10 +263,16 @@
         throw err;
       }
     },
-    async leadDeny(requestId, leadId, note) {
+    async closeContinuing(requestId, commanderId, note) {
       const r = state.requests.find(x => x.id === requestId);
       if (!r || r.status !== 'pending') return null;
-      const next = { ...r, status: 'denied', reviewedBy: leadId || r.leadId, reviewedAt: Date.now(), denyNote: note || '' };
+      const next = {
+        ...r,
+        status: 'denied',
+        reviewedBy: commanderId,
+        reviewedAt: Date.now(),
+        denyNote: note || 'Closed after Sir Mack call - continuing program.',
+      };
       upsertLocal(next);
       try {
         const saved = await persistUpdate(next);
@@ -267,6 +282,80 @@
         if (hasDb()) await store.refresh();
         throw err;
       }
+    },
+    async submitTurnoverPlan(requestId, userId, plan) {
+      const r = state.requests.find(x => x.id === requestId);
+      if (!r || r.status !== 'endorsed' || r.userId !== userId) return null;
+      const next = {
+        ...r,
+        status: 'approved',
+        endorseNote: JSON.stringify({
+          emailSent: !!plan.emailSent,
+          handoffUserId: plan.handoffUserId || '',
+          handoffName: plan.handoffName || '',
+          turnoverNotes: plan.turnoverNotes || '',
+          finalWorkingDate: plan.finalWorkingDate || '',
+          submittedAt: nowIso(),
+        }),
+        denyNote: null,
+      };
+      upsertLocal(next);
+      try {
+        const saved = await persistUpdate(next);
+        upsertLocal(saved);
+        return saved;
+      } catch (err) {
+        if (hasDb()) await store.refresh();
+        throw err;
+      }
+    },
+    async requestTurnoverChanges(requestId, commanderId, note) {
+      const r = state.requests.find(x => x.id === requestId);
+      if (!r || r.status !== 'approved') return null;
+      const next = {
+        ...r,
+        status: 'endorsed',
+        reviewedBy: commanderId,
+        reviewedAt: Date.now(),
+        denyNote: note || 'Sir Mack requested changes to the turnover plan.',
+      };
+      upsertLocal(next);
+      try {
+        const saved = await persistUpdate(next);
+        upsertLocal(saved);
+        return saved;
+      } catch (err) {
+        if (hasDb()) await store.refresh();
+        throw err;
+      }
+    },
+    async approveFinalExit(requestId, commanderId, note) {
+      const r = state.requests.find(x => x.id === requestId);
+      if (!r || r.status !== 'approved') return null;
+      const next = {
+        ...r,
+        status: 'executed',
+        reviewedBy: commanderId,
+        reviewedAt: r.reviewedAt || Date.now(),
+        reviewNote: note || r.reviewNote || '',
+        executedBy: commanderId,
+        executedAt: Date.now(),
+      };
+      upsertLocal(next);
+      try {
+        const saved = await persistUpdate(next);
+        upsertLocal(saved);
+        return saved;
+      } catch (err) {
+        if (hasDb()) await store.refresh();
+        throw err;
+      }
+    },
+    async leadEndorse(requestId, leadId, note) {
+      return store.requestTurnoverPlan(requestId, leadId, note);
+    },
+    async leadDeny(requestId, leadId, note) {
+      return store.closeContinuing(requestId, leadId, note);
     },
     async approve(requestId, commanderId, note) {
       const r = state.requests.find(x => x.id === requestId);
@@ -323,6 +412,7 @@
     },
     getReasons() { return REASONS; },
     getResignReasons() { return RESIGN_REASONS; },
+    bookingUrl: BOOKING_URL,
     reasonLabel(id) {
       const all = [...REASONS, ...RESIGN_REASONS];
       return (all.find(r => r.id === id) || {}).label || id;
@@ -360,6 +450,12 @@
       approve: store.approve,
       deny: store.deny,
       execute: store.execute,
+      requestTurnoverPlan: store.requestTurnoverPlan,
+      closeContinuing: store.closeContinuing,
+      submitTurnoverPlan: store.submitTurnoverPlan,
+      requestTurnoverChanges: store.requestTurnoverChanges,
+      approveFinalExit: store.approveFinalExit,
+      bookingUrl: store.bookingUrl,
       withdrawByExonaut: store.withdrawByExonaut,
       activeForUser: store.activeForUser,
       isRemoved: store.isRemoved,
@@ -371,10 +467,10 @@
   window.getActiveRemovalFor = userId => store.activeForUser(userId);
 
   window.REMOVAL_STATUS_META = {
-    pending: { label: 'AWAITING MANAGER', color: 'var(--amber)', icon: 'fa-user-clock' },
-    endorsed: { label: 'AWAITING COMMANDER', color: 'var(--lavender)', icon: 'fa-hourglass-half' },
-    approved: { label: 'AWAITING ADMIN', color: 'var(--sky)', icon: 'fa-check-double' },
-    denied: { label: 'DENIED', color: 'var(--off-white-40)', icon: 'fa-ban' },
-    executed: { label: 'REMOVED', color: 'var(--red)', icon: 'fa-user-slash' },
+    pending: { label: 'AWAITING SIR MACK CALL', color: 'var(--amber)', icon: 'fa-calendar-check' },
+    endorsed: { label: 'AWAITING TURNOVER PLAN', color: 'var(--lavender)', icon: 'fa-clipboard-list' },
+    approved: { label: 'AWAITING FINAL SIGNAL', color: 'var(--sky)', icon: 'fa-check-double' },
+    denied: { label: 'CLOSED - CONTINUING', color: 'var(--off-white-40)', icon: 'fa-circle-check' },
+    executed: { label: 'FINAL EXIT APPROVED', color: 'var(--red)', icon: 'fa-user-slash' },
   };
 })();

@@ -437,9 +437,46 @@ function RitualsPage() {
   const userId = ME_ID;
   const weekNum = COHORT.week;
   const [composing, setComposing] = React.useState(null);
+  const [iotwCert, setIotwCert] = React.useState(false);
   const { weekData, refresh } = window.useRituals ? window.useRituals(userId, weekNum) : { weekData: {}, refresh: () => {} };
   const allHistory = window.__ritualStore ? window.__ritualStore.getAll(userId) : {};
   const pastWeeks = Object.keys(allHistory).map(Number).filter(w => w < weekNum).sort((a, b) => b - a);
+
+  // Determine weekly winner via EOW synthesizer
+  const weeklyWinner = React.useMemo(() => {
+    if (!window.EOW || !weekNum) return null;
+    const cohortId = (ME && ME.cohort) || 'c2627';
+    const winners = window.EOW.topOfWeek(cohortId, weekNum, 1);
+    return winners[0] || null;
+  }, [weekNum]);
+
+  // Is the current user the winner for this week?
+  const isInternOfWeek = weeklyWinner?.user?.id === ME_ID;
+
+  // Has the Friday 6PM cutoff passed?
+  const isCutoffPassed = (() => {
+    const now = new Date();
+    return now.getDay() === 5 && now.getHours() >= 18;
+  })();
+
+  // Award is active if cutoff has passed (or was already recorded in a prior session)
+  const storedAward = window.__ritualStore ? window.__ritualStore.getIotwWinner(weekNum) : null;
+  const awardActive = isCutoffPassed || !!storedAward;
+  const isAwardedWinner = isInternOfWeek && awardActive;
+
+  // Build the EowShareModal entry object when user is the winner
+  const iotwEntry = React.useMemo(() => {
+    if (!weeklyWinner) return null;
+    return {
+      user:       weeklyWinner.user,
+      rank:       1,
+      weekPoints: weeklyWinner.weekPoints,
+      breakdown:  weeklyWinner.breakdown,
+    };
+  }, [weeklyWinner]);
+
+  const iotwCohort = (window.COHORTS || []).find(c => c.status === 'active') || (window.COHORTS || [])[0] || { id: 'c2627', name: 'Batch 2026–2027', code: 'EXO-B-2627' };
+  const iotwWindow = window.EOW && weekNum ? window.EOW.weekWindow(iotwCohort, weekNum) : { label: '' };
 
   function handleDone() {
     setComposing(null);
@@ -500,6 +537,60 @@ function RitualsPage() {
                   </div>
                 );
               })}
+
+              {/* ── Intern of the Week ritual card ── */}
+              <div
+                className={'ritual-cell ' + (isAwardedWinner ? 'done' : 'not-started')}
+                onClick={() => { if (isAwardedWinner && iotwEntry) setIotwCert(true); }}
+                style={{
+                  display: 'flex', flexDirection: 'column', gap: 8, position: 'relative',
+                  cursor: isAwardedWinner ? 'pointer' : 'default',
+                  borderColor: isAwardedWinner ? '#F4C542' : undefined,
+                  boxShadow: isAwardedWinner ? '0 0 32px rgba(244,197,66,0.30), inset 0 0 16px rgba(244,197,66,0.08)' : undefined,
+                  transition: 'box-shadow 0.4s',
+                }}
+              >
+                <div className="ritual-head">
+                  <div className="ritual-name">Intern of the Week</div>
+                  <i
+                    className={'fa-solid ' + (isAwardedWinner ? 'fa-trophy' : 'fa-lock') + ' ritual-icon ' + (isAwardedWinner ? 'done-c' : 'pend-c')}
+                    style={{ color: isAwardedWinner ? '#F4C542' : undefined }}
+                  />
+                </div>
+                <div style={{
+                  fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.05em',
+                  color: isAwardedWinner ? '#F4C542' : 'var(--off-white-40)',
+                }}>
+                  {isAwardedWinner ? 'AWARDED · WEEK ' + weekNum : 'AWARDED EVERY FRIDAY 6PM'}
+                </div>
+                <div className="ritual-points" style={{ color: isAwardedWinner ? '#F4C542' : undefined }}>+25 PTS</div>
+
+                {/* Pulsing download badge — only shown to the winner */}
+                {isAwardedWinner && (
+                  <div style={{
+                    marginTop: 6, padding: '7px 10px',
+                    background: 'rgba(244,197,66,0.15)',
+                    border: '1px solid #F4C542',
+                    borderRadius: 4,
+                    fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 700,
+                    color: '#F4C542', letterSpacing: '0.08em', textAlign: 'center',
+                    animation: 'iotw-pulse 2s ease-in-out infinite',
+                  }}>
+                    <i className="fa-solid fa-download" style={{ marginRight: 5 }} />
+                    CLICK HERE TO DOWNLOAD CERTIFICATE
+                  </div>
+                )}
+
+                {/* Lock note for non-winners */}
+                {!isAwardedWinner && (
+                  <div style={{
+                    fontFamily: 'var(--font-mono)', fontSize: 9,
+                    color: 'var(--off-white-40)', letterSpacing: '0.04em', marginTop: 4,
+                  }}>
+                    Highest scorer earns this each Friday
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -544,6 +635,208 @@ function RitualsPage() {
       {composing && (
         <RitualComposer ritual={composing} weekNum={weekNum} onClose={() => setComposing(null)} onDone={handleDone} />
       )}
+
+      {/* IotW certificate modal */}
+      {iotwCert && iotwEntry && (
+        <IotwCertModal entry={iotwEntry} cohort={iotwCohort} weekNumber={weekNum} win={iotwWindow} onClose={() => setIotwCert(false)} />
+      )}
+
+      {/* Keyframe for pulsing download badge */}
+      <style>{`
+        @keyframes iotw-pulse {
+          0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(244,197,66,0.4); }
+          50%       { opacity: 0.85; box-shadow: 0 0 0 6px rgba(244,197,66,0); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+// ── Inline IotW certificate modal (fallback / standalone) ──────────────────
+function IotwCertModal({ entry, cohort, weekNumber, win, onClose }) {
+  const { user, weekPoints, breakdown } = entry;
+  const svgRef = React.useRef(null);
+  const accent = '#C9F24A';
+  const gold   = '#F4C542';
+  const initials = user.name.split(' ').map(s => s[0]).slice(0, 2).join('').toUpperCase();
+  const track = (window.TRACKS || []).find(t => t.code === (user.track || ''));
+  const max = Math.max(1, ...(breakdown || []).map(d => d.points));
+
+  function downloadPNG() {
+    const svg = svgRef.current; if (!svg) return;
+    const src = new XMLSerializer().serializeToString(svg);
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 1200; canvas.height = 630;
+      canvas.getContext('2d').drawImage(img, 0, 0, 1200, 630);
+      canvas.toBlob(blob => {
+        const url = URL.createObjectURL(blob);
+        const a   = document.createElement('a');
+        a.href = url;
+        a.download = `intern-of-the-week-${user.name.replace(/\s+/g,'-').toLowerCase()}-w${weekNumber}.png`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }, 'image/png');
+    };
+    img.src = URL.createObjectURL(new Blob([src], { type: 'image/svg+xml;charset=utf-8' }));
+  }
+
+  const shareText =
+`🏆 Honored to be Intern of the Week at Exoasia Innovation Hub!
+
++${weekPoints} points earned this week (${win?.label || ''}).
+Week ${weekNumber} of ${(typeof COHORT !== 'undefined' ? COHORT.weekTotal : 12)}.
+
+#Exoasia #ExonautProgram #InternOfTheWeek${track ? ' #' + track.short.replace(/[^A-Z0-9]/gi,'') : ''}`;
+
+  function copyCopy() { try { navigator.clipboard.writeText(shareText); } catch(e) {} }
+  function openLinkedIn() {
+    window.open('https://www.linkedin.com/feed/?shareActive=true&text=' + encodeURIComponent(shareText), '_blank', 'noopener,noreferrer');
+  }
+
+  return (
+    <div onClick={onClose} style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.78)', backdropFilter: 'blur(6px)',
+      zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, overflowY: 'auto',
+    }}>
+      <div onClick={e => e.stopPropagation()} className="card-panel" style={{
+        width: 'min(900px, 100%)', padding: 0, borderColor: gold,
+        display: 'flex', flexDirection: 'column', maxHeight: '92vh',
+      }}>
+        {/* Header */}
+        <div style={{ padding: '18px 24px 14px', borderBottom: '1px solid var(--off-white-07)', position: 'relative' }}>
+          <div className="t-mono" style={{ fontSize: 9, color: gold, letterSpacing: '0.12em', fontWeight: 700, marginBottom: 6 }}>
+            INTERN OF THE WEEK · CERTIFICATE · 1200 × 630
+          </div>
+          <h2 className="t-title" style={{ fontSize: 20, margin: 0 }}>{user.name} — EXONAUT OF THE WEEK</h2>
+          <div className="t-body" style={{ fontSize: 12, color: 'var(--off-white-68)', marginTop: 4 }}>
+            Download your PNG certificate and share it on LinkedIn to celebrate your win!
+          </div>
+          <div onClick={onClose} style={{
+            position: 'absolute', top: 14, right: 14, width: 26, height: 26,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', color: 'var(--off-white-40)',
+          }}><i className="fa-solid fa-xmark" /></div>
+        </div>
+
+        <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16, overflowY: 'auto' }}>
+          {/* SVG Certificate */}
+          <div style={{ width: '100%', aspectRatio: '1200/630', background: '#0A0D11', border: '1px solid var(--off-white-15)', borderRadius: 2, overflow: 'hidden' }}>
+            <svg ref={svgRef} viewBox="0 0 1200 630" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <linearGradient id="iotw-bg" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stopColor="#0A0D11"/>
+                  <stop offset="100%" stopColor="#181D24"/>
+                </linearGradient>
+                <pattern id="iotw-grid" width="40" height="40" patternUnits="userSpaceOnUse">
+                  <path d="M 40 0 L 0 0 0 40" fill="none" stroke={gold} strokeOpacity="0.05" strokeWidth="1"/>
+                </pattern>
+              </defs>
+
+              <rect width="1200" height="630" fill="url(#iotw-bg)"/>
+              <rect width="1200" height="630" fill="url(#iotw-grid)"/>
+              <rect x="0" y="0" width="1200" height="6" fill={gold}/>
+              <rect x="0" y="624" width="1200" height="6" fill={gold}/>
+
+              {/* Branding */}
+              <text x="60" y="70" fontFamily="Montserrat,sans-serif" fontWeight="800" fontSize="18" fill={gold} letterSpacing="6">
+                EXOASIA · EXONAUT PROGRAM
+              </text>
+              <text x="60" y="95" fontFamily="JetBrains Mono,monospace" fontSize="13" fill="#B8C2CE" letterSpacing="2">
+                {(cohort.code || cohort.id || '').toUpperCase()} · WEEK {String(weekNumber).padStart(2,'0')} · {win?.label || ''}
+              </text>
+
+              {/* Gold medal badge */}
+              <circle cx="1080" cy="110" r="58" fill="none" stroke={gold} strokeWidth="3"/>
+              <circle cx="1080" cy="110" r="44" fill={gold} fillOpacity="0.12"/>
+              <text x="1080" y="103" textAnchor="middle" fontFamily="Montserrat,sans-serif" fontWeight="900" fontSize="28" fill={gold}>🏆</text>
+              <text x="1080" y="128" textAnchor="middle" fontFamily="JetBrains Mono,monospace" fontSize="10" fill={gold} letterSpacing="2">GOLD</text>
+
+              {/* Headline */}
+              <text x="60" y="230" fontFamily="Montserrat,sans-serif" fontWeight="900" fontSize="72" fill="#F5F2ED" letterSpacing="-1">EXONAUT</text>
+              <text x="60" y="310" fontFamily="Montserrat,sans-serif" fontWeight="900" fontSize="72" fill={gold} letterSpacing="-1">OF THE WEEK</text>
+
+              {/* Avatar ring */}
+              <circle cx="160" cy="470" r="72" fill="none" stroke={gold} strokeWidth="3"/>
+              <circle cx="160" cy="470" r="62" fill={gold} fillOpacity="0.15"/>
+              <text x="160" y="492" textAnchor="middle" fontFamily="Montserrat,sans-serif" fontWeight="900" fontSize="48" fill={gold}>{initials}</text>
+
+              {/* Identity */}
+              <text x="265" y="440" fontFamily="Montserrat,sans-serif" fontWeight="800" fontSize="34" fill="#F5F2ED">
+                {user.name.length > 24 ? user.name.slice(0,22)+'…' : user.name}
+              </text>
+              <text x="265" y="475" fontFamily="JetBrains Mono,monospace" fontSize="14" fill="#B8C2CE" letterSpacing="2">
+                {track?.short || ''}{track ? ' · ' + track.name : ''}
+              </text>
+
+              {/* Points */}
+              <text x="265" y="545" fontFamily="Montserrat,sans-serif" fontWeight="900" fontSize="54" fill={gold}>+{weekPoints}</text>
+              <text x="265" y="572" fontFamily="JetBrains Mono,monospace" fontSize="11" fill="#B8C2CE" letterSpacing="2">
+                POINTS · WEEK {String(weekNumber).padStart(2,'0')}
+              </text>
+
+              {/* Daily sparkline */}
+              {(breakdown || []).map((d, i) => {
+                const barH = Math.max(4, Math.round((d.points / max) * 140));
+                const x = 720 + i * 60, y = 530 - barH;
+                return (
+                  <g key={i}>
+                    <rect x={x} y={y} width={44} height={barH} fill={gold} opacity={d.points === 0 ? 0.25 : 1}/>
+                    <text x={x+22} y={555} textAnchor="middle" fontFamily="JetBrains Mono,monospace" fontSize="11" fill="#B8C2CE" letterSpacing="1">{d.day}</text>
+                    <text x={x+22} y={y-6} textAnchor="middle" fontFamily="Montserrat,sans-serif" fontWeight="700" fontSize="11" fill="#F5F2ED">{d.points}</text>
+                  </g>
+                );
+              })}
+              <text x="720" y="405" fontFamily="JetBrains Mono,monospace" fontSize="11" fill="#B8C2CE" letterSpacing="2">DAILY · FRI → THU</text>
+
+              {/* Signature */}
+              <text x="60" y="600" fontFamily="JetBrains Mono,monospace" fontSize="11" fill="#858C94" letterSpacing="2">
+                EXOASIA.COM · AWARDED BY MACK COMANDANTE · MISSION COMMANDER
+              </text>
+            </svg>
+          </div>
+
+          {/* Action buttons */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+            <button onClick={downloadPNG} style={{
+              padding: '11px 12px', background: gold, border: 'none', borderRadius: 2,
+              color: '#000', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 10,
+              letterSpacing: '0.08em', fontWeight: 700,
+            }}>
+              <i className="fa-solid fa-download" style={{ marginRight: 6 }}/>DOWNLOAD PNG
+            </button>
+            <button onClick={copyCopy} style={{
+              padding: '11px 12px', background: 'transparent', border: '1px solid var(--off-white-15)', borderRadius: 2,
+              color: 'var(--off-white)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 10,
+              letterSpacing: '0.08em', fontWeight: 700,
+            }}>
+              <i className="fa-regular fa-copy" style={{ marginRight: 6 }}/>COPY CAPTION
+            </button>
+            <button onClick={openLinkedIn} style={{
+              padding: '11px 12px', background: '#0A66C2', border: 'none', borderRadius: 2,
+              color: '#FFF', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 10,
+              letterSpacing: '0.08em', fontWeight: 700,
+            }}>
+              <i className="fa-brands fa-linkedin" style={{ marginRight: 6 }}/>POST TO LINKEDIN
+            </button>
+          </div>
+
+          {/* Pre-filled LinkedIn caption */}
+          <div>
+            <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.1em', marginBottom: 6 }}>
+              PRE-FILLED LINKEDIN CAPTION
+            </div>
+            <textarea readOnly value={shareText} style={{
+              width: '100%', minHeight: 110, resize: 'vertical',
+              padding: '10px 12px',
+              background: 'var(--deep-black)', color: 'var(--off-white)',
+              border: '1px solid var(--off-white-15)', borderRadius: 2,
+              fontFamily: 'var(--font-display)', fontSize: 12, outline: 'none', lineHeight: 1.5,
+            }}/>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -1756,4 +2049,4 @@ function PointsLedger({ userId }) {
   );
 }
 
-Object.assign(window, { MissionsList, KudosFeed, RitualsPage, AnnouncementsPage, NotificationsPage, AdminPanel, AlumniPage, SettingsPage, CommunityPage, CertsBadgesPage });
+Object.assign(window, { MissionsList, KudosFeed, RitualsPage, AnnouncementsPage, NotificationsPage, AdminPanel, AlumniPage, SettingsPage, CommunityPage, CertsBadgesPage, IotwCertModal });

@@ -14,10 +14,24 @@ function profileHandle(profile) {
   return source.replace(/[^a-z0-9]+/g, '.').replace(/^\.+|\.+$/g, '') || 'member';
 }
 
-function boardMembers(profiles, me) {
+function tierForBoardMember(profile, profileMembers = []) {
+  const communityMember = (profileMembers || []).find(item => item.id === profile?.id);
+  if (communityMember?.tierBadge) return communityMember.tierBadge;
+  if (communityMember?.tier) return communityMember.tier;
+  if (profile?.role && profile.role !== 'exonaut') return 'corps';
+  const seed = (typeof USERS !== 'undefined' ? USERS : []).find(item => item.id === profile?.id);
+  if (seed?.tier) return seed.tier;
+  return 'entry';
+}
+
+function boardMembers(profiles, me, profileMembers = []) {
   const items = [...(profiles || [])];
   if (me && !items.some(profile => profile.id === me.id)) items.unshift(me);
-  return items.map(profile => ({ ...profile, handle: profileHandle(profile) }));
+  return items.map(profile => ({
+    ...profile,
+    handle: profileHandle(profile),
+    tierBadge: tierForBoardMember(profile, profileMembers),
+  }));
 }
 
 function extractMentionIds(text, members) {
@@ -25,15 +39,17 @@ function extractMentionIds(text, members) {
   return members.filter(member => handles.has(member.handle.toLowerCase())).map(member => member.id);
 }
 
-function authorFor(post) {
+function authorFor(post, members = []) {
   const profile = (window.__profileDirectory || []).find(item => item.id === post.authorId);
+  const member = members.find(item => item.id === post.authorId);
+  const role = post.authorRole || member?.role || profile?.role || 'exonaut';
   return {
     id: post.authorId,
-    name: post.authorName || profile?.fullName || 'Exonaut',
-    avatarUrl: profile?.avatarUrl || '',
-    role: post.authorRole || profile?.role || 'exonaut',
-    tier: (post.authorRole || profile?.role) === 'exonaut' ? 'gold' : 'corps',
-    handle: profileHandle(profile || { fullName: post.authorName }),
+    name: post.authorName || member?.fullName || profile?.fullName || 'Exonaut',
+    avatarUrl: member?.avatarUrl || profile?.avatarUrl || '',
+    role,
+    tier: role === 'exonaut' ? (member?.tierBadge || tierForBoardMember(profile, members)) : 'corps',
+    handle: member?.handle || profileHandle(profile || { fullName: post.authorName }),
   };
 }
 
@@ -102,7 +118,7 @@ function MentionTextarea({ value, onChange, members, rows = 4, placeholder, clas
         <div className="board-mention-list" role="listbox" aria-label="Mention a member">
           {matches.map(member => (
             <button type="button" key={member.id} className="board-mention-option" onClick={() => selectMember(member)}>
-              <AvatarWithRing name={member.fullName || member.email} avatarUrl={member.avatarUrl} size={25} tier="gold" />
+              <AvatarWithRing name={member.fullName || member.email} avatarUrl={member.avatarUrl} size={25} tier={member.tierBadge} />
               <span>{member.fullName || member.email}</span>
               <small>@{member.handle}</small>
             </button>
@@ -154,7 +170,7 @@ function MediaGrid({ media }) {
 function CommunityBoard({ channel, onChannelChange, sort, search, composerOpen, onComposeClose, profileMembers = [], onOpenProfile }) {
   const me = useBoardIdentity();
   const { profiles } = useUserProfiles();
-  const members = React.useMemo(() => boardMembers(profiles, me), [profiles, me.id, me.fullName]);
+  const members = React.useMemo(() => boardMembers(profiles, me, profileMembers), [profiles, me.id, me.fullName, profileMembers]);
   const board = useBoard(me);
   const posts = board.list({ channel, sort, search });
   const openProfile = React.useCallback((userId) => {
@@ -177,7 +193,7 @@ function CommunityBoard({ channel, onChannelChange, sort, search, composerOpen, 
         <div className="board-current-user">
           <div className="board-eyebrow">POSTING AS</div>
           <div className="board-current-row">
-            <AvatarWithRing name={me.fullName} avatarUrl={me.avatarUrl} size={29} tier={me.role === 'exonaut' ? 'gold' : 'corps'} />
+            <AvatarWithRing name={me.fullName} avatarUrl={me.avatarUrl} size={29} tier={tierForBoardMember(me, profileMembers)} />
             <div>
               <strong>{me.fullName}</strong>
               <span>@{profileHandle(me)}</span>
@@ -210,7 +226,7 @@ function PostCard({ post, board, me, members, onOpenProfile }) {
   const [commentText, setCommentText] = React.useState('');
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState('');
-  const author = authorFor(post);
+  const author = authorFor(post, members);
   const channel = BOARD_CHANNELS.find(item => item.id === post.channel);
   const liked = post.likes.includes(me.id);
   const canDelete = post.authorId === me.id;
@@ -286,7 +302,7 @@ function CommentCard({ comment, postId, board, me, members, depth, onOpenProfile
   const [replying, setReplying] = React.useState(false);
   const [reply, setReply] = React.useState('');
   const [error, setError] = React.useState('');
-  const author = authorFor(comment);
+  const author = authorFor(comment, members);
 
   async function submitReply() {
     if (!reply.trim()) return;

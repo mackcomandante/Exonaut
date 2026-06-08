@@ -1,8 +1,9 @@
 // Dashboard screen — hero stats, pillars, rituals, track work, project feed
 
 function StatCell({ label, icon, value, unit, meta, metaDir, lime }) {
+  const statKey = label.toLowerCase().replace(/[^a-z0-9]+/g, '-');
   return (
-    <div className="stat-cell">
+    <div className={'stat-cell stat-cell-' + statKey}>
       <div className="stat-label"><i className={'fa-solid ' + icon} />{label}</div>
       <div className={'stat-value' + (lime ? ' lime' : '')}>
         <span>{value}</span>
