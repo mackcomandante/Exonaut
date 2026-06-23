@@ -5,7 +5,7 @@
   const WELCOME = {
     id: 'welcome',
     role: 'assistant',
-    content: "Hi! I'm EX-O. Ask me anything about the program — missions, badges, rituals, how points work, and more.",
+    content: "Hi! I'm X-O. Ask me anything about the program — missions, badges, rituals, how points work, and more.",
     time: new Date().toISOString(),
   };
 
@@ -42,7 +42,7 @@
     { command: '/project', icon: 'fa-diagram-project', hint: 'Add an action register item' },
     { command: '/ritual', icon: 'fa-calendar-check', hint: 'Log a weekly ritual' },
     { command: '/thread', icon: 'fa-comments', hint: 'Create a community post' },
-    { command: '/clear', icon: 'fa-broom', hint: 'Clear EX-O chat history' },
+    { command: '/clear', icon: 'fa-broom', hint: 'Clear X-O chat history' },
   ];
 
   function freshWelcome() {
@@ -772,7 +772,7 @@
       });
       return 'Thread post created.';
     }
-    throw new Error('Unsupported EX-O action.');
+    throw new Error('Unsupported X-O action.');
   }
 
   function AgentActionCard({ action, onConfirm, onCancel, busy }) {
@@ -822,7 +822,7 @@
 
     return (
       <div className="exo-action-card">
-        <div className="exo-action-kicker">EX-O ACTION</div>
+        <div className="exo-action-kicker">X-O ACTION</div>
         <h3>{action.title}</h3>
         <div className="exo-action-details">
           {(action.details || []).filter(([label]) => label !== 'Attachment').map(([label, value]) => (
@@ -963,7 +963,7 @@
           if (remote?.conversationId) conversationId.current = remote.conversationId;
           if (remote?.messages?.length) setMessages([freshWelcome(), ...remote.messages]);
         } catch (err) {
-          console.warn('Could not load EX-O chat history:', err?.message || err);
+          console.warn('Could not load X-O chat history:', err?.message || err);
         } finally {
           if (!cancelled) {
             remoteProfileId.current = profile?.id || null;
@@ -1024,7 +1024,7 @@
           try {
             await clearRemoteChatHistory(conversationId.current, profile);
           } catch (err) {
-            console.warn('Could not clear EX-O chat history:', err?.message || err);
+            console.warn('Could not clear X-O chat history:', err?.message || err);
           }
         }
         conversationId.current = 'conv-' + Date.now();
@@ -1066,7 +1066,7 @@
             const result = await executeAgentAction(nextAction, { profile });
             setMessages(prev => prev.map(msg => msg.id === actionId ? { ...msg, action: null, busy: false, content: result } : msg));
           } catch (err) {
-            setMessages(prev => prev.map(msg => msg.id === actionId ? { ...msg, busy: false, action: null, content: err?.message || 'EX-O could not complete that action.' } : msg));
+            setMessages(prev => prev.map(msg => msg.id === actionId ? { ...msg, busy: false, action: null, content: err?.message || 'X-O could not complete that action.' } : msg));
           }
         };
         setMessages(prev => [...prev, actionMsg]);
@@ -1129,7 +1129,7 @@
           <div className="chatbot-header-left">
             <div className="chatbot-header-icon"><i className="fa-solid fa-robot" /></div>
             <div>
-              <div className="chatbot-header-title">EX-O</div>
+              <div className="chatbot-header-title">X-O</div>
               <div className="chatbot-header-sub">Program Assistant</div>
             </div>
           </div>
@@ -1205,7 +1205,7 @@
             <textarea
               ref={inputRef}
               className={'chatbot-input' + (input.trim().startsWith('/') ? ' command-mode' : '')}
-              placeholder="Ask EX-O or use /kudos, /messages, /project, /ritual..."
+              placeholder="Ask X-O or use /kudos, /messages, /project, /ritual..."
               value={input}
               onChange={e => updateInput(e.target.value)}
               onKeyDown={handleKey}
@@ -1234,7 +1234,7 @@
         <button
           className="floating-action floating-chatbot"
           onClick={() => setOpen(v => !v)}
-          title="EX-O"
+          title="X-O"
           style={{
             position: 'fixed', bottom: 20, right: 136, zIndex: 140,
             background: open ? 'var(--accent)' : 'var(--bg-darkest)',

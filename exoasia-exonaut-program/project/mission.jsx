@@ -294,8 +294,6 @@ function MissionDetail({ missionId, onBack, onSubmitted, onMessageLead }) {
           </button>
         </div>
 
-        {/* XO Intelligence AI copilot */}
-        <XOCopilot mission={mission} />
       </div>
     </div>
   );

@@ -22,6 +22,215 @@ function StatCell({ label, icon, value, unit, meta, metaDir, lime }) {
   );
 }
 
+function startOfMondayWeek(date = new Date()) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  return d;
+}
+
+function addDays(date, days) {
+  const d = new Date(date);
+  d.setDate(d.getDate() + days);
+  return d;
+}
+
+function localDateKey(date) {
+  const d = new Date(date);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function dateMs(value) {
+  if (!value) return NaN;
+  if (typeof value === 'number') return value;
+  const ms = new Date(value).getTime();
+  return Number.isFinite(ms) ? ms : NaN;
+}
+
+function inDateWindow(value, start, end) {
+  const ms = dateMs(value);
+  return Number.isFinite(ms) && ms >= start.getTime() && ms <= end.getTime();
+}
+
+function shortDateRange(start, end) {
+  const opts = { month: 'short', day: 'numeric' };
+  return `${start.toLocaleDateString('en-US', opts)} - ${end.toLocaleDateString('en-US', opts)}`;
+}
+
+function WeeklyRecap({ onNavigate, onOpenMission }) {
+  const { profile } = useCurrentUserProfile();
+  const { total, entries } = useUserPoints(profile.id);
+  const subs = useSubs();
+  useManualCredits();
+  const missions = useMissions();
+  const [kudosTick, setKudosTick] = React.useState(0);
+  const { tasks, assignees } = useProjects();
+  const rowsFromProfiles = useSupabaseExonautRows();
+  const liveBadges = useLiveBadges(profile.id);
+  const activeCohort = window.getActiveCohort?.(profile) || COHORT;
+  const timeline = window.getCohortTimeline?.(activeCohort);
+  const currentWeek = timeline?.valid ? timeline.currentWeek : (COHORT.week || 1);
+  const currentMonday = React.useMemo(() => startOfMondayWeek(new Date()), []);
+  const recapStart = React.useMemo(() => addDays(currentMonday, -7), [currentMonday]);
+  const recapEnd = React.useMemo(() => {
+    const end = addDays(currentMonday, -1);
+    end.setHours(23, 59, 59, 999);
+    return end;
+  }, [currentMonday]);
+  const weekKey = localDateKey(currentMonday);
+  const [visible, setVisible] = React.useState(false);
+
+  React.useEffect(() => {
+    const store = window.__kudosStore;
+    if (!store?.subscribe) return undefined;
+    const unsub = store.subscribe(() => setKudosTick(t => t + 1));
+    store.refresh?.();
+    return unsub;
+  }, []);
+
+  React.useEffect(() => {
+    const key = `exo:weekly-recap:seen:${profile.id}:${weekKey}`;
+    try {
+      if (localStorage.getItem(key)) return;
+      localStorage.setItem(key, new Date().toISOString());
+      setVisible(true);
+    } catch {
+      setVisible(true);
+    }
+  }, [profile.id, weekKey]);
+
+  const rankedRows = React.useMemo(
+    () => window.rankExonautRows ? window.rankExonautRows(rowsFromProfiles) : [...rowsFromProfiles].sort((a,b) => b.points - a.points).map((u, i) => ({ ...u, cohortRank: i + 1 })),
+    [rowsFromProfiles]
+  );
+
+  const recap = React.useMemo(() => {
+    const myTrack = profile.trackCode || ME.track || 'AIS';
+    const myCohort = activeCohort?.id || profile.cohortId || ME.cohort || 'c2627';
+    const lastWeekEntries = (entries || []).filter(e => inDateWindow(e.awardedAt || e.createdAt || e.creditedAt, recapStart, recapEnd));
+    const pointsEarned = lastWeekEntries.reduce((sum, e) => sum + Number(e.points || 0), 0);
+    const pillarTotals = lastWeekEntries.reduce((acc, e) => {
+      const pillar = e.pillar === 'missions' ? 'project' : (e.pillar || 'project');
+      acc[pillar] = (acc[pillar] || 0) + Number(e.points || 0);
+      return acc;
+    }, {});
+    const topEntry = [...lastWeekEntries].sort((a, b) => Number(b.points || 0) - Number(a.points || 0))[0];
+
+    const scopedMissions = missions.filter(m => (m.cohortId || 'c2627') === myCohort && (!m.track || m.track === myTrack));
+    const lastWeekSubs = scopedMissions
+      .map(m => ({ mission: m, sub: window.getSubmissionForMission?.(m, profile.id, myCohort) || subs.find(s => s.exonautId === profile.id && s.missionId === m.id) }))
+      .filter(item => item.sub && inDateWindow(item.sub.gradedAt || item.sub.submittedAtIso || item.sub.submittedAt, recapStart, recapEnd));
+    const approvedMissions = lastWeekSubs.filter(item => item.sub.state === 'approved');
+    const submittedMissions = lastWeekSubs.filter(item => ['pending', 'approved', 'needs-revision'].includes(item.sub.state));
+
+    const allKudos = window.__kudosStore?.all?.() || [];
+    const kudosGiven = allKudos.filter(k => k.from === profile.id && inDateWindow(k.createdAt, recapStart, recapEnd)).length;
+    const kudosReceived = allKudos.filter(k => k.to === profile.id && inDateWindow(k.createdAt, recapStart, recapEnd)).length;
+
+    const ritualRecords = window.__ritualStore?.recordsFor?.(profile.id, Math.max(1, Number(currentWeek) - 1)) || {};
+    const ritualsDone = Object.keys(ritualRecords).length;
+
+    const currentRank = rankedRows.find(u => u.id === profile.id)?.cohortRank || 1;
+    const rankDelta = rankedRows.find(u => u.id === profile.id)?.change || 0;
+    const tierProgress = window.getTierProgressForPoints
+      ? window.getTierProgressForPoints(total)
+      : { current: TIERS.entry, next: TIERS.builder, pointsToNext: Math.max(0, 100 - total) };
+    const assignedTaskIds = new Set(assignees.filter(a => a.userId === profile.id).map(a => a.taskId));
+    const projectDone = tasks.filter(t => assignedTaskIds.has(t.id) && t.status === 'approved').length;
+    const nextMission = scopedMissions
+      .filter(m => Number(m.week || 0) >= Number(currentWeek || 1))
+      .find(m => window.getSubmissionForMission?.(m, profile.id, myCohort)?.state !== 'approved');
+
+    const highlight = topEntry?.note
+      ? `Biggest point move: ${topEntry.note}`
+      : approvedMissions[0]
+        ? `Completed ${approvedMissions[0].mission.title}`
+        : kudosReceived
+          ? `Received ${kudosReceived} kudos`
+          : 'No logged wins yet - this week is a clean launchpad.';
+
+    return {
+      pointsEarned,
+      pillarTotals,
+      approvedCount: approvedMissions.length,
+      submittedCount: submittedMissions.length,
+      kudosGiven,
+      kudosReceived,
+      ritualsDone,
+      currentRank,
+      rankDelta,
+      tierLabel: tierProgress.current?.short || 'ENTRY',
+      pointsToNext: tierProgress.next ? tierProgress.pointsToNext : 0,
+      projectDone,
+      badgeCount: liveBadges.filter(b => b.earned).length,
+      highlight,
+      nextMission,
+    };
+  }, [activeCohort, assignees, currentWeek, entries, kudosTick, liveBadges, missions, profile, rankedRows, recapEnd, recapStart, subs, tasks, total]);
+
+  if (!visible) return null;
+
+  const rankCopy = recap.rankDelta > 0
+    ? `+${recap.rankDelta} vs last week`
+    : recap.rankDelta < 0
+      ? `${recap.rankDelta} vs last week`
+      : 'Held steady';
+
+  return (
+    <div className="weekly-recap-overlay" role="dialog" aria-modal="true" aria-labelledby="weekly-recap-title">
+      <div className="weekly-recap-modal">
+        <div className="weekly-recap-seal">
+          <div className="weekly-recap-orbit">
+            <i className="fa-solid fa-calendar-week" />
+            <strong>+{recap.pointsEarned}</strong>
+          </div>
+        </div>
+
+        <div className="weekly-recap-kicker">WEEKLY RECAP READY</div>
+        <h1 id="weekly-recap-title" className="weekly-recap-title">Weekly Recap</h1>
+        <div className="weekly-recap-sub">{shortDateRange(recapStart, recapEnd)}</div>
+        <div className="weekly-recap-meta">{recap.highlight}</div>
+
+        <div className="weekly-recap-metrics">
+          <div><span>Missions</span><strong>{recap.approvedCount}</strong><em>{recap.submittedCount} submitted</em></div>
+          <div><span>Kudos</span><strong>{recap.kudosReceived}</strong><em>{recap.kudosGiven} given</em></div>
+          <div><span>Rituals</span><strong>{recap.ritualsDone}</strong><em>logged last week</em></div>
+          <div><span>Rank</span><strong>#{recap.currentRank}</strong><em>{rankCopy}</em></div>
+        </div>
+
+        <div className="weekly-recap-progress">
+          <div><span>Project</span><strong>{recap.pillarTotals.project || 0} pts</strong></div>
+          <div><span>Client</span><strong>{recap.pillarTotals.client || 0} pts</strong></div>
+          <div><span>Recruitment</span><strong>{recap.pillarTotals.recruitment || 0} pts</strong></div>
+          <div><span>Tier</span><strong>{recap.tierLabel}{recap.pointsToNext ? ` · ${recap.pointsToNext} to next` : ' · top tier'}</strong></div>
+        </div>
+
+        <div className="weekly-recap-next">
+          <span>Next suggested action</span>
+          <strong>{recap.nextMission ? recap.nextMission.title : 'Check the Track Feed for your next task.'}</strong>
+        </div>
+
+        <div className="weekly-recap-actions">
+          {recap.nextMission && (
+            <button className="btn btn-primary" onClick={() => { setVisible(false); onOpenMission(recap.nextMission.id); }}>
+              <i className="fa-solid fa-bullseye" /> OPEN TASK
+            </button>
+          )}
+          <button className="btn btn-ghost" onClick={() => { setVisible(false); onNavigate('leaderboard'); }}>
+            <i className="fa-solid fa-ranking-star" /> LEADERBOARD
+          </button>
+          <button className="btn btn-ghost" onClick={() => setVisible(false)}>
+            DISMISS
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function HeroStats() {
   const { profile } = useCurrentUserProfile();
   const activeCohort = window.getActiveCohort?.(profile) || COHORT;
@@ -560,6 +769,7 @@ function Dashboard({ onNavigate, onOpenMission }) {
       </div>
 
       <div className="enter enter-d1"><HeroStats /></div>
+      <WeeklyRecap onNavigate={onNavigate} onOpenMission={onOpenMission} />
       <DirectiveInbox onAccepted={(d) => onNavigate('missions')} />
       <div className="enter enter-d2"><PillarGrid /></div>
       <div className="enter enter-d3"><RitualTracker /></div>

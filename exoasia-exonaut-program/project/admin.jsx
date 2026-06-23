@@ -491,7 +491,8 @@ function hasValidCohortDateRange(start, end) {
 
 function AdminCohorts() {
   const { all, cohortId, setSelected, createCohort, updateCohort, deleteCohort, assignUserToCohort, unassignUserFromCohort, isUserUnassigned, getAssignments } = useCohort();
-  const { profiles, updateProfile } = useUserProfiles();
+  const { profile: currentProfile } = useCurrentUserProfile();
+  const { profiles, updateProfile, deleteProfile, refresh: refreshProfiles } = useUserProfiles();
   const [creating, setCreating] = React.useState(false);
   const [editingCohort, setEditingCohort] = React.useState(null);
   const [selectedUsers, setSelectedUsers] = React.useState([]);
@@ -503,6 +504,7 @@ function AdminCohorts() {
     ? profiles.map(p => ({
         id: p.id,
         name: p.fullName || p.email || 'User',
+        email: p.email || '',
         role: p.role || 'exonaut',
         cohort: p.cohortId || 'c2627',
         track: p.trackCode || '',
@@ -565,6 +567,41 @@ function AdminCohorts() {
     setEditingCohort(null);
     setSelectedUsers([]);
     setTick(t => t + 1);
+  }
+
+  async function handleDeleteAccount(row) {
+    if (!row?.id) return;
+    if (!row.supabaseProfile) {
+      alert('This row is local demo data and does not have a Supabase Auth account to delete.');
+      return;
+    }
+    if (row.id === currentProfile?.id) {
+      alert('You cannot delete your own signed-in admin account from here.');
+      return;
+    }
+    const label = row.name || row.email || row.id;
+    const ok = confirm(
+      `Delete account "${label}"?\n\nThis permanently deletes the Supabase Auth user and their profile. This cannot be undone.`
+    );
+    if (!ok) return;
+
+    try {
+      const result = await deleteProfile(row.id);
+      unassignUserFromCohort(row.id);
+      setSelectedUsers(prev => prev.filter(id => id !== row.id));
+      await refreshProfiles();
+      setTick(t => t + 1);
+      if (result?.profileOnly) {
+        alert(`${result.warning}\n\nDeploy the delete-user Edge Function to fully delete users from Supabase Auth.`);
+      }
+    } catch (err) {
+      console.error('Could not delete account:', err);
+      const message = err?.message || 'Could not delete account.';
+      const friendly = /Failed to send a request to the Edge Function|FunctionsFetchError/i.test(message)
+        ? 'The delete-user Edge Function is not deployed or reachable. Deploy it before deleting Supabase Auth users.'
+        : message;
+      alert(friendly);
+    }
   }
 
   return (
@@ -659,7 +696,7 @@ function AdminCohorts() {
                 const track = row.track ? (TRACKS.find(t => t.code === row.track)?.short || row.track) : 'N/A';
                 const role = row.role ? row.role.toUpperCase() : 'N/A';
                 return (
-                  <div key={row.id} className="card-flat" style={{ display: 'grid', gridTemplateColumns: '34px 1fr 90px 90px auto', alignItems: 'center', gap: 10 }}>
+                  <div key={row.id} className="card-flat" style={{ display: 'grid', gridTemplateColumns: '34px 1fr 90px 90px auto auto', alignItems: 'center', gap: 10 }}>
                     <AvatarWithRing name={row.name} avatarUrl={row.avatarUrl} size={30} tier={row.role === 'exonaut' ? 'entry' : 'corps'} />
                     <div>
                       <div className="t-heading" style={{ fontSize: 13, textTransform: 'none', letterSpacing: 0 }}>{row.name}</div>
@@ -669,6 +706,9 @@ function AdminCohorts() {
                     <span className="status-pill status-not-started">{role}</span>
                     <button className="btn btn-ghost btn-sm" onClick={() => { unassignUserFromCohort(row.id); setTick(t => t + 1); }}>
                       Unassign
+                    </button>
+                    <button className="btn btn-danger btn-sm" onClick={() => handleDeleteAccount(row)} title="Delete account from Supabase">
+                      <i className="fa-solid fa-trash" /> Delete
                     </button>
                   </div>
                 );
@@ -688,11 +728,14 @@ function AdminCohorts() {
           <div style={{ display: 'grid', gap: 8, maxHeight: 420, overflow: 'auto', marginBottom: 12 }}>
             {unassignedRows.length === 0 && <div className="empty-line">No unassigned users.</div>}
             {unassignedRows.map(row => (
-              <label key={row.id} className="card-flat" style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+              <div key={row.id} className="card-flat" style={{ display: 'grid', gridTemplateColumns: 'auto 28px minmax(0, 1fr) auto', alignItems: 'center', gap: 10 }}>
                 <input type="checkbox" checked={selectedUsers.includes(row.id)} onChange={() => toggleSelected(row.id)} />
                 <AvatarWithRing name={row.name} avatarUrl={row.avatarUrl} size={28} tier={row.role === 'exonaut' ? 'entry' : 'corps'} />
-                <span className="t-heading" style={{ fontSize: 13, textTransform: 'none', letterSpacing: 0 }}>{row.name}</span>
-              </label>
+                <span className="t-heading" style={{ fontSize: 13, textTransform: 'none', letterSpacing: 0, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.name}</span>
+                <button className="btn btn-danger btn-sm" onClick={() => handleDeleteAccount(row)} title="Delete account from Supabase">
+                  <i className="fa-solid fa-trash" />
+                </button>
+              </div>
             ))}
           </div>
           <button className="btn btn-primary" disabled={!selectedUsers.length} onClick={assignSelected} style={{ width: '100%', justifyContent: 'center', opacity: selectedUsers.length ? 1 : 0.45 }}>

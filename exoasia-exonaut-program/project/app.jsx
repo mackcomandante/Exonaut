@@ -126,7 +126,10 @@ function App() {
     setTimeout(() => setToasts(prev => prev.filter(x => x.id !== id)), 4200);
   };
 
-  const onCelebrate = (kind, payload = {}) => setCelebration({ kind, payload });
+  const onCelebrate = (kind, payload = {}) => {
+    if (kind === 'badge') return;
+    setCelebration({ kind, payload });
+  };
 
   // Auto-issue milestone badges when the Exonaut's total crosses thresholds.
   useAutoBadgeFire(onCelebrate);

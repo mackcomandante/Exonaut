@@ -220,7 +220,45 @@ function useUserProfiles() {
     return nextProfile;
   }, [profiles]);
 
-  return { profiles, loading, error, refresh, updateProfile };
+  const deleteProfile = React.useCallback(async (id) => {
+    if (!window.__db) throw new Error('Supabase is not loaded.');
+    if (!id) throw new Error('Missing user id.');
+
+    let result = null;
+    try {
+      const { data, error: deleteError } = await window.__db.functions.invoke('delete-user', {
+        body: { userId: id },
+      });
+      if (deleteError) throw deleteError;
+      if (data?.error) throw new Error(data.error);
+      result = data || { ok: true };
+    } catch (err) {
+      const message = err?.message || String(err || '');
+      const functionUnreachable = /Failed to send a request to the Edge Function|FunctionsFetchError/i.test(message);
+      if (!functionUnreachable) throw err;
+
+      const { error: profileDeleteError } = await window.__db
+        .from('user_profiles')
+        .delete()
+        .eq('id', id);
+      if (profileDeleteError) {
+        throw new Error(profileDeleteError.message || 'Could not delete profile row.');
+      }
+
+      result = {
+        ok: true,
+        profileOnly: true,
+        warning: 'Profile row deleted, but the Supabase Auth user remains because the delete-user Edge Function is not deployed or reachable.',
+      };
+    }
+
+    const nextProfiles = profiles.filter(p => p.id !== id);
+    setProfileDirectory(nextProfiles);
+    setProfiles(nextProfiles);
+    return result;
+  }, [profiles]);
+
+  return { profiles, loading, error, refresh, updateProfile, deleteProfile };
 }
 
 Object.assign(window, { useCurrentUserProfile, useUserProfiles, uploadProfileAvatar });
