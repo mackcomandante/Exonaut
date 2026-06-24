@@ -615,7 +615,7 @@ function RoleAuthScreen({ onAuthComplete, tweaks, setTweak }) {
       if (!user) throw new Error('Supabase did not return a user session.');
       if (isSignup && !result.data.session) {
         setLoading(false);
-        setAuthNotice('Account created. Check your email to confirm before signing in, then wait for Admin approval.');
+        setAuthNotice('Account created. Confirm your email first. Once confirmed, the app will show that your account is in process for Admin approval.');
         return;
       }
 

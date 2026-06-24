@@ -238,7 +238,7 @@ function AdminCohortFilter() {
   const current = scope === 'all' ? null : all.find(c => c.id === scope);
   const totalUsers = USERS.length;
   const scopedUsers = scope === 'all' ? totalUsers : getCohortUsers(scope).length;
-  const accent = scope === 'all' ? 'var(--sky)' : (current?.status === 'active' ? 'var(--lime)' : 'var(--lavender)');
+  const accent = scope === 'all' ? 'var(--accent)' : (current?.status === 'active' ? 'var(--accent)' : 'var(--lavender)');
 
   return (
     <div style={{ padding: '14px 16px 8px', borderBottom: '1px solid var(--off-white-07)' }}>
@@ -280,14 +280,14 @@ function AdminCohortFilter() {
           }}
           onMouseEnter={(e) => { if (scope !== 'all') e.currentTarget.style.background = 'var(--off-white-07)'; }}
           onMouseLeave={(e) => { if (scope !== 'all') e.currentTarget.style.background = 'transparent'; }}>
-            <i className="fa-solid fa-globe" style={{ fontSize: 10, color: 'var(--sky)' }} />
+            <i className="fa-solid fa-globe" style={{ fontSize: 10, color: 'var(--accent)' }} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div className="t-body" style={{ fontSize: 11, color: 'var(--off-white)' }}>All Cohorts</div>
               <div className="t-mono" style={{ fontSize: 8, color: 'var(--off-white-40)', letterSpacing: '0.06em' }}>
                 {totalUsers} EXONAUTS · PLATFORM-WIDE
               </div>
             </div>
-            {scope === 'all' && <i className="fa-solid fa-check" style={{ fontSize: 10, color: 'var(--sky)' }} />}
+            {scope === 'all' && <i className="fa-solid fa-check" style={{ fontSize: 10, color: 'var(--accent)' }} />}
           </div>
 
           <div style={{ height: 1, background: 'var(--off-white-07)', margin: '4px 0' }} />
@@ -295,7 +295,7 @@ function AdminCohortFilter() {
           {all.map(c => {
             const count = getCohortUsers(c.id).length;
             const isActive = c.id === scope;
-            const cAccent = c.status === 'active' ? 'var(--lime)' : c.status === 'upcoming' ? 'var(--sky)' : 'var(--lavender)';
+            const cAccent = c.status === 'active' ? 'var(--accent)' : c.status === 'upcoming' ? 'var(--sky)' : 'var(--lavender)';
             return (
               <div key={c.id}
                 onClick={() => { setScope(c.id); setOpen(false); }}
@@ -627,7 +627,7 @@ function AdminCohorts() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 14, marginBottom: 18 }}>
         {all.map(c => {
           const users = rows.filter(row => rowCohort(row) === c.id);
-          const accent = c.status === 'active' ? 'var(--lime)' : c.status === 'upcoming' ? 'var(--sky)' : 'var(--lavender)';
+          const accent = c.status === 'active' ? 'var(--accent)' : c.status === 'upcoming' ? 'var(--sky)' : 'var(--lavender)';
           const isSelected = c.id === cohortId;
           return (
             <div key={c.id} className="card-panel" style={{
@@ -1222,7 +1222,7 @@ function AdminUsers() {
                   >
                     {['exonaut','commander','admin'].map(r => <option key={r} value={r}>{r.toUpperCase()}</option>)}
                   </select>
-                : <div className="t-mono" style={{ fontSize: 10, color: 'var(--lime)', letterSpacing: '0.08em' }}>{u.role.toUpperCase()}</div>}
+                : <div className="t-mono" style={{ fontSize: 10, color: 'var(--accent)', letterSpacing: '0.08em' }}>{u.role.toUpperCase()}</div>}
               <div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-68)', letterSpacing: '0.06em' }}>
                 {cohortObj?.name?.replace('Batch ', '') || '—'}
               </div>
@@ -2052,7 +2052,7 @@ function AdminManagers() {
                 ) : (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                     {mgrCohorts.map(c => {
-                      const cAccent = c.status === 'active' ? 'var(--lime)' : c.status === 'upcoming' ? 'var(--sky)' : 'var(--lavender)';
+                      const cAccent = c.status === 'active' ? 'var(--accent)' : c.status === 'upcoming' ? 'var(--sky)' : 'var(--lavender)';
                       return (
                         <div key={c.id} style={{
                           padding: '3px 8px', background: 'var(--off-white-07)', border: '1px solid ' + cAccent, borderRadius: 2,
@@ -2231,7 +2231,7 @@ function ManagerEditModal({ mode, initial, cohorts = [], defaultCohortId, onClos
                 <div style={{ padding: 14, color: 'var(--off-white-40)', fontSize: 12 }}>No cohorts available.</div>
               )}
               {cohorts.map(c => {
-                const cAccent = c.status === 'active' ? 'var(--lime)' : c.status === 'upcoming' ? 'var(--sky)' : 'var(--lavender)';
+                const cAccent = c.status === 'active' ? 'var(--accent)' : c.status === 'upcoming' ? 'var(--sky)' : 'var(--lavender)';
                 const checked = selectedCohorts.includes(c.id);
                 return (
                   <div
@@ -2359,7 +2359,7 @@ function ManagerRosterModal({ managerId, scopedCohortId, scopeLabel, onClose, on
           {/* Cohort chips */}
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 8 }}>
             {mgrCohorts.map(c => {
-              const cAccent = c.status === 'active' ? 'var(--lime)' : c.status === 'upcoming' ? 'var(--sky)' : 'var(--lavender)';
+              const cAccent = c.status === 'active' ? 'var(--accent)' : c.status === 'upcoming' ? 'var(--sky)' : 'var(--lavender)';
               const dimmed = scopedCohortId && c.id !== scopedCohortId;
               return (
                 <div key={c.id} style={{
@@ -2385,7 +2385,7 @@ function ManagerRosterModal({ managerId, scopedCohortId, scopeLabel, onClose, on
           {/* LEFT: currently assigned — remove */}
           <div style={{ borderRight: '1px solid var(--off-white-07)', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
             <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--off-white-07)' }}>
-              <div className="t-mono" style={{ fontSize: 9, color: 'var(--lime)', letterSpacing: '0.12em', fontWeight: 700 }}>
+              <div className="t-mono" style={{ fontSize: 9, color: 'var(--accent)', letterSpacing: '0.12em', fontWeight: 700 }}>
                 ASSIGNED · {assigned.length}
               </div>
             </div>

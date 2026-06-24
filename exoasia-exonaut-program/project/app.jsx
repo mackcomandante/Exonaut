@@ -11,8 +11,8 @@ function AccountApprovalGate({ status, profile, onSignOut }) {
     },
     pending_approval: {
       icon: 'fa-hourglass-half',
-      title: 'Waiting for Admin approval',
-      body: 'Your email is verified. Admin still needs to approve your account and assign your role, cohort, and track.',
+      title: 'Email confirmed',
+      body: 'Your account is now in process for Admin approval. Once approved, Admin will assign your role, cohort, and track.',
       tone: 'var(--accent)',
     },
     rejected: {
@@ -54,6 +54,33 @@ function AccountApprovalGate({ status, profile, onSignOut }) {
   );
 }
 
+function updateAccentFavicon(accentKey) {
+  const colors = {
+    lime: '#B8E630',
+    platinum: '#7FE3FF',
+    lavender: '#C6B8FF',
+  };
+  const accent = colors[accentKey] || colors.lime;
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+      <rect width="64" height="64" rx="14" fill="#11131d"/>
+      <path d="M14 10h15l9 14 9-14h13L44 32l16 22H45L36 40l-9 14H14l16-22L14 10z" fill="${accent}"/>
+      <path d="M27 10h-9l30 44h9L27 10z" fill="#ffffff" opacity=".32"/>
+    </svg>
+  `.trim();
+  const href = 'data:image/svg+xml,' + encodeURIComponent(svg);
+  const links = [
+    document.querySelector('link[rel="icon"]'),
+    document.querySelector('link[rel="shortcut icon"]'),
+  ].filter(Boolean);
+  const targetLinks = links.length ? links : [document.head.appendChild(document.createElement('link'))];
+  targetLinks.forEach(link => {
+    link.rel = link.rel || 'icon';
+    link.type = 'image/svg+xml';
+    link.href = href;
+  });
+}
+
 function App() {
   const { profile: currentProfile } = useCurrentUserProfile();
   const crownState = useCrownState();
@@ -92,6 +119,7 @@ function App() {
   React.useEffect(() => {
     document.body.dataset.density = mergedTweaks.density;
     document.body.dataset.accent = mergedTweaks.accent;
+    updateAccentFavicon(mergedTweaks.accent);
   }, [mergedTweaks.density, mergedTweaks.accent]);
 
   React.useEffect(() => { localStorage.setItem('exo:route', route); }, [route]);

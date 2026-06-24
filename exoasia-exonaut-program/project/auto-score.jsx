@@ -69,6 +69,10 @@
     return session?.data?.session?.user?.id || null;
   }
 
+  function activeUserId() {
+    return localStorage.getItem('exo:userId') || ME_ID;
+  }
+
   async function refreshUserBadges(userId = ME_ID) {
     if (!userId) return [];
     if (!window.__db) return badgeState.byUser[userId] || [];
@@ -175,22 +179,25 @@
   }
 
   function useAutoBadgeFire(onCelebrate) {
-    const { total } = useComputedPoints(ME_ID);
-    const remoteBadges = useUserBadges(ME_ID);
+    const userId = activeUserId();
+    const { total } = useComputedPoints(userId);
+    const remoteBadges = useUserBadges(userId);
     React.useEffect(() => {
       if (!onCelebrate) return;
       for (const m of MILESTONES) {
         const alreadyEarned = remoteBadges.some(b => b.code === m.code);
-        if (total >= m.at && !alreadyEarned && !window.__autoBadges.celebratedCodes.has(m.code)) {
-          window.__autoBadges.celebratedCodes.add(m.code);
+        const celebrationKey = `${userId}:${m.code}`;
+        if (total >= m.at && !alreadyEarned && !window.__autoBadges.celebratedCodes.has(celebrationKey)) {
+          window.__autoBadges.celebratedCodes.add(celebrationKey);
           const badge = BADGES.find(b => b.code === m.code);
           if (badge) {
             badge.earned = true;
             badge.date = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toUpperCase();
-            persistUserBadge(ME_ID, badge, 'system', { threshold: m.at });
+            persistUserBadge(userId, badge, 'system', { threshold: m.at });
             if (window.__notifStore) {
               window.__notifStore.add({
-                toUserId: ME_ID,
+                id: `badge-${userId}-${m.code}`,
+                toUserId: userId,
                 type: 'badge',
                 title: 'You earned ' + badge.name,
                 sub: (badge.subtitle || (m.at + ' points')) + ' milestone',
@@ -203,7 +210,7 @@
           }
         }
       }
-    }, [total, onCelebrate, remoteBadges]);
+    }, [total, onCelebrate, remoteBadges, userId]);
   }
 
   function useLiveBadges(userId = ME_ID) {

@@ -123,8 +123,32 @@
     };
   }
 
+  function dedupeKey(n) {
+    const badgeCode = n && n.metadata && n.metadata.badgeCode;
+    if (n.type === 'badge' && badgeCode) {
+      return ['badge', n.toUserId || JSON.stringify(n.audience || null) || 'all', badgeCode].join(':');
+    }
+    return n.id;
+  }
+
+  function dedupeNotifications(items) {
+    const byKey = new Map();
+    (items || []).forEach(item => {
+      const key = dedupeKey(item);
+      const existing = byKey.get(key);
+      if (!existing) {
+        byKey.set(key, item);
+        return;
+      }
+      const existingTime = new Date(existing.createdAt || 0).getTime();
+      const itemTime = new Date(item.createdAt || 0).getTime();
+      if (itemTime < existingTime) byKey.set(key, item);
+    });
+    return [...byKey.values()];
+  }
+
   function replaceAll(items) {
-    state.notifications = (items || []).map(normalize).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    state.notifications = dedupeNotifications((items || []).map(normalize)).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     state.loaded = true;
     state.error = '';
     notify();
@@ -176,6 +200,10 @@
     },
     async add(data) {
       const item = normalize(data);
+      const duplicate = state.notifications.find(n => {
+        return dedupeKey(n) === dedupeKey(item);
+      });
+      if (duplicate) return duplicate;
       state.notifications.unshift(item);
       notify();
       if (window.__db) {

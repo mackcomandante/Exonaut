@@ -2443,7 +2443,10 @@ img, svg { display: block; max-width: 100%; }
   content: '';
   width: 34px; height: 34px;
   flex: 0 0 34px;
-  background: url('assets/exonaut-logo.png') center / contain no-repeat;
+  background: var(--accent);
+  -webkit-mask: url('assets/exonaut-logo.png') center / contain no-repeat;
+  mask: url('assets/exonaut-logo.png') center / contain no-repeat;
+  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--accent) 45%, transparent));
 }
 .sidebar-tag {
   font-family: var(--font-mono);
@@ -2675,19 +2678,19 @@ img, svg { display: block; max-width: 100%; }
 .topbar-live {
   display: flex; align-items: center; gap: 7px;
   color: var(--ink);
-  background: var(--lime-wash);
+  background: var(--accent-wash);
   padding: 6px 12px;
   border-radius: var(--radius-pill);
   font-weight: 700;
 }
 .topbar-live .pulse {
   width: 7px; height: 7px; border-radius: 50%;
-  background: var(--lime-deep);
+  background: var(--accent-deep);
   animation: pulse 1.8s ease-in-out infinite;
 }
 @keyframes pulse {
-  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(143,191,21,0.5); }
-  50% { opacity: 0.6; box-shadow: 0 0 0 6px rgba(143,191,21,0); }
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 var(--accent-border); }
+  50% { opacity: 0.6; box-shadow: 0 0 0 6px transparent; }
 }
 
 .content { padding: 28px 32px 64px; max-width: 1600px; }
@@ -4506,9 +4509,9 @@ body[data-density="compact"] .pillar-card { padding: 16px; }
   display: inline-flex; align-items: center; gap: 3px;
   margin-left: 8px;
   padding: 1px 5px;
-  background: color-mix(in oklch, var(--lime) 16%, transparent);
-  color: var(--lime);
-  border: 1px solid color-mix(in oklch, var(--lime) 30%, transparent);
+  background: color-mix(in oklch, var(--accent) 16%, transparent);
+  color: var(--accent);
+  border: 1px solid color-mix(in oklch, var(--accent) 30%, transparent);
   border-radius: 3px;
   font-family: var(--font-mono);
   font-size: 8px;
@@ -4522,8 +4525,8 @@ body[data-density="compact"] .pillar-card { padding: 16px; }
   display: inline-block;
   margin-left: 8px;
   padding: 2px 7px;
-  background: color-mix(in oklch, var(--lime) 22%, transparent);
-  color: var(--lime);
+  background: color-mix(in oklch, var(--accent) 22%, transparent);
+  color: var(--accent);
   border-radius: 3px;
   font-family: var(--font-mono);
   font-size: 11px;
@@ -4533,8 +4536,8 @@ body[data-density="compact"] .pillar-card { padding: 16px; }
   animation: auto-delta-flash 1.4s ease-out;
 }
 @keyframes auto-delta-flash {
-  0%   { transform: translateY(-4px) scale(1.1); opacity: 0; box-shadow: 0 0 0 6px color-mix(in oklch, var(--lime) 30%, transparent); }
-  50%  { opacity: 1; box-shadow: 0 0 0 3px color-mix(in oklch, var(--lime) 18%, transparent); }
+  0%   { transform: translateY(-4px) scale(1.1); opacity: 0; box-shadow: 0 0 0 6px color-mix(in oklch, var(--accent) 30%, transparent); }
+  50%  { opacity: 1; box-shadow: 0 0 0 3px color-mix(in oklch, var(--accent) 18%, transparent); }
   100% { transform: translateY(0)   scale(1.0); opacity: 1; box-shadow: 0 0 0 0 transparent; }
 }
 
