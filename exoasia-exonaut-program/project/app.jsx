@@ -110,11 +110,13 @@ function App() {
   const ExtrasTweaksPanel = window.TweaksPanel || (() => null);
   const ChatbotWidget = window.Chatbot || (() => null);
 
+  const legacySidebarMode = localStorage.getItem('exo:sidebarCollapsed') === 'true' ? 'compact' : 'expanded';
   const mergedTweaks = {
     density: 'default', accent: 'lime', dashVariant: 'default',
-    ritualStyle: 'cards', badgeShape: 'geom', ...tweaks,
+    ritualStyle: 'cards', badgeShape: 'geom', sidebarMode: legacySidebarMode, ...tweaks,
   };
   const setTweak = (key, value) => setTweaks(current => ({ ...current, [key]: value }));
+  const sidebarCollapsed = mergedTweaks.sidebarMode === 'compact';
 
   React.useEffect(() => {
     document.body.dataset.density = mergedTweaks.density;
@@ -318,6 +320,7 @@ function App() {
     setMobileNavOpen(false);
     navigate(id);
   };
+  const toggleSidebarCollapsed = () => setTweak('sidebarMode', sidebarCollapsed ? 'expanded' : 'compact');
 
   if (authStage === 'login') {
     return <LoginScreen onAuthComplete={handleAuthenticated} tweaks={mergedTweaks} setTweak={setTweak} />;
@@ -401,7 +404,7 @@ function App() {
   if (roleView === 'exonaut') {
     const gradeMatch = route.startsWith('lead-grade');
     const subId = gradeMatch && route.includes(':') ? route.split(':')[1] : null;
-    sidebar = <Sidebar current={route} onNavigate={navigateFromSidebar} onSignOut={signOut} mobileOpen={mobileNavOpen} onMobileClose={() => setMobileNavOpen(false)} />;
+    sidebar = <Sidebar current={route} onNavigate={navigateFromSidebar} onSignOut={signOut} mobileOpen={mobileNavOpen} onMobileClose={() => setMobileNavOpen(false)} collapsed={sidebarCollapsed} onToggleCollapsed={toggleSidebarCollapsed} />;
     if (route === 'dashboard')        page = <Dashboard onNavigate={navigate} onOpenMission={openMission} />;
     else if (route === 'leaderboard') page = <Leaderboard onBack={() => navigate('dashboard')} />;
     else if (route === 'profile')     page = <Profile onOpenMission={openMission} onTriggerBadge={(b) => onCelebrate('badge', { badge: b })} />;
@@ -439,7 +442,7 @@ function App() {
     const gradeMatch = route.startsWith('lead-grade');
     const subId = gradeMatch && route.includes(':') ? route.split(':')[1] : null;
     const _r = gradeMatch ? 'lead-grade' : route;
-    sidebar = <LeadSidebar current={_r} onNavigate={navigateFromSidebar} onSignOut={signOut} mobileOpen={mobileNavOpen} onMobileClose={() => setMobileNavOpen(false)} />;
+    sidebar = <LeadSidebar current={_r} onNavigate={navigateFromSidebar} onSignOut={signOut} mobileOpen={mobileNavOpen} onMobileClose={() => setMobileNavOpen(false)} collapsed={sidebarCollapsed} onToggleCollapsed={toggleSidebarCollapsed} />;
     if (route === 'lead-home')        page = <LeadHome onNavigate={navigate} />;
     else if (route === 'lead-roster') page = <LeadRoster />;
     else if (route === 'lead-queue')  page = <LeadQueue onNavigate={navigate} />;
@@ -458,7 +461,7 @@ function App() {
     else if (gradeMatch)              page = <LeadGrade subId={subId} onBack={() => navigate('lead-queue')} />;
     else                              page = <LeadHome onNavigate={navigate} />;
   } else if (roleView === 'commander') {
-    sidebar = <CommanderSidebar current={route} onNavigate={navigateFromSidebar} onSignOut={signOut} mobileOpen={mobileNavOpen} onMobileClose={() => setMobileNavOpen(false)} />;
+    sidebar = <CommanderSidebar current={route} onNavigate={navigateFromSidebar} onSignOut={signOut} mobileOpen={mobileNavOpen} onMobileClose={() => setMobileNavOpen(false)} collapsed={sidebarCollapsed} onToggleCollapsed={toggleSidebarCollapsed} />;
     if (route === 'cmdr-home')        page = <CommanderHome onNavigate={navigate} />;
     else if (route === 'cmdr-leads')  page = <CommanderLeads />;
     else if (route === 'cmdr-projects') page = <CommanderProjectProgress onNavigate={navigate} />;
@@ -483,7 +486,7 @@ function App() {
     else if (route === 'settings')    page = <SettingsPage onSignOut={signOut} />;
     else                              page = <CommanderHome onNavigate={navigate} />;
   } else if (roleView === 'admin') {
-    sidebar = <PlatformAdminSidebar current={route} onNavigate={navigateFromSidebar} onSignOut={signOut} mobileOpen={mobileNavOpen} onMobileClose={() => setMobileNavOpen(false)} />;
+    sidebar = <PlatformAdminSidebar current={route} onNavigate={navigateFromSidebar} onSignOut={signOut} mobileOpen={mobileNavOpen} onMobileClose={() => setMobileNavOpen(false)} collapsed={sidebarCollapsed} onToggleCollapsed={toggleSidebarCollapsed} />;
     if (route === 'pa-cohorts')      page = <AdminCohorts />;
     else if (route === 'pa-missions') page = <AdminMissionBuilder />;
     else if (route === 'pa-projects') page = <ProjectBuilderPage />;
@@ -508,8 +511,9 @@ function App() {
   }
 
   return (
-    <div className="app-shell hud-bg">
+    <div className={'app-shell hud-bg' + (sidebarCollapsed ? ' sidebar-collapsed' : '')}>
       {sidebar}
+      <SidebarTooltip />
       {mobileNavOpen && <button type="button" className="sidebar-backdrop" onClick={() => setMobileNavOpen(false)} aria-label="Close navigation menu" />}
       <main className="main">
         <Topbar crumbs={crumbMap[route] || ['EXONAUT']} onNavigate={navigate} onMenuOpen={() => setMobileNavOpen(true)} menuOpen={mobileNavOpen} />
@@ -546,7 +550,7 @@ function App() {
 }
 
 // ========== Role-specific sidebars ==========
-function LeadSidebar({ current, onNavigate, onSignOut, mobileOpen = false, onMobileClose }) {
+function LeadSidebar({ current, onNavigate, onSignOut, mobileOpen = false, onMobileClose, collapsed = false, onToggleCollapsed }) {
   const { profile } = useCurrentUserProfile();
   const { unreadCount } = useNotifications(profile);
   const { unreadCount: messageUnread } = useMessages(profile);
@@ -586,12 +590,12 @@ function LeadSidebar({ current, onNavigate, onSignOut, mobileOpen = false, onMob
     { id: 'kudos',       label: 'Kudos',         icon: 'fa-hand-sparkles' },
   ];
   return (
-    <aside id="application-navigation" className={'sidebar' + (mobileOpen ? ' mobile-open' : '')} aria-label="Application navigation">
+    <aside id="application-navigation" className={'sidebar' + (mobileOpen ? ' mobile-open' : '') + (collapsed ? ' collapsed' : '')} aria-label="Application navigation">
       <button type="button" className="sidebar-mobile-close" onClick={onMobileClose} aria-label="Close navigation menu">
         <i className="fa-solid fa-xmark" />
       </button>
       <div className="sidebar-brand">
-        <div className="sidebar-logo">EXOASIA</div>
+        <SidebarLogoToggle collapsed={collapsed} onToggle={onToggleCollapsed} />
         <div className="sidebar-tag" style={{ color: 'var(--platinum)' }}>LEAD CONSOLE · v2.0</div>
       </div>
       <button type="button" className="sidebar-user" style={{ cursor: 'pointer' }} onClick={() => onNavigate('lead-profile')} title="Open my profile">
@@ -641,7 +645,7 @@ function LeadSidebar({ current, onNavigate, onSignOut, mobileOpen = false, onMob
   );
 }
 
-function CommanderSidebar({ current, onNavigate, onSignOut, mobileOpen = false, onMobileClose }) {
+function CommanderSidebar({ current, onNavigate, onSignOut, mobileOpen = false, onMobileClose, collapsed = false, onToggleCollapsed }) {
   const { profile } = useCurrentUserProfile();
   const { unreadCount } = useNotifications(profile);
   const { unreadCount: messageUnread } = useMessages(profile);
@@ -702,12 +706,12 @@ function CommanderSidebar({ current, onNavigate, onSignOut, mobileOpen = false, 
     },
   ];
   return (
-    <aside id="application-navigation" className={'sidebar' + (mobileOpen ? ' mobile-open' : '')} aria-label="Application navigation">
+    <aside id="application-navigation" className={'sidebar' + (mobileOpen ? ' mobile-open' : '') + (collapsed ? ' collapsed' : '')} aria-label="Application navigation">
       <button type="button" className="sidebar-mobile-close" onClick={onMobileClose} aria-label="Close navigation menu">
         <i className="fa-solid fa-xmark" />
       </button>
       <div className="sidebar-brand">
-        <div className="sidebar-logo">EXOASIA</div>
+        <SidebarLogoToggle collapsed={collapsed} onToggle={onToggleCollapsed} />
         <div className="sidebar-tag" style={{ color: 'var(--amber)' }}>COMMAND · v2.0</div>
       </div>
       <button type="button" className="sidebar-user" style={{ cursor: 'pointer' }} onClick={() => onNavigate('cmdr-profile')} title="Open my profile">
@@ -767,7 +771,7 @@ function CohortSwitcher() {
   const accent = cohort?.status === 'active' ? 'var(--lime)' : 'var(--lavender)';
 
   return (
-    <div style={{ padding: '14px 16px 8px', borderBottom: '1px solid var(--off-white-07)' }}>
+    <div className="sidebar-cohort-widget" style={{ padding: '14px 16px 8px', borderBottom: '1px solid var(--off-white-07)' }}>
       <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.12em', marginBottom: 8 }}>
         COHORT FILTER
       </div>

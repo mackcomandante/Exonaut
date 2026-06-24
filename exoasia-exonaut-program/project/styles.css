@@ -2416,6 +2416,7 @@ img, svg { display: block; max-width: 100%; }
   overflow-x: hidden;
   scrollbar-gutter: stable;
   overscroll-behavior: contain;
+  transition: width 180ms ease, transform 220ms ease;
 }
 .sidebar::-webkit-scrollbar { width: 8px; }
 .sidebar::-webkit-scrollbar-track { background: transparent; }
@@ -2429,6 +2430,7 @@ img, svg { display: block; max-width: 100%; }
   padding: 0 22px 22px;
   border-bottom: 1px solid var(--hairline);
   margin-bottom: 14px;
+  position: relative;
 }
 .sidebar-logo {
   font-family: var(--font-display);
@@ -2438,6 +2440,16 @@ img, svg { display: block; max-width: 100%; }
   color: var(--ink);
   line-height: 1;
   display: flex; align-items: center; gap: 10px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: color 150ms ease, background 150ms ease, box-shadow 150ms ease;
+}
+.sidebar-logo:hover {
+  color: var(--accent);
 }
 .sidebar-logo::before {
   content: '';
@@ -2554,6 +2566,7 @@ img, svg { display: block; max-width: 100%; }
 
 .sidebar-user:focus-visible,
 .sidebar-link:focus-visible,
+.sidebar-logo:focus-visible,
 .sidebar-mobile-close:focus-visible,
 .topbar-menu-btn:focus-visible,
 .messages-mobile-back:focus-visible {
@@ -2601,6 +2614,163 @@ img, svg { display: block; max-width: 100%; }
 }
 .sidebar-footer button:hover { color: var(--ink); }
 
+.sidebar.collapsed {
+  width: 76px;
+  scrollbar-gutter: auto;
+}
+.sidebar.collapsed .sidebar-brand {
+  min-height: 58px;
+  padding: 0 12px 12px;
+  margin-bottom: 8px;
+}
+.sidebar.collapsed .sidebar-logo {
+  justify-content: center;
+  gap: 0;
+  width: 52px;
+  height: 52px;
+  margin: 0 auto;
+  font-size: 0;
+  border-radius: var(--radius-md);
+  transition: background 150ms ease, box-shadow 150ms ease;
+}
+.sidebar.collapsed .sidebar-logo:hover,
+.sidebar.collapsed .sidebar-logo:focus-visible {
+  background: var(--accent-wash);
+  box-shadow: inset 0 0 0 1px var(--accent-border);
+}
+.sidebar.collapsed .sidebar-logo::before {
+  width: 36px;
+  height: 36px;
+  flex-basis: 36px;
+}
+.sidebar.collapsed .sidebar-tag,
+.sidebar.collapsed .sidebar-user-info,
+.sidebar.collapsed .sidebar-nav-section,
+.sidebar.collapsed .sidebar-cohort-widget {
+  display: none !important;
+}
+.sidebar.collapsed .sidebar-user {
+  position: relative;
+  width: 52px;
+  height: 52px;
+  margin: 0 auto 10px;
+  padding: 0;
+  justify-content: center;
+}
+.sidebar.collapsed .sidebar-nav {
+  padding: 0 10px;
+  gap: 6px;
+}
+.sidebar.collapsed .sidebar-link {
+  position: relative;
+  justify-content: center;
+  width: 52px;
+  min-height: 46px;
+  margin: 0 auto;
+  padding: 0;
+  gap: 0;
+  border-radius: var(--radius-md);
+}
+.sidebar.collapsed .sidebar-link i {
+  width: auto;
+  font-size: 15px;
+}
+.sidebar.collapsed .sidebar-link > span:not(.badge-count) {
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 260;
+  max-width: 220px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--ink);
+  color: var(--bg-darkest);
+  box-shadow: var(--shadow-card);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+.sidebar.collapsed .sidebar-link:hover > span:not(.badge-count),
+.sidebar.collapsed .sidebar-link:focus-visible > span:not(.badge-count) {
+  opacity: 1;
+  transform: translate(2px, -50%);
+}
+.sidebar.collapsed .sidebar-link .badge-count {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  min-width: 18px;
+  padding: 2px 4px;
+  font-size: 9px;
+}
+.sidebar.collapsed .sidebar-footer {
+  padding: 12px 0 0;
+  margin: auto 10px 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.sidebar.collapsed .sidebar-footer button,
+.sidebar.collapsed .sidebar-footer .theme-toggle {
+  position: relative;
+  width: 40px;
+  height: 40px;
+}
+.sidebar.collapsed .sidebar-footer button::after,
+.sidebar.collapsed .sidebar-user::after {
+  content: none;
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  z-index: 270;
+  max-width: 180px;
+  padding: 8px 12px;
+  border-radius: var(--radius-pill);
+  background: var(--ink);
+  color: var(--bg-darkest);
+  box-shadow: var(--shadow-card);
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-2px, -50%);
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+.sidebar.collapsed .sidebar-footer button:hover::after,
+.sidebar.collapsed .sidebar-footer button:focus-visible::after,
+.sidebar.collapsed .sidebar-user:hover::after,
+.sidebar.collapsed .sidebar-user:focus-visible::after {
+  opacity: 1;
+  transform: translate(0, -50%);
+}
+
+.sidebar-floating-tooltip {
+  position: fixed;
+  z-index: 500;
+  max-width: 220px;
+  padding: 8px 12px;
+  border-radius: var(--radius-pill);
+  background: var(--ink);
+  color: var(--bg-darkest);
+  box-shadow: var(--shadow-card);
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
 .theme-toggle {
   display: inline-flex;
   align-items: center;
@@ -2646,6 +2816,7 @@ img, svg { display: block; max-width: 100%; }
    ============================================================ */
 .app-shell { min-height: 100vh; display: flex; }
 .main { margin-left: 240px; flex: 1; min-width: 0; }
+.app-shell.sidebar-collapsed .main { margin-left: 76px; }
 
 .topbar {
   display: flex;
@@ -5558,6 +5729,9 @@ body.mobile-nav-open {
     transition: transform 220ms ease;
     box-shadow: 18px 0 52px rgba(0, 0, 0, 0.42);
   }
+  .sidebar.collapsed {
+    width: min(290px, 86vw);
+  }
   .sidebar.mobile-open {
     transform: translateX(0);
   }
@@ -5578,6 +5752,94 @@ body.mobile-nav-open {
   .sidebar-brand {
     padding-right: 54px;
   }
+  .sidebar.collapsed .sidebar-brand {
+    padding: 0 54px 22px 22px;
+    margin-bottom: 14px;
+  }
+  .sidebar.collapsed .sidebar-logo {
+    justify-content: flex-start;
+    gap: 10px;
+    width: auto;
+    height: auto;
+    margin: 0;
+    background: transparent;
+    box-shadow: none;
+    font-size: 20px;
+  }
+  .sidebar.collapsed .sidebar-logo::before {
+    width: 34px;
+    height: 34px;
+    flex-basis: 34px;
+  }
+  .sidebar.collapsed .sidebar-tag,
+  .sidebar.collapsed .sidebar-user-info,
+  .sidebar.collapsed .sidebar-nav-section,
+  .sidebar.collapsed .sidebar-cohort-widget {
+    display: block !important;
+  }
+  .sidebar.collapsed .sidebar-user {
+    width: calc(100% - 24px);
+    height: auto;
+    margin: 0 12px 14px;
+    padding: 12px 14px;
+    justify-content: flex-start;
+  }
+  .sidebar.collapsed .sidebar-nav {
+    padding: 0 10px;
+    gap: 2px;
+  }
+  .sidebar.collapsed .sidebar-link {
+    justify-content: flex-start;
+    width: 100%;
+    min-height: auto;
+    margin: 0;
+    padding: 11px 14px;
+    gap: 12px;
+    border-radius: var(--radius-pill);
+  }
+  .sidebar.collapsed .sidebar-link i {
+    width: 16px;
+    font-size: 13px;
+  }
+  .sidebar.collapsed .sidebar-link > span:not(.badge-count) {
+    position: static;
+    transform: none;
+    max-width: none;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    box-shadow: none;
+    font-size: inherit;
+    white-space: normal;
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .sidebar.collapsed .sidebar-link:hover > span:not(.badge-count),
+  .sidebar.collapsed .sidebar-link:focus-visible > span:not(.badge-count) {
+    transform: none;
+  }
+  .sidebar.collapsed .sidebar-link .badge-count {
+    position: static;
+    top: auto;
+    right: auto;
+    min-width: 28px;
+    margin-left: auto;
+    padding: 3px 7px;
+    font-size: 10px;
+  }
+  .sidebar.collapsed .sidebar-footer {
+    padding: 14px 24px 0;
+    margin: auto 10px 0;
+    flex-direction: row;
+    justify-content: space-between;
+    gap: 0;
+  }
+  .sidebar.collapsed .sidebar-footer button,
+  .sidebar.collapsed .sidebar-footer .theme-toggle {
+    width: auto;
+    height: auto;
+  }
   .sidebar-backdrop {
     display: block;
     position: fixed;
@@ -5590,6 +5852,9 @@ body.mobile-nav-open {
   .main {
     margin-left: 0;
     width: 100%;
+  }
+  .app-shell.sidebar-collapsed .main {
+    margin-left: 0;
   }
   .topbar {
     gap: 14px;

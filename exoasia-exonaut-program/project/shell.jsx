@@ -49,7 +49,92 @@ function ThemeToggle({ compact = false }) {
   );
 }
 
-function Sidebar({ current, onNavigate, onSignOut, mobileOpen = false, onMobileClose }) {
+function SidebarLogoToggle({ collapsed = false, onToggle }) {
+  if (!onToggle) return null;
+  const label = collapsed ? 'Open sidebar' : 'Close sidebar';
+  return (
+    <button
+      type="button"
+      className="sidebar-logo"
+      onClick={onToggle}
+      title={label}
+      aria-label={label}
+      aria-pressed={collapsed}
+      data-tooltip={label}
+    >
+      EXOASIA
+    </button>
+  );
+}
+
+function SidebarTooltip() {
+  const [tip, setTip] = React.useState(null);
+
+  React.useEffect(() => {
+    const selector = [
+      '.sidebar.collapsed .sidebar-logo',
+      '.sidebar.collapsed .sidebar-user',
+      '.sidebar.collapsed .sidebar-link',
+      '.sidebar.collapsed .sidebar-footer button',
+      '.sidebar.collapsed .theme-toggle',
+    ].join(',');
+
+    const getLabel = (el) => {
+      if (!el) return '';
+      const visibleLabel = el.querySelector?.('span:not(.badge-count)');
+      return el.dataset?.tooltip || el.getAttribute('aria-label') || el.getAttribute('title') || visibleLabel?.textContent?.trim() || '';
+    };
+
+    let activeEl = null;
+    const show = (event) => {
+      const el = event.target.closest?.(selector);
+      if (!el) return;
+      const label = getLabel(el);
+      if (!label) return;
+      activeEl = el;
+      const rect = el.getBoundingClientRect();
+      setTip({
+        label,
+        x: Math.round(rect.right + 10),
+        y: Math.round(rect.top + rect.height / 2),
+      });
+    };
+    const hide = (event) => {
+      if (activeEl && event?.relatedTarget && activeEl.contains(event.relatedTarget)) return;
+      activeEl = null;
+      setTip(null);
+    };
+
+    document.addEventListener('mouseover', show);
+    document.addEventListener('focusin', show);
+    document.addEventListener('mouseout', hide);
+    document.addEventListener('focusout', hide);
+    window.addEventListener('scroll', hide, true);
+    window.addEventListener('resize', hide);
+
+    return () => {
+      document.removeEventListener('mouseover', show);
+      document.removeEventListener('focusin', show);
+      document.removeEventListener('mouseout', hide);
+      document.removeEventListener('focusout', hide);
+      window.removeEventListener('scroll', hide, true);
+      window.removeEventListener('resize', hide);
+    };
+  }, []);
+
+  if (!tip) return null;
+  return (
+    <div
+      className="sidebar-floating-tooltip"
+      style={{ left: tip.x, top: tip.y }}
+      role="tooltip"
+    >
+      {tip.label}
+    </div>
+  );
+}
+
+function Sidebar({ current, onNavigate, onSignOut, mobileOpen = false, onMobileClose, collapsed = false, onToggleCollapsed }) {
   const { profile } = useCurrentUserProfile();
   const { unreadCount } = useNotifications(profile);
   const { unreadCount: messageUnread } = useMessages(profile);
@@ -103,15 +188,15 @@ function Sidebar({ current, onNavigate, onSignOut, mobileOpen = false, onMobileC
   ];
 
   return (
-    <aside id="application-navigation" className={'sidebar' + (mobileOpen ? ' mobile-open' : '')} aria-label="Application navigation">
+    <aside id="application-navigation" className={'sidebar' + (mobileOpen ? ' mobile-open' : '') + (collapsed ? ' collapsed' : '')} aria-label="Application navigation">
       <button type="button" className="sidebar-mobile-close" onClick={onMobileClose} aria-label="Close navigation menu">
         <i className="fa-solid fa-xmark" />
       </button>
       <div className="sidebar-brand">
-        <div className="sidebar-logo">EXOASIA</div>
+        <SidebarLogoToggle collapsed={collapsed} onToggle={onToggleCollapsed} />
         <div className="sidebar-tag">EXONAUT PORTAL · v2.0</div>
       </div>
-      <button type="button" className="sidebar-user" onClick={() => onNavigate('profile')} style={{ cursor: 'pointer' }}>
+      <button type="button" className="sidebar-user" onClick={() => onNavigate('profile')} style={{ cursor: 'pointer' }} title="Open my profile">
         <AvatarWithRing name={displayName} avatarUrl={profile.avatarUrl} size={36} tier={tier} />
         <div className="sidebar-user-info">
           <div className="sidebar-user-name">{displayName}</div>
@@ -243,4 +328,4 @@ function Topbar({ crumbs, onNavigate, onMenuOpen, menuOpen = false }) {
   );
 }
 
-Object.assign(window, { Sidebar, Topbar, ThemeToggle, useThemeMode, applyTheme });
+Object.assign(window, { Sidebar, Topbar, ThemeToggle, SidebarLogoToggle, SidebarTooltip, useThemeMode, applyTheme });

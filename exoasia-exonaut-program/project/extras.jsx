@@ -261,6 +261,10 @@ function TweaksPanel({ open, onClose, tweaks, setTweak }) {
         { v: 'default', l: 'Default' },
         { v: 'comfy',   l: 'Comfy'   },
       ])}
+      {row('Sidebar', 'sidebarMode', [
+        { v: 'expanded', l: 'Expanded' },
+        { v: 'compact',  l: 'Compact'  },
+      ])}
       {row('Accent hue', 'accent', [
         { v: 'lime',     l: 'Lime'     },
         { v: 'platinum', l: 'Platinum' },

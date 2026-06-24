@@ -241,7 +241,7 @@ function AdminCohortFilter() {
   const accent = scope === 'all' ? 'var(--accent)' : (current?.status === 'active' ? 'var(--accent)' : 'var(--lavender)');
 
   return (
-    <div style={{ padding: '14px 16px 8px', borderBottom: '1px solid var(--off-white-07)' }}>
+    <div className="sidebar-cohort-widget" style={{ padding: '14px 16px 8px', borderBottom: '1px solid var(--off-white-07)' }}>
       <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.12em', marginBottom: 8 }}>
         COHORT FILTER
       </div>
@@ -353,7 +353,7 @@ function AdminCohortFilter() {
 }
 
 // -------- Platform Admin sidebar --------
-function PlatformAdminSidebar({ current, onNavigate, onSignOut, mobileOpen = false, onMobileClose }) {
+function PlatformAdminSidebar({ current, onNavigate, onSignOut, mobileOpen = false, onMobileClose, collapsed = false, onToggleCollapsed }) {
   const { profile } = useCurrentUserProfile();
   const { unreadCount } = useNotifications(profile);
   const { unreadCount: messageUnread } = useMessages(profile);
@@ -411,12 +411,12 @@ function PlatformAdminSidebar({ current, onNavigate, onSignOut, mobileOpen = fal
     },
   ];
   return (
-    <aside id="application-navigation" className={'sidebar' + (mobileOpen ? ' mobile-open' : '')} aria-label="Application navigation">
+    <aside id="application-navigation" className={'sidebar' + (mobileOpen ? ' mobile-open' : '') + (collapsed ? ' collapsed' : '')} aria-label="Application navigation">
       <button type="button" className="sidebar-mobile-close" onClick={onMobileClose} aria-label="Close navigation menu">
         <i className="fa-solid fa-xmark" />
       </button>
       <div className="sidebar-brand">
-        <div className="sidebar-logo">EXOASIA</div>
+        <SidebarLogoToggle collapsed={collapsed} onToggle={onToggleCollapsed} />
         <div className="sidebar-tag" style={{ color: 'var(--sky)' }}>PLATFORM · ADMIN</div>
       </div>
       <button type="button" className="sidebar-user" style={{ cursor: 'pointer' }} onClick={() => onNavigate('pa-profile')} title="Open my profile">
