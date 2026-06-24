@@ -1020,6 +1020,7 @@ function ProjectWorkspacePage({ selectedProjectId = '', onBack }) {
   const visibleProjects = window.__projectStore.visibleProjects(profile).filter(project => project.status !== 'archived');
   const [tab, setTab] = React.useState('register');
   const [selectedId, setSelectedId] = React.useState(null);
+  const [editingProject, setEditingProject] = React.useState(null);
   const project = visibleProjects.find(item => item.id === selectedProjectId) || visibleProjects[0];
   const actions = tasks.filter(task => task.projectId === project?.id);
   const projectMembers = members.filter(member => member.projectId === project?.id);
@@ -1027,6 +1028,8 @@ function ProjectWorkspacePage({ selectedProjectId = '', onBack }) {
   const selectedAction = actions.find(task => task.id === selectedId);
   const access = project ? window.__projectStore.projectAccess(profile.id, project.id) : 'none';
   const canManage = profile.role === 'admin' || profile.role === 'commander' || access === 'first' || access === 'lead';
+  const canEditProject = profile.role === 'admin' || profile.role === 'commander' || access === 'first';
+  const canManageProjectSettings = profile.role === 'admin' || profile.role === 'commander';
   const canEditActions = canManage || projectMembers.some(member => member.userId === profile.id);
   const nameOf = id => profiles.find(person => person.id === id)?.fullName || profiles.find(person => person.id === id)?.email || 'Unassigned';
   const complete = actions.filter(task => task.status === 'done').length;
@@ -1049,7 +1052,18 @@ function ProjectWorkspacePage({ selectedProjectId = '', onBack }) {
           </div>
         </div>
         <div className="project-header-side">
-          {onBack && <button className="btn btn-ghost project-workspace-back" onClick={onBack}><i className="fa-solid fa-arrow-left" /> All Projects</button>}
+          <div className="project-header-actions">
+            {canEditProject && (
+              <button className="btn btn-ghost project-workspace-edit" type="button" onClick={() => setEditingProject(project)}>
+                <i className="fa-solid fa-pen" /> Edit Project
+              </button>
+            )}
+            {onBack && (
+              <button className="icon-btn project-workspace-back" type="button" onClick={onBack} title="Back to projects" aria-label="Back to projects">
+                <i className="fa-solid fa-arrow-left" />
+              </button>
+            )}
+          </div>
           <div className="project-metric-grid">
             <ProjectMetric label="Actions" value={actions.length} />
             <ProjectMetric label="Done" value={complete} />
@@ -1070,6 +1084,14 @@ function ProjectWorkspacePage({ selectedProjectId = '', onBack }) {
       {tab === 'activity' && <ProjectActivity actions={actions} activity={activity.filter(item => actions.some(action => action.id === item.taskId))} profiles={profiles} />}
       {tab === 'deploy' && canManage && <LaunchpadDeployModal project={project} profile={profile} existingEntry={projectLaunchpadEntry} embedded />}
       {selectedAction && <ActionModal key={selectedAction.id} action={selectedAction} project={project} members={projectMembers} profiles={profiles} assignees={assignees.filter(item => item.taskId === selectedAction.id)} comments={comments.filter(item => item.taskId === selectedAction.id)} activity={activity.filter(item => item.taskId === selectedAction.id)} canManage={canManage} canEditActions={canEditActions} onClose={() => setSelectedId(null)} />}
+      {editingProject && (
+        <AdminProjectEditModal
+          project={editingProject}
+          profiles={profiles}
+          canManageProjectSettings={canManageProjectSettings}
+          onClose={() => setEditingProject(null)}
+        />
+      )}
     </div>
   );
 }
@@ -3383,11 +3405,11 @@ function CertificatesBadgesPage() {
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr', gap: 18, marginBottom: 20 }}>
         <div className="card-panel" style={{ padding: 24 }}>
-          <div className="t-label" style={{ color: certificateReady ? 'var(--lime)' : 'var(--off-white-40)', marginBottom: 10 }}>BADGE STATUS</div>
+          <div className="t-label" style={{ color: certificateReady ? 'var(--accent)' : 'var(--off-white-40)', marginBottom: 10 }}>BADGE STATUS</div>
           <h2 className="t-title" style={{ fontSize: 28, margin: 0 }}>{certificateReady ? 'Ready for Issue' : 'In Progress'}</h2>
           <div className="t-body" style={{ marginTop: 8 }}>{certificateReady ? 'You have reached the certificate threshold.' : `${Math.max(0, 900 - total)} points until certificate eligibility.`}</div>
           <div style={{ height: 8, background: 'var(--off-white-07)', borderRadius: 4, overflow: 'hidden', marginTop: 18 }}>
-            <div style={{ width: Math.min(100, total / 900 * 100) + '%', height: '100%', background: 'var(--lime)' }} />
+            <div style={{ width: Math.min(100, total / 900 * 100) + '%', height: '100%', background: 'var(--accent)' }} />
           </div>
         </div>
         <div className="card-panel" style={{ padding: 24 }}>
@@ -3397,7 +3419,7 @@ function CertificatesBadgesPage() {
           <div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)', marginTop: 12 }}>
             PROJECT {breakdown.project || 0} Â· CLIENT {breakdown.client || 0} Â· RECRUITMENT {breakdown.recruitment || 0}
           </div>
-          {next && <div className="t-body" style={{ marginTop: 10, color: 'var(--lime)' }}>{next.at - total} points to {next.name}</div>}
+          {next && <div className="t-body" style={{ marginTop: 10, color: 'var(--accent)' }}>{next.at - total} points to {next.name}</div>}
         </div>
       </div>
       <div className="credential-category-grid">

@@ -111,6 +111,43 @@ function ExonautGuidePage() {
       </div>
 
       <div className="section-head" style={{ marginTop: 8 }}>
+        <h2>Track Tasks & Projects</h2>
+        <span className="section-meta">HOW TO USE THE WORKSPACE</span>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, marginBottom: 22 }}>
+        <GuideInfoPanel
+          icon="fa-list-check"
+          title="Track Tasks Guide"
+          summary="Track Tasks are your role-based work under your assigned track."
+          items={[
+            'Your Track Lead may assign or review work connected to your track.',
+            'Open your assigned tasks, read the expected output, and update your progress.',
+            'If you are assigned to a task, you can work on it and submit updates.',
+            'If you are blocked, update the blocker/status or inform your Track Lead.',
+            'Track Tasks should reflect real work done for your track, not just activity for points.',
+            'Completed work may still need review before it counts as fully approved.',
+          ]}
+        />
+        <GuideInfoPanel
+          icon="fa-diagram-project"
+          title="Project Guide"
+          summary="Projects are shared workspaces where assigned Exonauts collaborate on a bigger goal."
+          items={[
+            'Open the project assigned to you from the Projects page.',
+            'Use the Action Register to see actions, responsible users, due dates, blockers, and next steps.',
+            'Any user assigned to the project can add a new action.',
+            'Assigned users can update actions they are responsible for.',
+            'Project Lead, Commander, and Admin can manage the project and review progress.',
+            'Only Project Lead, Commander, and Admin can mark an action as fully done.',
+            'Use blockers when something is preventing progress.',
+            'Use comments or updates to keep the team aligned.',
+            'The Project Lead can edit project details and assigned Exonauts for their own project.',
+            'Commander and Admin can edit and manage projects across the system.',
+          ]}
+        />
+      </div>
+
+      <div className="section-head" style={{ marginTop: 8 }}>
         <h2>Contacts</h2>
         <span className="section-meta">WHO TO REACH OUT TO</span>
       </div>
@@ -155,6 +192,27 @@ function ExonautGuidePage() {
   );
 }
 
+function GuideInfoPanel({ icon, title, summary, items }) {
+  return (
+    <div className="card-panel" style={{ padding: 18 }}>
+      <div className="t-heading" style={{ fontSize: 17, marginBottom: 8 }}>
+        <i className={'fa-solid ' + icon} style={{ color: 'var(--accent)', marginRight: 8 }} />
+        {title}
+      </div>
+      <div className="t-body" style={{ fontSize: 12, color: 'var(--off-white-68)', lineHeight: 1.55, marginBottom: 12 }}>
+        {summary}
+      </div>
+      <div style={{ display: 'grid', gap: 8 }}>
+        {items.map(item => (
+          <div key={item} className="card-flat" style={{ padding: 10 }}>
+            <div className="t-body" style={{ fontSize: 12, color: 'var(--off-white)', lineHeight: 1.45 }}>{item}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function guideActionIcon(action = '') {
   if (action.includes('SHEET')) return 'fa-table';
   if (action.includes('DRIVE')) return 'fa-folder-open';
@@ -175,7 +233,12 @@ function GuideSection({ section, checked, onToggle }) {
             {section.title}
           </div>
         </div>
-        <div className="status-pill status-approved">{complete}/{section.tasks.length}</div>
+        <div
+          className="status-pill"
+          style={{ background: 'var(--accent-wash)', border: '1px solid var(--accent-border-soft)', color: 'var(--accent)' }}
+        >
+          {complete}/{section.tasks.length}
+        </div>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {section.tasks.map(task => (
@@ -183,7 +246,7 @@ function GuideSection({ section, checked, onToggle }) {
             key={task.id}
             className="card-flat"
             style={{
-              border: checked[task.id] ? '1px solid color-mix(in srgb, var(--lime) 60%, transparent)' : '1px solid var(--line)',
+              border: checked[task.id] ? '1px solid var(--accent-border)' : '1px solid var(--line)',
               padding: 12,
               textAlign: 'left',
               display: 'grid',
@@ -201,7 +264,7 @@ function GuideSection({ section, checked, onToggle }) {
             >
               <i
                 className={'fa-solid ' + (checked[task.id] ? 'fa-circle-check' : 'fa-circle')}
-                style={{ color: checked[task.id] ? 'var(--lime)' : 'var(--off-white-20)', marginTop: 2 }}
+                style={{ color: checked[task.id] ? 'var(--accent)' : 'var(--off-white-20)', marginTop: 2 }}
               />
             </button>
             <span>

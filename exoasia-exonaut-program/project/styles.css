@@ -1726,7 +1726,12 @@ img, svg { display: block; max-width: 100%; }
 .project-header-meta span { align-items: center; display: inline-flex; gap: 6px; }
 .project-header-side { display: grid; gap: 14px; }
 .project-header-side .project-switcher { justify-self: end; max-width: none; width: min(100%, 400px); }
-.project-workspace-back { justify-self: end; }
+.project-header-actions {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
 .project-metric-grid, .project-overview-metrics {
   display: grid;
   gap: 8px;
@@ -2236,7 +2241,7 @@ img, svg { display: block; max-width: 100%; }
   .project-register-header, .overview-columns { grid-template-columns: 1fr; }
   .project-register-header { gap: 16px; padding: 18px; }
   .project-header-side { gap: 12px; }
-  .project-workspace-back { justify-self: stretch; }
+  .project-header-actions { justify-content: flex-start; }
   .project-metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .project-overview-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .action-toolbar, .resource-form { grid-template-columns: 1fr; }
