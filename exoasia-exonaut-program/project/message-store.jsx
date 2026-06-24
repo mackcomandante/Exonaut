@@ -602,6 +602,36 @@
       }
       await store.sendMessage({ threadId, body: `${profileName(removeUserId)} was removed from the group.`, attachments: [], profile, system: true });
     },
+    async addParticipants({ threadId, userIds = [], profile }) {
+      const actor = window.__db ? await remoteUserId(profile) : (profile?.id || currentUserId());
+      const thread = state.threads.find(t => t.id === threadId);
+      if (!thread || !activeParticipantIds(thread).includes(actor)) throw new Error('You are not a participant in this group.');
+      if (!thread.isGroup && !['group', 'track_group'].includes(thread.threadType)) throw new Error('Members can only be added to group chats.');
+      const now = new Date().toISOString();
+      const existingIds = activeParticipantIds(thread);
+      const addIds = Array.from(new Set((userIds || []).filter(id => id && !existingIds.includes(id))));
+      if (!addIds.length) return thread;
+      thread.participantIds = Array.from(new Set([...existingIds, ...addIds]));
+      thread.participants = [
+        ...(thread.participants || []).filter(p => !addIds.includes(p.userId)),
+        ...addIds.map(id => normalizeParticipant({ userId: id, memberRole: 'member', createdAt: now })),
+      ];
+      thread.updatedAt = now;
+      notify();
+      if (window.__db) {
+        const { error } = await window.__db.from('message_participants').upsert(addIds.map(id => ({
+          thread_id: threadId,
+          user_id: id,
+          member_role: 'member',
+          last_read_at: null,
+          removed_at: null,
+        })), { onConflict: 'thread_id,user_id' });
+        if (error) throw error;
+      }
+      const names = addIds.map(profileName).join(', ');
+      await store.sendMessage({ threadId, body: `${profileName(actor)} added ${names} to the group.`, attachments: [], profile, system: true });
+      return thread;
+    },
     async sendMessage({ threadId, body, attachments, profile }) {
       const text = String(body || '').trim();
       const files = Array.isArray(attachments) ? attachments.map(normalizeAttachment).filter(Boolean) : [];
@@ -685,6 +715,7 @@
       createGroup: (data) => store.createGroup({ ...data, profile }),
       renameThread: (data) => store.renameThread({ ...data, profile }),
       removeParticipant: (data) => store.removeParticipant({ ...data, profile }),
+      addParticipants: (data) => store.addParticipants({ ...data, profile }),
       ensureTrackGroups: (profiles) => store.ensureTrackGroups({ profile, profiles }),
       sendMessage: (data) => store.sendMessage({ ...data, profile }),
       markThreadRead: (threadId) => store.markThreadRead(threadId, profile),

@@ -46,6 +46,7 @@ function profileDisplayName(profile) {
 
 function userCanRemoveGroupMember(currentProfile, thread, memberProfile) {
   if (!currentProfile || !thread?.isGroup || !memberProfile || memberProfile.id === currentProfile.id) return false;
+  if ((thread.participantIds || []).includes(currentProfile.id)) return true;
   if (['admin', 'commander'].includes(currentProfile.role)) return true;
   const ledTracks = new Set();
   if ((currentProfile.role || '') === 'lead' && currentProfile.trackCode) ledTracks.add(currentProfile.trackCode);
@@ -135,6 +136,7 @@ function MessagesPage({ intent, onIntentHandled }) {
     createGroup,
     renameThread,
     removeParticipant,
+    addParticipants,
     ensureTrackGroups,
     sendMessage,
     markThreadRead,
@@ -280,6 +282,8 @@ function MessagesPage({ intent, onIntentHandled }) {
             const avatarName = (thread.otherParticipantNames || []).join(', ') || thread.title;
             const avatarUrl = (thread.otherParticipantAvatars || []).find(Boolean) || '';
             const avatarRole = (thread.otherParticipantRoles || [])[0] || 'exonaut';
+            const threadAdmin = profiles.find(p => p.id === thread.createdBy);
+            const adminName = threadAdmin ? profileDisplayName(threadAdmin) : 'Group admin';
             return (
               <button
                 key={thread.id}
@@ -303,7 +307,7 @@ function MessagesPage({ intent, onIntentHandled }) {
                     <span>{thread.title}</span>
                     {thread.unreadCount > 0 && <b>{thread.unreadCount}</b>}
                   </div>
-                  {thread.isGroup && <div className="messages-thread-meta">{thread.threadType === 'track_group' ? 'Track Group' : 'Group'} / {thread.participantIds.length} members</div>}
+                  {thread.isGroup && <div className="messages-thread-meta">{thread.threadType === 'track_group' ? 'Track Group' : 'Group'} / {thread.participantIds.length} members / Admin: {adminName}</div>}
                   <div className="messages-thread-preview">{thread.preview}</div>
                 </div>
                 <div className="messages-thread-time">{thread.lastMessage ? timeAgo(thread.lastMessage.createdAt) : ''}</div>
@@ -322,7 +326,11 @@ function MessagesPage({ intent, onIntentHandled }) {
                 <div className="messages-conversation-title">
                   <div>
                     <div className="t-heading" style={{ marginBottom: 2 }}>{activeThread.title}</div>
-                    <div className="t-micro">{activeThread.isGroup ? `${activeThread.participantIds.length} members` : activeThread.otherParticipantNames.join(' / ')}</div>
+                    <div className="t-micro">
+                      {activeThread.isGroup
+                        ? `${activeThread.participantIds.length} members / Admin: ${profileDisplayName(profiles.find(p => p.id === activeThread.createdBy))}`
+                        : activeThread.otherParticipantNames.join(' / ')}
+                    </div>
                   </div>
                   {activeThread.isGroup && (
                     <button type="button" className="message-group-details-btn" onClick={() => setDetailsOpen(true)} title="Group Details">
@@ -444,6 +452,9 @@ function MessagesPage({ intent, onIntentHandled }) {
           onRemove={async (userId) => {
             await removeParticipant({ threadId: activeThread.id, userId });
           }}
+          onAdd={async (userIds) => {
+            await addParticipants({ threadId: activeThread.id, userIds });
+          }}
         />
       )}
 
@@ -555,11 +566,25 @@ function GroupComposeModal({ profiles, cohortId, onClose, onCreate }) {
   );
 }
 
-function GroupDetailsModal({ thread, profiles, currentProfile, onClose, onRename, onRemove }) {
+function GroupDetailsModal({ thread, profiles, currentProfile, onClose, onRename, onRemove, onAdd }) {
   const [title, setTitle] = React.useState(thread.title || '');
   const [saving, setSaving] = React.useState(false);
+  const [addOpen, setAddOpen] = React.useState(false);
+  const [addQuery, setAddQuery] = React.useState('');
+  const [selectedAdds, setSelectedAdds] = React.useState([]);
   const participants = (thread.participantIds || []).map(id => profiles.find(p => p.id === id) || { id, fullName: 'Exonaut' });
+  const adminProfile = profiles.find(p => p.id === thread.createdBy) || participants.find(p => p.id === thread.createdBy);
   const canRename = thread.threadType === 'group';
+  const canManageMembers = thread.isGroup && (thread.participantIds || []).includes(currentProfile?.id);
+  const addCandidates = profiles
+    .filter(p => p.id && !(thread.participantIds || []).includes(p.id))
+    .filter(p => {
+      const q = addQuery.trim().toLowerCase();
+      if (!q) return true;
+      return [p.fullName, p.email, p.role, p.trackCode].some(value => String(value || '').toLowerCase().includes(q));
+    })
+    .sort((a, b) => profileDisplayName(a).localeCompare(profileDisplayName(b)))
+    .slice(0, 20);
 
   async function rename() {
     if (!canRename || title.trim() === thread.title) return;
@@ -583,6 +608,25 @@ function GroupDetailsModal({ thread, profiles, currentProfile, onClose, onRename
     }
   }
 
+  function toggleAdd(userId) {
+    setSelectedAdds(current => current.includes(userId) ? current.filter(id => id !== userId) : [...current, userId]);
+  }
+
+  async function addSelected() {
+    if (!selectedAdds.length) return;
+    setSaving(true);
+    try {
+      await onAdd(selectedAdds);
+      setSelectedAdds([]);
+      setAddQuery('');
+      setAddOpen(false);
+      setSaving(false);
+    } catch (err) {
+      alert((err && err.message) || 'Could not add members.');
+      setSaving(false);
+    }
+  }
+
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="messages-modal group-details-modal card-panel" onClick={e => e.stopPropagation()}>
@@ -598,7 +642,48 @@ function GroupDetailsModal({ thread, profiles, currentProfile, onClose, onRename
           <input className="input" disabled={!canRename} value={title} onChange={e => setTitle(e.target.value)} />
           <button className="btn btn-primary" disabled={!canRename || saving || title.trim() === thread.title} onClick={rename}>Rename Group</button>
         </div>
+        <label className="group-details-label">Group admin</label>
+        <div className="group-admin-card">
+          <AvatarWithRing name={profileDisplayName(adminProfile)} avatarUrl={adminProfile?.avatarUrl} size={34} tier={adminProfile?.role === 'exonaut' ? 'entry' : 'corps'} />
+          <span>
+            <strong>{profileDisplayName(adminProfile)}</strong>
+            <em>{adminProfile ? `${trackLabel(adminProfile.trackCode)} / ${adminProfile.role || 'exonaut'}` : 'Original group creator'}</em>
+          </span>
+        </div>
         {thread.threadType === 'track_group' && <p className="group-details-note">Default track groups are synced from the cohort roster and cannot be renamed.</p>}
+        {canManageMembers && (
+          <div className="group-member-tools">
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => setAddOpen(open => !open)}>
+              <i className="fa-solid fa-user-plus" /> Add Members
+            </button>
+          </div>
+        )}
+        {addOpen && canManageMembers && (
+          <div className="group-add-panel">
+            <div className="messages-thread-search">
+              <i className="fa-solid fa-magnifying-glass" />
+              <input value={addQuery} onChange={e => setAddQuery(e.target.value)} placeholder="Search people to add..." />
+            </div>
+            <div className="messages-recipient-list group-member-picker">
+              {addCandidates.map(p => (
+                <button key={p.id} className={'messages-recipient' + (selectedAdds.includes(p.id) ? ' active' : '')} onClick={() => toggleAdd(p.id)}>
+                  <AvatarWithRing name={profileDisplayName(p)} avatarUrl={p.avatarUrl} size={30} tier={p.role === 'exonaut' ? 'entry' : 'corps'} />
+                  <span>
+                    <strong>{profileDisplayName(p)}</strong>
+                    <em>{trackLabel(p.trackCode)} / {p.role || 'exonaut'}</em>
+                  </span>
+                  {selectedAdds.includes(p.id) && <i className="fa-solid fa-check" />}
+                </button>
+              ))}
+              {addCandidates.length === 0 && <div className="messages-empty compact">No available members found.</div>}
+            </div>
+            <div className="messages-modal-actions">
+              <button className="btn btn-primary btn-sm" disabled={!selectedAdds.length || saving} onClick={addSelected}>
+                <i className="fa-solid fa-user-plus" /> Add {selectedAdds.length || ''} Member{selectedAdds.length === 1 ? '' : 's'}
+              </button>
+            </div>
+          </div>
+        )}
         <div className="group-participant-list">
           {participants.map(p => {
             const canRemove = userCanRemoveGroupMember(currentProfile, thread, p);
