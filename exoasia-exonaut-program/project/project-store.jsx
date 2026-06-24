@@ -801,7 +801,7 @@ function ProjectBuilderPage({ roleLabel = 'PLATFORM ADMIN' } = {}) {
   const officers = selectedRoster.length ? selectedRoster : profiles.filter(p => ['exonaut', 'lead', 'commander'].includes(p.role || 'exonaut'));
   const exonauts = selectedRoster.filter(p => (p.role || 'exonaut') === 'exonaut');
   const currentMemberTrack = selectedTrackCodes.includes(memberTrackFilter) ? memberTrackFilter : (selectedTrackCodes[0] || '');
-  const currentTrackExonauts = exonauts.filter(p => (p.trackCode || 'AIS') === currentMemberTrack);
+  const currentTrackExonauts = exonauts.filter(p => (p.trackCode || 'AIS') === currentMemberTrack && p.id !== draft.firstOfficerId);
   const nameOf = id => profiles.find(p => p.id === id)?.fullName || profiles.find(p => p.id === id)?.email || 'Unassigned';
   const trackName = code => tracks.find(t => t.code === code)?.short || code || 'TRACK';
 
@@ -826,14 +826,12 @@ function ProjectBuilderPage({ roleLabel = 'PLATFORM ADMIN' } = {}) {
     if (!selectedTrackCodes.includes(memberTrackFilter)) setMemberTrackFilter(selectedTrackCodes[0]);
   }, [selectedTrackCodes.join('|'), memberTrackFilter]);
 
-  function updateCurrentTrackMembers(selectedIds) {
-    const currentTrackIds = new Set(currentTrackExonauts.map(p => p.id));
+  function toggleCurrentTrackMember(userId) {
     setDraft(d => ({
       ...d,
-      memberIds: [
-        ...d.memberIds.filter(id => !currentTrackIds.has(id)),
-        ...selectedIds,
-      ],
+      memberIds: d.memberIds.includes(userId)
+        ? d.memberIds.filter(id => id !== userId)
+        : [...d.memberIds, userId],
     }));
   }
 
@@ -877,7 +875,7 @@ function ProjectBuilderPage({ roleLabel = 'PLATFORM ADMIN' } = {}) {
             {tracks.map(t => <button key={t.code} className={'lb-filter' + (draft.trackCodes.includes(t.code) ? ' active' : '')} onClick={() => toggleTrack(t.code)}>{t.short}</button>)}
           </div>
           <label className="t-label-muted">PROJECT LEAD</label>
-          <select className="select" value={draft.firstOfficerId} onChange={e => setDraft(d => ({ ...d, firstOfficerId: e.target.value }))}>
+          <select className="select" value={draft.firstOfficerId} onChange={e => setDraft(d => ({ ...d, firstOfficerId: e.target.value, memberIds: d.memberIds.filter(id => id !== e.target.value) }))}>
             <option value="">Select officer</option>
             {officers.map(p => <option key={p.id} value={p.id}>{p.fullName || p.email} · {tracks.find(t => t.code === (p.trackCode || 'AIS'))?.short || p.trackCode}</option>)}
           </select>
@@ -886,14 +884,14 @@ function ProjectBuilderPage({ roleLabel = 'PLATFORM ADMIN' } = {}) {
             {!selectedTrackCodes.length && <option value="">Select tracks first</option>}
             {selectedTrackCodes.map(code => <option key={code} value={code}>{trackName(code)} roster</option>)}
           </select>
-          <select multiple className="select assignee-select" disabled={!currentMemberTrack}
-            value={draft.memberIds.filter(id => currentTrackExonauts.some(p => p.id === id))}
-            onChange={e => updateCurrentTrackMembers(Array.from(e.target.selectedOptions).map(o => o.value))}>
-            {currentTrackExonauts.map(p => <option key={p.id} value={p.id}>{p.fullName || p.email} · {trackName(p.trackCode || 'AIS')}</option>)}
-          </select>
-          {currentMemberTrack && currentTrackExonauts.length === 0 && (
-            <div className="empty-line">No exonauts found under {trackName(currentMemberTrack)}.</div>
-          )}
+          <ProjectMemberToggleList
+            members={currentTrackExonauts}
+            selectedIds={draft.memberIds}
+            disabled={!currentMemberTrack}
+            emptyLabel={currentMemberTrack ? `No exonauts found under ${trackName(currentMemberTrack)}.` : 'Select a track first.'}
+            trackLabel={code => trackName(code)}
+            onToggle={toggleCurrentTrackMember}
+          />
           {draft.memberIds.length > 0 && (
             <div className="selected-member-list">
               {draft.memberIds.map(id => (
@@ -2393,6 +2391,7 @@ function ProjectsPage() {
   const projects = window.__projectStore.visibleProjects(profile).filter(project => project.status !== 'archived');
   const selected = projects.find(project => project.id === selectedId);
   const canManageProjects = ['admin', 'commander'].includes(profile.role);
+  const canEditProject = project => canManageProjects || window.__projectStore.projectAccess(profile.id, project.id) === 'first';
   const nameOf = id => profiles.find(person => person.id === id)?.fullName || profiles.find(person => person.id === id)?.email || 'Unassigned';
 
   if (selected) {
@@ -2416,13 +2415,14 @@ function ProjectsPage() {
           const actions = tasks.filter(task => task.projectId === project.id);
           const done = actions.filter(action => action.status === 'done').length;
           const blocked = actions.filter(action => action.status === 'blocked').length;
+          const canEditThisProject = canEditProject(project);
           return (
             <div key={project.id} className="project-card-button project-register-card" role="button" tabIndex={0} onClick={() => setSelectedId(project.id)} onKeyDown={e => { if (e.key === 'Enter') setSelectedId(project.id); }}>
               <div className="project-card-head">
                 <ProjectState status={project.status} />
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, position: 'relative' }}>
                   <span className="project-card-progress">{actions.length ? Math.round(done / actions.length * 100) : 0}% complete</span>
-                  {canManageProjects && (
+                  {canEditThisProject && (
                     <button
                       type="button"
                       className="project-card-menu-button"
@@ -2440,9 +2440,11 @@ function ProjectsPage() {
                       <button type="button" onClick={() => { setEditingProject(project); setMenuProjectId(''); }}>
                         <i className="fa-solid fa-pen" /> Edit Project
                       </button>
-                      <button type="button" className="danger" onClick={() => { setDeletingProject(project); setMenuProjectId(''); }}>
-                        <i className="fa-solid fa-trash" /> Delete
-                      </button>
+                      {canManageProjects && (
+                        <button type="button" className="danger" onClick={() => { setDeletingProject(project); setMenuProjectId(''); }}>
+                          <i className="fa-solid fa-trash" /> Delete
+                        </button>
+                      )}
                     </div>
                   )}
                 </span>
@@ -2466,6 +2468,7 @@ function ProjectsPage() {
         <AdminProjectEditModal
           project={editingProject}
           profiles={profiles}
+          canManageProjectSettings={canManageProjects}
           onClose={() => setEditingProject(null)}
         />
       )}
@@ -2479,7 +2482,33 @@ function ProjectsPage() {
   );
 }
 
-function AdminProjectEditModal({ project, profiles, onClose }) {
+function ProjectMemberToggleList({ members, selectedIds, disabled = false, emptyLabel = 'No exonauts found.', trackLabel, onToggle }) {
+  if (disabled || !members.length) {
+    return <div className="project-member-toggle-list empty">{emptyLabel}</div>;
+  }
+  return (
+    <div className="project-member-toggle-list" role="group" aria-label="Project members">
+      {members.map(person => {
+        const selected = selectedIds.includes(person.id);
+        return (
+          <button
+            key={person.id}
+            type="button"
+            className={'project-member-toggle' + (selected ? ' active' : '')}
+            aria-pressed={selected}
+            onClick={() => onToggle(person.id)}
+          >
+            <span className="project-member-toggle-name">{person.fullName || person.email}</span>
+            <span className="project-member-toggle-track">{trackLabel(person.trackCode || 'AIS')}</span>
+            <i className={'fa-solid ' + (selected ? 'fa-check' : 'fa-plus')} />
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function AdminProjectEditModal({ project, profiles, canManageProjectSettings = true, onClose }) {
   const tracks = typeof useAdminTracks === 'function' ? useAdminTracks() : TRACKS;
   const initialRoster = window.__projectStore.projectRoster(project.id);
   const [draft, setDraft] = React.useState({
@@ -2497,11 +2526,12 @@ function AdminProjectEditModal({ project, profiles, onClose }) {
   const selectedTrackSet = new Set(draft.trackCodes);
   const candidateProfiles = profiles.filter(p => ['exonaut', 'lead', 'commander', 'admin'].includes(p.role || 'exonaut'));
   const leadOptions = candidateProfiles.filter(p => !draft.trackCodes.length || selectedTrackSet.has(p.trackCode || 'AIS') || (p.role || 'exonaut') !== 'exonaut');
-  const memberOptions = profiles.filter(p => (p.role || 'exonaut') === 'exonaut' && (!draft.trackCodes.length || selectedTrackSet.has(p.trackCode || 'AIS')));
+  const memberOptions = profiles.filter(p => (p.role || 'exonaut') === 'exonaut' && p.id !== draft.firstOfficerId && (!draft.trackCodes.length || selectedTrackSet.has(p.trackCode || 'AIS')));
   const trackLabel = code => tracks.find(t => t.code === code)?.short || code;
   const nameOf = id => profiles.find(p => p.id === id)?.fullName || profiles.find(p => p.id === id)?.email || 'Unassigned';
 
   function toggleTrack(code) {
+    if (!canManageProjectSettings) return;
     setDraft(d => {
       const trackCodes = d.trackCodes.includes(code) ? d.trackCodes.filter(item => item !== code) : [...d.trackCodes, code];
       const allowedMembers = new Set(profiles.filter(p => trackCodes.includes(p.trackCode || 'AIS')).map(p => p.id));
@@ -2511,6 +2541,15 @@ function AdminProjectEditModal({ project, profiles, onClose }) {
         memberIds: d.memberIds.filter(id => allowedMembers.has(id)),
       };
     });
+  }
+
+  function toggleMember(userId) {
+    setDraft(d => ({
+      ...d,
+      memberIds: d.memberIds.includes(userId)
+        ? d.memberIds.filter(id => id !== userId)
+        : [...d.memberIds, userId],
+    }));
   }
 
   async function saveProject() {
@@ -2554,13 +2593,13 @@ function AdminProjectEditModal({ project, profiles, onClose }) {
         <div className="project-date-grid">
           <label>
             <div className="t-label-muted">STATUS</div>
-            <select className="select" value={draft.status} onChange={e => setDraft(d => ({ ...d, status: e.target.value }))}>
+            <select className="select" value={draft.status} disabled={!canManageProjectSettings} onChange={e => setDraft(d => ({ ...d, status: e.target.value }))}>
               {['draft', 'active', 'paused', 'completed', 'archived'].map(status => <option key={status} value={status}>{status.toUpperCase()}</option>)}
             </select>
           </label>
           <label>
             <div className="t-label-muted">PROJECT LEAD</div>
-            <select className="select" value={draft.firstOfficerId} onChange={e => setDraft(d => ({ ...d, firstOfficerId: e.target.value }))}>
+            <select className="select" value={draft.firstOfficerId} disabled={!canManageProjectSettings} onChange={e => setDraft(d => ({ ...d, firstOfficerId: e.target.value, memberIds: d.memberIds.filter(id => id !== e.target.value) }))}>
               <option value="">Select lead</option>
               {leadOptions.map(p => <option key={p.id} value={p.id}>{p.fullName || p.email} · {trackLabel(p.trackCode || 'AIS')}</option>)}
             </select>
@@ -2569,20 +2608,19 @@ function AdminProjectEditModal({ project, profiles, onClose }) {
         <label className="t-label-muted">TRACKS</label>
         <div className="track-chip-row">
           {tracks.map(t => (
-            <button key={t.code} type="button" className={'lb-filter' + (draft.trackCodes.includes(t.code) ? ' active' : '')} onClick={() => toggleTrack(t.code)}>
+            <button key={t.code} type="button" disabled={!canManageProjectSettings} className={'lb-filter' + (draft.trackCodes.includes(t.code) ? ' active' : '')} onClick={() => toggleTrack(t.code)}>
               {t.short || t.code}
             </button>
           ))}
         </div>
         <label className="t-label-muted">PROJECT MEMBERS</label>
-        <select
-          multiple
-          className="select assignee-select"
-          value={draft.memberIds}
-          onChange={e => setDraft(d => ({ ...d, memberIds: Array.from(e.target.selectedOptions).map(o => o.value) }))}
-        >
-          {memberOptions.map(p => <option key={p.id} value={p.id}>{p.fullName || p.email} · {trackLabel(p.trackCode || 'AIS')}</option>)}
-        </select>
+        <ProjectMemberToggleList
+          members={memberOptions}
+          selectedIds={draft.memberIds}
+          emptyLabel="No exonauts found under the selected project tracks."
+          trackLabel={trackLabel}
+          onToggle={toggleMember}
+        />
         <div className="selected-member-list">
           {[draft.firstOfficerId, ...draft.memberIds].filter(Boolean).map(id => (
             <span key={id} className="selected-member-pill">

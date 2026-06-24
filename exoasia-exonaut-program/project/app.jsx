@@ -561,7 +561,7 @@ function CommanderSidebar({ current, onNavigate, onSignOut, mobileOpen = false, 
       links: [
         { id: 'cmdr-projects', label: 'Project Dashboard', icon: 'fa-chart-simple' },
         { id: 'cmdr-project-builder', label: 'Project Builder', icon: 'fa-diagram-project' },
-        { id: 'cmdr-action-register', label: 'Action Register', icon: 'fa-list-check' },
+        { id: 'cmdr-action-register', label: 'Projects', icon: 'fa-list-check' },
       ],
     },
     {
