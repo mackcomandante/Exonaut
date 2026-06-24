@@ -2236,7 +2236,7 @@ function CommunityPage() {
           <div className="t-body" style={{ color: 'var(--off-white-68)' }}>No members match your filters.</div>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+        <div className="community-directory-grid">
           {filtered.map(m => (
             <CommunityCard key={m.id} m={m} onOpen={() => setSelected(m)} />
           ))}
