@@ -546,7 +546,9 @@ function RoleAuthScreen({ onAuthComplete, tweaks, setTweak }) {
   const [fullName, setFullName] = React.useState('');
   const [showPw, setShowPw] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
+  const [resending, setResending] = React.useState(false);
   const [authError, setAuthError] = React.useState('');
+  const [authNotice, setAuthNotice] = React.useState('');
 
   const isSignup = mode === 'signup';
 
@@ -554,9 +556,11 @@ function RoleAuthScreen({ onAuthComplete, tweaks, setTweak }) {
     if (!user) return null;
     const metadata = user.user_metadata || {};
     const fullName = metadata.full_name || metadata.name || user.email || 'Exonaut';
+    const requestedCohort = metadata.cohort_id || ME.cohort || 'c2627';
+    const requestedTrack = metadata.track_code || ME.track || 'AIS';
     const profileResult = await window.__db
       .from('user_profiles')
-      .select('role, full_name, cohort_id, track_code')
+      .select('role, full_name, cohort_id, track_code, approval_status, approval_reason, requested_role, requested_cohort_id, requested_track_code, email_confirmed_at')
       .eq('id', user.id)
       .maybeSingle();
 
@@ -569,11 +573,16 @@ function RoleAuthScreen({ onAuthComplete, tweaks, setTweak }) {
         id: user.id,
         email: user.email || '',
         full_name: fullName,
-        role: metadata.role || selectedRole,
-        cohort_id: ME.cohort || 'c2627',
-        track_code: ME.track || 'AIS',
+        role: selectedRole,
+        cohort_id: requestedCohort,
+        track_code: requestedTrack,
+        approval_status: 'pending_approval',
+        requested_role: ['exonaut', 'commander', 'admin'].includes(metadata.role) ? metadata.role : selectedRole,
+        requested_cohort_id: requestedCohort,
+        requested_track_code: requestedTrack,
+        email_confirmed_at: user.email_confirmed_at || user.confirmed_at || null,
       }, { onConflict: 'id' })
-      .select('role, full_name, cohort_id, track_code')
+      .select('role, full_name, cohort_id, track_code, approval_status, approval_reason, requested_role, requested_cohort_id, requested_track_code, email_confirmed_at')
       .single();
 
     if (insertResult.error) throw insertResult.error;
@@ -584,6 +593,7 @@ function RoleAuthScreen({ onAuthComplete, tweaks, setTweak }) {
     e.preventDefault();
     if (!email || !password || (isSignup && !fullName.trim())) return;
     setAuthError('');
+    setAuthNotice('');
     setLoading(true);
 
     try {
@@ -605,7 +615,7 @@ function RoleAuthScreen({ onAuthComplete, tweaks, setTweak }) {
       if (!user) throw new Error('Supabase did not return a user session.');
       if (isSignup && !result.data.session) {
         setLoading(false);
-        setAuthError('Account created. Check your email to confirm before signing in.');
+        setAuthNotice('Account created. Check your email to confirm before signing in, then wait for Admin approval.');
         return;
       }
 
@@ -615,6 +625,7 @@ function RoleAuthScreen({ onAuthComplete, tweaks, setTweak }) {
                        (user.app_metadata && user.app_metadata.role);
 
       setLoading(false);
+      setAuthNotice('');
       if (onAuthComplete) {
         onAuthComplete({
           role: authRole || selectedRole,
@@ -625,12 +636,36 @@ function RoleAuthScreen({ onAuthComplete, tweaks, setTweak }) {
       }
     } catch (err) {
       setLoading(false);
+      setAuthNotice('');
       setAuthError((err && err.message) || 'Authentication failed. Check your credentials.');
+    }
+  }
+
+  async function handleResendVerification() {
+    if (!email) return;
+    setAuthError('');
+    setAuthNotice('');
+    setResending(true);
+    try {
+      if (!window.__db || !window.__db.auth) {
+        throw new Error('Supabase is not loaded. Open the app through the local server and check your internet connection.');
+      }
+      const result = await window.__db.auth.resend({
+        type: 'signup',
+        email,
+      });
+      if (result.error) throw result.error;
+      setAuthNotice('Verification email resent. Give it a minute, then check Inbox, Promotions, Spam, and All Mail.');
+    } catch (err) {
+      setAuthError((err && err.message) || 'Could not resend verification email.');
+    } finally {
+      setResending(false);
     }
   }
 
   async function handleGoogleAuth() {
     setAuthError('');
+    setAuthNotice('');
     setLoading(true);
     try {
       if (!window.__db || !window.__db.auth) {
@@ -714,6 +749,18 @@ function RoleAuthScreen({ onAuthComplete, tweaks, setTweak }) {
             {authError && (
               <div className="t-body" style={{ marginBottom: 14, padding: '10px 12px', border: '1px solid var(--red)', borderRadius: 4, color: 'var(--red)', fontSize: 12 }}>
                 {authError}
+              </div>
+            )}
+            {authNotice && (
+              <div className="t-body" style={{ marginBottom: 14, padding: '10px 12px', border: '1px solid var(--accent)', borderRadius: 4, color: 'var(--accent)', fontSize: 12, lineHeight: 1.45 }}>
+                {authNotice}
+                {isSignup && (
+                  <button type="button" className="btn btn-ghost btn-sm" onClick={handleResendVerification} disabled={resending} style={{ marginTop: 10, width: '100%', justifyContent: 'center' }}>
+                    {resending
+                      ? <><i className="fa-solid fa-circle-notch fa-spin" /> RESENDING...</>
+                      : <><i className="fa-solid fa-paper-plane" /> RESEND VERIFICATION EMAIL</>}
+                  </button>
+                )}
               </div>
             )}
 

@@ -383,6 +383,7 @@ function PlatformAdminSidebar({ current, onNavigate, onSignOut, mobileOpen = fal
     {
       label: 'People & Recognition',
       links: [
+        { id: 'pa-approvals', label: 'Pending Accounts', icon: 'fa-user-clock' },
         { id: 'pa-users',    label: 'User Directory',     icon: 'fa-address-book' },
         { id: 'pa-manual-credit', label: 'Manual Credit', icon: 'fa-clipboard-check' },
         { id: 'pa-recruitment', label: 'Recruitment', icon: 'fa-user-plus' },
@@ -934,6 +935,172 @@ function AdminAssign() {
           <div className="t-body" style={{ color: 'var(--off-white-68)' }}>No Exonauts match your filters.</div>
         </div>
       )}
+    </div>
+  );
+}
+
+// -------- Pending Account Approval --------
+function AdminPendingAccounts() {
+  const { profile: currentProfile } = useCurrentUserProfile();
+  const { all: cohorts } = useCohort();
+  const { profiles, updateProfile, refresh } = useUserProfiles();
+  const tracks = useAdminTracks();
+  const [drafts, setDrafts] = React.useState({});
+  const [busyId, setBusyId] = React.useState('');
+  const [error, setError] = React.useState('');
+
+  const approvalRows = profiles
+    .filter(p => ['pending_approval', 'rejected', 'suspended'].includes(p.approvalStatus))
+    .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+  const pendingRows = approvalRows.filter(p => p.approvalStatus === 'pending_approval');
+
+  const draftFor = (profile) => drafts[profile.id] || {
+    role: profile.requestedRole || 'exonaut',
+    cohortId: profile.requestedCohortId || cohorts[0]?.id || 'c2627',
+    trackCode: profile.requestedTrackCode || tracks[0]?.code || 'AIS',
+    reason: profile.approvalReason || '',
+  };
+
+  const updateDraft = (id, patch) => {
+    setDrafts(current => ({ ...current, [id]: { ...(current[id] || {}), ...patch } }));
+  };
+
+  async function approve(profile) {
+    const draft = draftFor(profile);
+    setBusyId(profile.id);
+    setError('');
+    try {
+      await updateProfile(profile.id, {
+        role: draft.role,
+        cohortId: draft.cohortId,
+        trackCode: draft.trackCode,
+        approvalStatus: 'active',
+        approvalReason: '',
+        approvedAt: new Date().toISOString(),
+        approvedBy: currentProfile.id,
+      });
+      await refresh();
+    } catch (err) {
+      setError(err?.message || 'Could not approve account.');
+    } finally {
+      setBusyId('');
+    }
+  }
+
+  async function reject(profile) {
+    const draft = draftFor(profile);
+    setBusyId(profile.id);
+    setError('');
+    try {
+      await updateProfile(profile.id, {
+        approvalStatus: 'rejected',
+        approvalReason: draft.reason || 'Account was not approved.',
+        rejectedAt: new Date().toISOString(),
+        rejectedBy: currentProfile.id,
+      });
+      await refresh();
+    } catch (err) {
+      setError(err?.message || 'Could not reject account.');
+    } finally {
+      setBusyId('');
+    }
+  }
+
+  return (
+    <div className="enter">
+      <div className="section-head">
+        <div>
+          <div className="t-label" style={{ marginBottom: 8, color: 'var(--sky)' }}>
+            PLATFORM ADMIN - ACCOUNT APPROVAL
+          </div>
+          <h1 className="t-title" style={{ fontSize: 40, margin: 0 }}>Pending Accounts</h1>
+          <div className="t-body" style={{ marginTop: 6 }}>
+            Review verified new signups, then assign their role, cohort, and track before access opens.
+          </div>
+        </div>
+        <KPI label="PENDING" value={pendingRows.length} accent="sky" sub="WAITING REVIEW" />
+      </div>
+
+      {error && (
+        <div className="card-flat" style={{ padding: 14, marginBottom: 16, borderColor: 'var(--red)', color: 'var(--red)' }}>
+          {error}
+        </div>
+      )}
+
+      {approvalRows.length === 0 && (
+        <div className="card-panel" style={{ padding: 36, textAlign: 'center' }}>
+          <div className="t-heading" style={{ fontSize: 18, marginBottom: 6 }}>No pending accounts</div>
+          <div className="t-body" style={{ color: 'var(--off-white-68)' }}>New verified signups will appear here before they can enter the platform.</div>
+        </div>
+      )}
+
+      <div style={{ display: 'grid', gap: 14 }}>
+        {approvalRows.map(p => {
+          const draft = draftFor(p);
+          const verified = Boolean(p.emailConfirmedAt);
+          const isPending = p.approvalStatus === 'pending_approval';
+          return (
+            <div key={p.id} className="card-panel" style={{ padding: 20 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 18, alignItems: 'start' }}>
+                <div style={{ display: 'flex', gap: 14, minWidth: 0 }}>
+                  <AvatarWithRing name={p.fullName || p.email} avatarUrl={p.avatarUrl} size={46} tier="entry" />
+                  <div style={{ minWidth: 0 }}>
+                    <div className="t-heading" style={{ fontSize: 18, margin: 0, textTransform: 'none', letterSpacing: 0 }}>{p.fullName || 'New Exonaut'}</div>
+                    <div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)', marginTop: 5 }}>{p.email || 'NO EMAIL'} - SIGNED UP {p.createdAt ? new Date(p.createdAt).toLocaleDateString() : 'RECENTLY'}</div>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+                      <span className="status-pill" style={{ borderColor: verified ? 'var(--accent)' : 'var(--amber)', color: verified ? 'var(--accent)' : 'var(--amber)' }}>
+                        {verified ? 'EMAIL VERIFIED' : 'EMAIL PENDING'}
+                      </span>
+                      <span className="status-pill">{p.approvalStatus.replace('_', ' ').toUpperCase()}</span>
+                    </div>
+                  </div>
+                </div>
+                {isPending && (
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                    <button type="button" className="btn btn-primary btn-sm" disabled={busyId === p.id || !verified} onClick={() => approve(p)} title={!verified ? 'User must verify email first' : 'Approve account'}>
+                      <i className="fa-solid fa-check" /> APPROVE
+                    </button>
+                    <button type="button" className="btn btn-ghost btn-sm" disabled={busyId === p.id} onClick={() => reject(p)}>
+                      <i className="fa-solid fa-xmark" /> REJECT
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {isPending ? (
+                <div className="admin-approval-fields">
+                  <label className="admin-assignment-field">
+                    <span className="admin-assignment-field-label">Role</span>
+                    <select className="admin-assignment-select" value={draft.role} onChange={e => updateDraft(p.id, { role: e.target.value })}>
+                      {['exonaut', 'commander', 'admin'].map(role => <option key={role} value={role}>{role.toUpperCase()}</option>)}
+                    </select>
+                  </label>
+                  <label className="admin-assignment-field">
+                    <span className="admin-assignment-field-label">Cohort</span>
+                    <select className="admin-assignment-select" value={draft.cohortId} onChange={e => updateDraft(p.id, { cohortId: e.target.value })}>
+                      {cohorts.map(c => <option key={c.id} value={c.id}>{c.name || c.id}</option>)}
+                    </select>
+                  </label>
+                  <label className="admin-assignment-field">
+                    <span className="admin-assignment-field-label">Track</span>
+                    <select className="admin-assignment-select" value={draft.trackCode} onChange={e => updateDraft(p.id, { trackCode: e.target.value })}>
+                      {tracks.map(t => <option key={t.code} value={t.code}>{t.short || t.code} - {t.name}</option>)}
+                    </select>
+                  </label>
+                  <label className="admin-assignment-field">
+                    <span className="admin-assignment-field-label">Reject reason</span>
+                    <input className="input" value={draft.reason} onChange={e => updateDraft(p.id, { reason: e.target.value })} placeholder="Optional" />
+                  </label>
+                </div>
+              ) : (
+                <div className="t-body" style={{ marginTop: 16, color: 'var(--off-white-68)' }}>
+                  {p.approvalReason || 'No reason recorded.'}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -2616,5 +2783,5 @@ function AdminMissionBuilder() {
 
 Object.assign(window, {
   PlatformAdminSidebar, AdminCohortFilter,
-  AdminCohorts, AdminAssign, AdminUsers, AdminManagers, AdminTrackControl, AdminMissionBuilder,
+  AdminCohorts, AdminAssign, AdminPendingAccounts, AdminUsers, AdminManagers, AdminTrackControl, AdminMissionBuilder,
 });

@@ -1,8 +1,21 @@
 // Supabase-backed current profile helpers.
 
+const PROFILE_SELECT = [
+  'id', 'email', 'full_name', 'role', 'cohort_id', 'track_code',
+  'bio', 'linkedin_url', 'data_room_url', 'school', 'expertise', 'avatar_url',
+  'approval_status', 'approval_reason', 'requested_role', 'requested_cohort_id',
+  'requested_track_code', 'email_confirmed_at', 'approved_at', 'rejected_at',
+  'created_at', 'updated_at',
+].join(', ');
+
+function normalizedRequestedRole(role) {
+  return ['exonaut', 'commander', 'admin'].includes(role) ? role : 'exonaut';
+}
+
 function profileToClient(row, user) {
   const metadata = (user && user.user_metadata) || {};
   const fullName = (row && row.full_name) || metadata.full_name || metadata.name || (row && row.email) || (user && user.email) || ME.name;
+  const approvalStatus = (row && row.approval_status) || 'active';
   return {
     id: (row && row.id) || (user && user.id) || ME_ID,
     email: (row && row.email) || (user && user.email) || '',
@@ -16,6 +29,16 @@ function profileToClient(row, user) {
     school: (row && row.school) || '',
     expertise: (row && row.expertise) || '',
     avatarUrl: (row && row.avatar_url) || '',
+    approvalStatus,
+    approvalReason: (row && row.approval_reason) || '',
+    requestedRole: (row && row.requested_role) || metadata.role || '',
+    requestedCohortId: (row && row.requested_cohort_id) || metadata.cohort_id || '',
+    requestedTrackCode: (row && row.requested_track_code) || metadata.track_code || '',
+    emailConfirmedAt: (row && row.email_confirmed_at) || (user && (user.email_confirmed_at || user.confirmed_at)) || '',
+    approvedAt: (row && row.approved_at) || '',
+    rejectedAt: (row && row.rejected_at) || '',
+    createdAt: (row && row.created_at) || '',
+    updatedAt: (row && row.updated_at) || '',
   };
 }
 
@@ -52,7 +75,7 @@ function useCurrentUserProfile() {
 
       const { data, error: profileError } = await window.__db
         .from('user_profiles')
-        .select('id, email, full_name, role, cohort_id, track_code, bio, linkedin_url, data_room_url, school, expertise, avatar_url')
+        .select(PROFILE_SELECT)
         .eq('id', user.id)
         .maybeSingle();
       if (profileError) throw profileError;
@@ -60,17 +83,24 @@ function useCurrentUserProfile() {
       let row = data;
       if (!row) {
         const metadata = user.user_metadata || {};
+        const requestedCohort = metadata.cohort_id || ME.cohort || 'c2627';
+        const requestedTrack = metadata.track_code || ME.track || 'AIS';
         const insertResult = await window.__db
           .from('user_profiles')
           .upsert({
             id: user.id,
             email: user.email || '',
             full_name: metadata.full_name || metadata.name || user.email || 'Exonaut',
-            role: metadata.role || 'exonaut',
-            cohort_id: ME.cohort || 'c2627',
-            track_code: ME.track || 'AIS',
+            role: 'exonaut',
+            cohort_id: requestedCohort,
+            track_code: requestedTrack,
+            approval_status: 'pending_approval',
+            requested_role: normalizedRequestedRole(metadata.role),
+            requested_cohort_id: requestedCohort,
+            requested_track_code: requestedTrack,
+            email_confirmed_at: user.email_confirmed_at || user.confirmed_at || null,
           }, { onConflict: 'id' })
-          .select('id, email, full_name, role, cohort_id, track_code, bio, linkedin_url, data_room_url, school, expertise, avatar_url')
+          .select(PROFILE_SELECT)
           .single();
         if (insertResult.error) throw insertResult.error;
         row = insertResult.data;
@@ -124,7 +154,7 @@ function useCurrentUserProfile() {
       .from('user_profiles')
       .update(update)
       .eq('id', user.id)
-      .select('id, email, full_name, role, cohort_id, track_code, bio, linkedin_url, data_room_url, school, expertise, avatar_url')
+      .select(PROFILE_SELECT)
       .single();
     if (updateError) throw updateError;
 
@@ -174,7 +204,7 @@ function useUserProfiles() {
     try {
       const { data, error: profilesError } = await window.__db
         .from('user_profiles')
-        .select('id, email, full_name, role, cohort_id, track_code, bio, linkedin_url, data_room_url, school, expertise, avatar_url, created_at, updated_at')
+        .select(PROFILE_SELECT)
         .order('created_at', { ascending: true });
       if (profilesError) throw profilesError;
       const nextProfiles = (data || []).map(row => profileToClient(row, null));
@@ -203,12 +233,22 @@ function useUserProfiles() {
     if (Object.prototype.hasOwnProperty.call(patch, 'school')) update.school = patch.school;
     if (Object.prototype.hasOwnProperty.call(patch, 'expertise')) update.expertise = patch.expertise;
     if (Object.prototype.hasOwnProperty.call(patch, 'avatarUrl')) update.avatar_url = patch.avatarUrl;
+    if (Object.prototype.hasOwnProperty.call(patch, 'approvalStatus')) update.approval_status = patch.approvalStatus;
+    if (Object.prototype.hasOwnProperty.call(patch, 'approvalReason')) update.approval_reason = patch.approvalReason;
+    if (Object.prototype.hasOwnProperty.call(patch, 'requestedRole')) update.requested_role = patch.requestedRole;
+    if (Object.prototype.hasOwnProperty.call(patch, 'requestedCohortId')) update.requested_cohort_id = patch.requestedCohortId;
+    if (Object.prototype.hasOwnProperty.call(patch, 'requestedTrackCode')) update.requested_track_code = patch.requestedTrackCode;
+    if (Object.prototype.hasOwnProperty.call(patch, 'emailConfirmedAt')) update.email_confirmed_at = patch.emailConfirmedAt;
+    if (Object.prototype.hasOwnProperty.call(patch, 'approvedAt')) update.approved_at = patch.approvedAt;
+    if (Object.prototype.hasOwnProperty.call(patch, 'approvedBy')) update.approved_by = patch.approvedBy;
+    if (Object.prototype.hasOwnProperty.call(patch, 'rejectedAt')) update.rejected_at = patch.rejectedAt;
+    if (Object.prototype.hasOwnProperty.call(patch, 'rejectedBy')) update.rejected_by = patch.rejectedBy;
 
     const { data, error: updateError } = await window.__db
       .from('user_profiles')
       .update(update)
       .eq('id', id)
-      .select('id, email, full_name, role, cohort_id, track_code, bio, linkedin_url, data_room_url, school, expertise, avatar_url, created_at, updated_at')
+      .select(PROFILE_SELECT)
       .single();
     if (updateError) throw updateError;
 

@@ -1,5 +1,59 @@
 // Main App — routing, state, tweaks, celebrations, auth, multi-role
 
+function AccountApprovalGate({ status, profile, onSignOut }) {
+  const normalized = status || 'pending_approval';
+  const copy = {
+    'email-verification': {
+      icon: 'fa-envelope-circle-check',
+      title: 'Verify your email',
+      body: 'Check your inbox and open the verification link. After that, your account will wait for Admin approval.',
+      tone: 'var(--accent)',
+    },
+    pending_approval: {
+      icon: 'fa-hourglass-half',
+      title: 'Waiting for Admin approval',
+      body: 'Your email is verified. Admin still needs to approve your account and assign your role, cohort, and track.',
+      tone: 'var(--accent)',
+    },
+    rejected: {
+      icon: 'fa-circle-xmark',
+      title: 'Account not approved',
+      body: profile?.approvalReason || 'This account was rejected by Admin. Contact the Exoasia team if you think this is a mistake.',
+      tone: 'var(--red)',
+    },
+    suspended: {
+      icon: 'fa-ban',
+      title: 'Account suspended',
+      body: 'This account is currently blocked from platform access.',
+      tone: 'var(--red)',
+    },
+  }[normalized] || {
+    icon: 'fa-lock',
+    title: 'Access unavailable',
+    body: 'This account is not active yet.',
+    tone: 'var(--accent)',
+  };
+
+  return (
+    <div className="hud-bg auth-screen" style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 32 }}>
+      <div className="card-panel enter" style={{ width: 'min(560px, 100%)', padding: 32, textAlign: 'center' }}>
+        <div style={{ width: 58, height: 58, borderRadius: '50%', display: 'grid', placeItems: 'center', margin: '0 auto 18px', border: `1px solid ${copy.tone}`, color: copy.tone, fontSize: 24 }}>
+          <i className={'fa-solid ' + copy.icon} />
+        </div>
+        <div className="t-label" style={{ color: copy.tone, marginBottom: 8 }}>ACCOUNT ACCESS</div>
+        <h1 className="t-title" style={{ fontSize: 34, margin: 0 }}>{copy.title}</h1>
+        <div className="t-body" style={{ margin: '12px auto 22px', maxWidth: 430, color: 'var(--off-white-68)' }}>{copy.body}</div>
+        {profile?.email && (
+          <div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)', marginBottom: 20 }}>{profile.email}</div>
+        )}
+        <button type="button" className="btn btn-ghost" onClick={onSignOut}>
+          <i className="fa-solid fa-right-from-bracket" /> SIGN OUT
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const { profile: currentProfile } = useCurrentUserProfile();
   const crownState = useCrownState();
@@ -61,7 +115,7 @@ function App() {
 
       const profileResult = await window.__db
         .from('user_profiles')
-        .select('role, full_name, cohort_id, track_code')
+        .select('role, full_name, cohort_id, track_code, approval_status, approval_reason, requested_role, requested_cohort_id, requested_track_code, email_confirmed_at')
         .eq('id', user.id)
         .maybeSingle();
 
@@ -69,22 +123,39 @@ function App() {
       let profile = profileResult.data;
       if (!profile) {
         const metadata = user.user_metadata || {};
+        const requestedCohort = metadata.cohort_id || ME.cohort || 'c2627';
+        const requestedTrack = metadata.track_code || ME.track || 'AIS';
         const insertResult = await window.__db
           .from('user_profiles')
           .upsert({
             id: user.id,
             email: user.email || '',
             full_name: metadata.full_name || metadata.name || user.email || 'Exonaut',
-            role: metadata.role || 'exonaut',
-            cohort_id: ME.cohort || 'c2627',
-            track_code: ME.track || 'AIS',
+            role: 'exonaut',
+            cohort_id: requestedCohort,
+            track_code: requestedTrack,
+            approval_status: 'pending_approval',
+            requested_role: ['exonaut', 'commander', 'admin'].includes(metadata.role) ? metadata.role : 'exonaut',
+            requested_cohort_id: requestedCohort,
+            requested_track_code: requestedTrack,
+            email_confirmed_at: user.email_confirmed_at || user.confirmed_at || null,
           }, { onConflict: 'id' })
-          .select('role, full_name, cohort_id, track_code')
+          .select('role, full_name, cohort_id, track_code, approval_status, approval_reason, requested_role, requested_cohort_id, requested_track_code, email_confirmed_at')
           .single();
         if (!active || insertResult.error) return;
         profile = insertResult.data;
       }
       if (!profile || !profile.role) return;
+
+      const approvalStatus = profile.approval_status || 'active';
+      const emailVerified = Boolean(user.email_confirmed_at || user.confirmed_at || profile.email_confirmed_at);
+      if (approvalStatus !== 'active') {
+        const blockedStage = !emailVerified ? 'email-verification' : `approval:${approvalStatus}`;
+        localStorage.setItem('exo:userId', user.id);
+        localStorage.setItem('exo:auth', blockedStage);
+        setAuthStage(blockedStage);
+        return;
+      }
 
       const restoredRole = normalizeRole(profile.role);
       const needsReload = localStorage.getItem('exo:userId') !== user.id;
@@ -164,7 +235,7 @@ function App() {
     const trackOpsRoutes = ['lead-home', 'lead-roster', 'lead-queue', 'lead-grade', 'lead-manual-credit', 'lead-announce', 'crown-pass'];
     const leadRoutes = ['lead-home', 'lead-roster', 'lead-queue', 'lead-grade', 'lead-manual-credit', 'lead-announce', 'lead-projects', 'lead-project-tasks', 'lead-profile', 'messages', 'community', 'knowledge-base', 'launchpad', 'kudos', 'notifications', 'settings'];
     const commanderRoutes = ['cmdr-home', 'cmdr-profile', 'cmdr-leads', 'cmdr-projects', 'cmdr-project-builder', 'cmdr-action-register', 'cmdr-exonauts', 'cmdr-esc', 'cmdr-health', 'cmdr-eow', 'cmdr-crowns', 'cmdr-removals', 'cmdr-manual-credit', 'cmdr-recruitment', 'cmdr-announce', 'messages', 'community', 'knowledge-base', 'launchpad', 'kudos', 'notifications', 'settings'];
-    const adminRoutes = ['pa-cohorts', 'pa-missions', 'pa-projects', 'pa-action-register', 'pa-managers', 'pa-assign', 'pa-users', 'pa-console', 'pa-manual-credit', 'pa-recruitment', 'pa-announce', 'pa-profile', 'messages', 'community', 'knowledge-base', 'launchpad', 'kudos', 'notifications', 'settings'];
+    const adminRoutes = ['pa-cohorts', 'pa-missions', 'pa-projects', 'pa-action-register', 'pa-managers', 'pa-assign', 'pa-users', 'pa-approvals', 'pa-console', 'pa-manual-credit', 'pa-recruitment', 'pa-announce', 'pa-profile', 'messages', 'community', 'knowledge-base', 'launchpad', 'kudos', 'notifications', 'settings'];
     const routeBase = (routeId || '').split(':')[0];
     if (role === 'lead') return leadRoutes.includes(routeBase);
     if (role === 'commander') return commanderRoutes.includes(routeBase);
@@ -175,6 +246,10 @@ function App() {
   React.useEffect(() => {
     const supabaseRole = normalizeRole(currentProfile.role);
     if (authStage !== 'app') return;
+    if (currentProfile.approvalStatus && currentProfile.approvalStatus !== 'active') {
+      setAuthStage(`approval:${currentProfile.approvalStatus}`);
+      return;
+    }
     if (roleView !== supabaseRole) {
       setRoleView(supabaseRole);
       return;
@@ -186,12 +261,16 @@ function App() {
     if (!routeAllowedForRole(supabaseRole, route)) {
       setRoute(homeForRole(supabaseRole));
     }
-  }, [authStage, currentProfile.role, roleView, route, hasTrackOps, crownsLoaded]);
+  }, [authStage, currentProfile.role, currentProfile.approvalStatus, roleView, route, hasTrackOps, crownsLoaded]);
 
   const handleAuthenticated = ({ role, isNewExonaut, user, profile }) => {
     const nextRole = normalizeRole(role);
     const nextRoute = homeForRole(nextRole);
-    const nextAuth = isNewExonaut ? 'onboarding' : 'app';
+    const approvalStatus = profile?.approvalStatus || profile?.approval_status || 'active';
+    const emailVerified = Boolean(user?.email_confirmed_at || user?.confirmed_at || profile?.emailConfirmedAt || profile?.email_confirmed_at);
+    const nextAuth = approvalStatus !== 'active'
+      ? (!emailVerified ? 'email-verification' : `approval:${approvalStatus}`)
+      : (isNewExonaut ? 'onboarding' : 'app');
     if (user && user.id) localStorage.setItem('exo:userId', user.id);
     localStorage.setItem('exo:route', nextRoute);
     localStorage.setItem('exo:auth', nextAuth);
@@ -217,6 +296,10 @@ function App() {
   }
   if (authStage === 'onboarding') {
     return <Onboarding onComplete={() => { setRoleView('exonaut'); setAuthStage('app'); setRoute('dashboard'); }} />;
+  }
+  if (authStage === 'email-verification' || authStage.startsWith('approval:')) {
+    const status = authStage === 'email-verification' ? 'email-verification' : authStage.split(':')[1];
+    return <AccountApprovalGate status={status} profile={currentProfile} onSignOut={signOut} />;
   }
 
   // ======= ROLE-SPECIFIC CRUMBS =======
@@ -277,6 +360,7 @@ function App() {
     'pa-managers': ['PLATFORM ADMIN', 'Track Management'],
     'pa-assign':   ['PLATFORM ADMIN', 'Exonaut Assignment'],
     'pa-users':    ['PLATFORM ADMIN', 'User Directory'],
+    'pa-approvals': ['PLATFORM ADMIN', 'Pending Accounts'],
     'pa-console':  ['PLATFORM ADMIN', 'System Console'],
     'pa-manual-credit': ['PLATFORM ADMIN', 'Manual Activity Credit'],
     'pa-recruitment': ['PLATFORM ADMIN', 'Recruitment Pipeline'],
@@ -379,6 +463,7 @@ function App() {
     else if (route === 'pa-managers') page = <AdminTrackControl />;
     else if (route === 'pa-assign')  page = <AdminAssign />;
     else if (route === 'pa-users')   page = <AdminUsers />;
+    else if (route === 'pa-approvals') page = <AdminPendingAccounts />;
     else if (route === 'pa-console') page = <AdminPanel />;
     else if (route === 'pa-manual-credit') page = <ManualActivityCreditPage />;
     else if (route === 'pa-recruitment') page = <RecruitmentReviewPage />;
