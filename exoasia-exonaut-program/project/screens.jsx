@@ -189,7 +189,7 @@ function LegacyMissionsList({ onOpenMission }) {
   const activeCohort = window.getActiveCohort?.(profile) || COHORT;
   const cohortName = activeCohort?.name || COHORT.name;
   const cohortWeekTotal = window.getCohortWeekTotal?.(activeCohort) || COHORT.weekTotal;
-  const myTrack = profile.trackCode || ME.track || 'AIS';
+  const myTrack = profile.trackCode || ME.track || '';
   const myCohort = profile.cohortId || ME.cohort || 'c2627';
   const [view, setView] = React.useState('queue'); // queue | briefs | rubric
   const [filter, setFilter] = React.useState('all');
@@ -322,7 +322,7 @@ function WeeklyMissionsList({ onOpenMission }) {
   const activeCohort = window.getActiveCohort?.(profile) || COHORT;
   const cohortName = activeCohort?.name || COHORT.name;
   const cohortWeekTotal = window.getCohortWeekTotal?.(activeCohort) || COHORT.weekTotal;
-  const myTrack = profile.trackCode || ME.track || 'AIS';
+  const myTrack = profile.trackCode || ME.track || '';
   const myCohort = profile.cohortId || ME.cohort || 'c2627';
   const [view, setView] = React.useState('queue');
   const [filter, setFilter] = React.useState('all');
@@ -710,7 +710,7 @@ function RitualsPage() {
       id: profile.id,
       name: profile.fullName || profile.email || ME.name,
       cohort: profile.cohortId || activeCohort.id || 'c2627',
-      track: profile.trackCode || 'AIS',
+      track: profile.trackCode || '',
       points: profile.points || 0,
       avatarUrl: profile.avatarUrl || '',
     };
@@ -721,23 +721,11 @@ function RitualsPage() {
   const myWeekPoints = React.useMemo(() => {
     return window.EOW?.weeklyPoints?.(myRosterRow, currentWeek, activeCohort) || 0;
   }, [myRosterRow, currentWeek, activeCohort]);
-  const isInternOfWeek = iotwLeader?.user?.id === profile.id;
   const lockAfterDoneRituals = new Set(['mon-ign', 'mid-pls', 'fri-win', 'teach-bk']);
-
-  React.useEffect(() => {
-    const manilaDay = new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'Asia/Manila' }).format(new Date());
-    if (manilaDay !== 'Fri') return;
-    if (isInternOfWeek && records.iotw?.state !== 'done') {
-      completeRitual('iotw', { description: 'Auto logged from weekly points rank' }, { userId: profile.id, cohortId: profile.cohortId || activeCohort.id || 'c2627', source: 'intern-of-week', profile, week: currentWeek });
-    }
-  }, [isInternOfWeek, records.iotw?.state, profile.id, profile.cohortId, activeCohort.id, currentWeek]);
 
   async function submitProof(ritual) {
     if (ritual.id === 'iotw') {
-      if (!isInternOfWeek && records.iotw?.state !== 'done') return;
-      if (isInternOfWeek && records.iotw?.state !== 'done') {
-        await completeRitual('iotw', { description: 'Intern of the Week certificate generated' }, { userId: profile.id, cohortId: profile.cohortId || activeCohort.id || 'c2627', source: 'intern-of-week', profile, week: currentWeek });
-      }
+      if (records.iotw?.state !== 'done') return;
       const pointsText = `${Number(myWeekPoints || iotwLeader?.weekPoints || 0).toLocaleString()} points`;
       setIotwShare({
         id: `iotw-w${currentWeek}-${profile.id}`,
@@ -775,7 +763,7 @@ function RitualsPage() {
             const state = records[r.id]?.state || 'not-started';
             const iconCls = state === 'done' ? 'fa-circle-check' : state === 'missed' ? 'fa-circle-xmark' : 'fa-circle-dot';
             const cCls = state === 'done' ? 'done-c' : state === 'missed' ? 'miss-c' : 'pend-c';
-            const canOpenIotw = r.id === 'iotw' && (isInternOfWeek || state === 'done');
+            const canOpenIotw = r.id === 'iotw' && state === 'done';
             const lockedDone = lockAfterDoneRituals.has(r.id) && state === 'done';
             const clickable = !lockedDone && (r.id !== 'iotw' || canOpenIotw);
             return (
@@ -783,7 +771,7 @@ function RitualsPage() {
                 key={r.id}
                 className={'ritual-cell ' + state + (lockedDone ? ' locked-done' : '')}
                 onClick={clickable ? () => submitProof(r) : undefined}
-                title={lockedDone ? 'Already logged this week' : (r.id === 'iotw' ? (canOpenIotw ? 'Open Intern of the Week certificate' : 'Awarded to the weekly points leader') : '')}
+                title={lockedDone ? 'Already logged this week' : (r.id === 'iotw' ? (canOpenIotw ? 'Open Intern of the Week certificate' : 'Awarded automatically every Saturday at 12:00 AM') : '')}
                 style={{ cursor: clickable ? 'pointer' : 'default' }}
               >
                 <div className="ritual-head">
@@ -1082,7 +1070,7 @@ function AdminPanel() {
       email: p.email || '',
       role: p.role || 'exonaut',
       cohortId: p.cohortId || 'c2627',
-      trackCode: p.trackCode || 'AIS',
+      trackCode: p.trackCode || '',
       avatarUrl: p.avatarUrl || '',
     }));
     return profileRows.length ? profileRows : USERS.map(u => ({
@@ -1091,7 +1079,7 @@ function AdminPanel() {
       email: u.email || '',
       role: 'exonaut',
       cohortId: window.getUserCohort?.(u.id) || u.cohort || 'c2627',
-      trackCode: window.getUserTrack?.(u.id) || u.track || 'AIS',
+      trackCode: window.getUserTrack?.(u.id) || u.track || '',
       avatarUrl: u.avatarUrl || '',
     }));
   }, [profiles]);
@@ -1327,7 +1315,7 @@ function AdminPanel() {
             <div className="t-body" style={{ color: 'var(--off-white-68)' }}>Rituals are weekly completion logs. Recording a completion creates a ritual log and awards that ritual's points once for that user/week.</div>
           </div>
           <div className="ritual-row">
-            {RITUALS.map(r => {
+            {RITUALS.filter(r => r.id !== 'iotw').map(r => {
               const completed = currentWeekRitualLogs.filter(log => log.ritualId === r.id);
               return (
                 <div key={r.id} className="ritual-cell pending">
@@ -1766,7 +1754,30 @@ function getCommunityMembers(profiles, ledger = [], subs = [], projectState = {}
   const projects = projectState.projects || [];
   const tasks = projectState.tasks || [];
   const assignees = projectState.assignees || [];
+  const projectMembers = projectState.members || [];
   const projectRosterFor = window.__projectStore?.projectRoster || (() => []);
+
+  function normalizeIdentity(value) {
+    return String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  }
+
+  function userIdsForProfile(profile) {
+    const email = normalizeIdentity(profile.email);
+    const name = normalizeIdentity(profile.fullName || profile.name);
+    return (profiles || [])
+      .filter(candidate => {
+        if (!candidate?.id) return false;
+        if (candidate.id === profile.id) return true;
+        const candidateEmail = normalizeIdentity(candidate.email);
+        const candidateName = normalizeIdentity(candidate.fullName || candidate.name);
+        return (email && candidateEmail === email) || (name && candidateName === name);
+      })
+      .map(candidate => candidate.id);
+  }
+
+  function idMatchesPerson(id, userIds) {
+    return userIds.includes(id);
+  }
 
   function liveBadgesFor(points) {
     return BADGES.map(b => {
@@ -1775,22 +1786,47 @@ function getCommunityMembers(profiles, ledger = [], subs = [], projectState = {}
     }).filter(b => b.earned);
   }
 
-  function projectsForUser(userId) {
+  function projectsForUser(userIds) {
     return projects.filter(project => {
       if (project.status === 'archived') return false;
-      if (project.firstOfficerId === userId) return true;
-      if ((project.trackCodes || []).some(code => window.__crownStore?.getActiveCrownForTrack(code)?.userId === userId)) return true;
-      if (projectRosterFor(project.id).includes(userId)) return true;
-      return tasks.some(task => task.projectId === project.id && (
-        task.trackLeadId === userId ||
-        task.secondOfficerId === userId ||
-        assignees.some(a => a.taskId === task.id && a.userId === userId)
-      ));
+      if (idMatchesPerson(project.firstOfficerId, userIds)) return true;
+      if (projectRosterFor(project.id).some(id => idMatchesPerson(id, userIds))) return true;
+      if (projectMembers.some(member => member.projectId === project.id && idMatchesPerson(member.userId, userIds))) return true;
+      return tasks.some(task => task.projectId === project.id &&
+        assignees.some(a => a.taskId === task.id && idMatchesPerson(a.userId, userIds))
+      );
     });
   }
 
+  function taskDone(task) {
+    return ['approved', 'done'].includes(task.status);
+  }
+
+  function userProjectRole(userIds, project) {
+    const explicitMember = projectMembers.find(member => member.projectId === project.id && idMatchesPerson(member.userId, userIds));
+    if (idMatchesPerson(project.firstOfficerId, userIds) || explicitMember?.memberRole === 'lead') return 'Project Lead';
+    return 'Project Member';
+  }
+
+  function projectCardForUser(userIds, project) {
+    const projectTasks = tasks.filter(task => task.projectId === project.id);
+    const assignedTasks = projectTasks.filter(task =>
+      assignees.some(a => a.taskId === task.id && idMatchesPerson(a.userId, userIds))
+    );
+    const approvedAssignedTasks = assignedTasks.filter(taskDone);
+    const taskSummary = `${approvedAssignedTasks.length}/${assignedTasks.length} assigned tasks done`;
+    return {
+      id: project.id,
+      title: project.title,
+      role: userProjectRole(userIds, project),
+      status: project.status || 'active',
+      output: project.description || 'Assigned project',
+      outcome: taskSummary,
+    };
+  }
+
   const active = (profiles || []).map(p => {
-    const trackCode = p.trackCode || 'AIS';
+    const trackCode = p.trackCode || '';
     const points = ledger
       .filter(e => e.userId === p.id)
       .reduce((sum, e) => sum + Number(e.points || 0), 0);
@@ -1798,10 +1834,11 @@ function getCommunityMembers(profiles, ledger = [], subs = [], projectState = {}
     const userSubs = subs.filter(s => s.exonautId === p.id);
     const approvedSubs = userSubs.filter(s => s.state === 'approved');
     const pendingSubs = userSubs.filter(s => s.state === 'pending');
-    const userProjects = projectsForUser(p.id);
+    const personIds = userIdsForProfile(p);
+    const userProjects = projectsForUser(personIds);
     const approvedProjectTasks = tasks.filter(t =>
-      t.status === 'approved' &&
-      (t.trackLeadId === p.id || t.secondOfficerId === p.id || assignees.some(a => a.taskId === t.id && a.userId === p.id))
+      taskDone(t) &&
+      assignees.some(a => a.taskId === t.id && idMatchesPerson(a.userId, personIds))
     );
     const cohort = COHORTS.find(c => c.id === (p.cohortId || 'c2627'));
     const credentials = [
@@ -1828,16 +1865,8 @@ function getCommunityMembers(profiles, ledger = [], subs = [], projectState = {}
       cohort: (cohort?.name || 'Batch 2026-27').replace('Batch ', ''),
       tierBadge: p.role === 'exonaut' ? activeTierFor({ points }) : 'corps',
       credentials,
-      project: primaryProject ? {
-        title: primaryProject.title,
-        output: primaryProject.description || 'Assigned project',
-        outcome: `${tasks.filter(t => t.projectId === primaryProject.id && t.status === 'approved').length}/${tasks.filter(t => t.projectId === primaryProject.id).length} tasks approved`,
-      } : null,
-      projectsAll: userProjects.map(project => ({
-        title: project.title,
-        output: project.description || 'Assigned project',
-        outcome: `${tasks.filter(t => t.projectId === project.id && t.status === 'approved').length}/${tasks.filter(t => t.projectId === project.id).length} tasks approved`,
-      })),
+      project: primaryProject ? projectCardForUser(personIds, primaryProject) : null,
+      projectsAll: userProjects.map(project => projectCardForUser(personIds, project)),
       progress: {
         trackTasksApproved: approvedSubs.length,
         pendingReviews: pendingSubs.length,
@@ -2100,7 +2129,7 @@ function CommunityPage() {
     if (batchFilter !== 'all' && m.cohort !== batchFilter) return false;
     if (query.trim()) {
       const q = query.toLowerCase();
-      const projectText = (m.project && m.project.title) || '';
+      const projectText = (m.projectsAll || []).map(project => project.title).join(' ');
       const emailText = m.email || '';
       if (!(m.name.toLowerCase().includes(q) || emailText.toLowerCase().includes(q) || projectText.toLowerCase().includes(q) || (m.role || '').toLowerCase().includes(q))) return false;
     }
@@ -2112,6 +2141,7 @@ function CommunityPage() {
     active: members.filter(m => m.status === 'active').length,
     alumni: members.filter(m => m.status === 'alumni').length,
   };
+  const selectedMember = selected ? (members.find(item => item.id === selected.id) || selected) : null;
 
   return (
     <div className={'enter community-page ' + (tab === 'board' ? 'board-view' : '')}>
@@ -2244,7 +2274,7 @@ function CommunityPage() {
       )}
         </React.Fragment>
       )}
-      {selected && <CommunityProfileSheet m={selected} onClose={() => setSelected(null)} />}
+      {selectedMember && <CommunityProfileSheet m={selectedMember} onClose={() => setSelected(null)} />}
     </div>
   );
 }
@@ -2347,10 +2377,62 @@ function CommunityCard({ m, onOpen }) {
 
 function CommunityProfileSheet({ m, onClose }) {
   const { profile } = useCurrentUserProfile();
+  const { profiles } = useUserProfiles();
+  const liveProjectState = useProjects();
   const track = TRACKS.find(t => t.code === m.track);
   const isAlumni = m.status === 'alumni';
   const displayBadges = m.earnedBadges || [];
   const canGiveKudos = profile.id !== m.id;
+  const liveProjects = React.useMemo(() => {
+    const projects = liveProjectState.projects || [];
+    const tasks = liveProjectState.tasks || [];
+    const members = liveProjectState.members || [];
+    const assignees = liveProjectState.assignees || [];
+    const normalize = value => String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    const selectedName = normalize(m.name);
+    const selectedEmail = normalize(m.email);
+    const profileById = new Map((profiles || []).map(person => [person.id, person]));
+    const idBelongsToMember = id => {
+      if (!id) return false;
+      if (id === m.id) return true;
+      const person = profileById.get(id);
+      if (!person) return false;
+      return (selectedEmail && normalize(person.email) === selectedEmail)
+        || (selectedName && normalize(person.fullName || person.name) === selectedName);
+    };
+    const taskDone = task => ['approved', 'done'].includes(task.status);
+    const roleFor = project => {
+      const projectMember = members.find(member => member.projectId === project.id && idBelongsToMember(member.userId));
+      if (idBelongsToMember(project.firstOfficerId) || projectMember?.memberRole === 'lead') return 'Project Lead';
+      return 'Project Member';
+    };
+    return projects
+      .filter(project => project.status !== 'archived')
+      .filter(project => {
+        if (idBelongsToMember(project.firstOfficerId)) return true;
+        if (members.some(member => member.projectId === project.id && idBelongsToMember(member.userId))) return true;
+        return tasks.some(task => task.projectId === project.id &&
+          assignees.some(assignment => assignment.taskId === task.id && idBelongsToMember(assignment.userId))
+        );
+      })
+      .map(project => {
+        const projectTasks = tasks.filter(task => task.projectId === project.id);
+        const assignedTasks = projectTasks.filter(task =>
+          assignees.some(assignment => assignment.taskId === task.id && idBelongsToMember(assignment.userId))
+        );
+        const doneTasks = assignedTasks.filter(taskDone).length;
+        const totalTasks = assignedTasks.length;
+        return {
+          id: project.id,
+          title: project.title,
+          role: roleFor(project),
+          output: project.description || 'Assigned project',
+          outcome: `${doneTasks}/${totalTasks} assigned tasks done`,
+        };
+      });
+  }, [liveProjectState, profiles, m.id, m.name, m.email]);
+  const displayProjects = liveProjects.length ? liveProjects : (m.projectsAll || []);
+  const primaryProject = displayProjects[0] || null;
 
   return (
     <div onClick={onClose} style={{
@@ -2474,7 +2556,7 @@ function CommunityProfileSheet({ m, onClose }) {
               { k: 'TRACK APPROVED', v: m.progress?.trackTasksApproved || 0 },
               { k: 'PENDING REVIEW', v: m.progress?.pendingReviews || 0 },
               { k: 'PROJECT TASKS', v: m.progress?.projectTasksApproved || 0 },
-              { k: 'PROJECTS', v: m.progress?.projectsAssigned || 0 },
+              { k: 'PROJECTS', v: displayProjects.length },
             ].map(item => (
               <div key={item.k} className="card-flat" style={{ padding: 12 }}>
                 <div className="t-mono" style={{ fontSize: 8, color: 'var(--off-white-40)', letterSpacing: '0.08em' }}>{item.k}</div>
@@ -2568,8 +2650,8 @@ function CommunityProfileSheet({ m, onClose }) {
           <div className="t-label" style={{ marginBottom: 14 }}>PROJECTS</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {/* Current / capstone project — full detail */}
-            {!m.project && <div className="empty-line">No assigned projects yet.</div>}
-            {m.project && (
+            {!primaryProject && <div className="empty-line">No assigned projects yet.</div>}
+            {primaryProject && (
               <div style={{
                 padding: '14px 16px',
                 border: '1px solid var(--accent-border-soft)',
@@ -2577,29 +2659,29 @@ function CommunityProfileSheet({ m, onClose }) {
                 background: 'var(--accent-wash)',
               }}>
                 <div className="t-mono" style={{ fontSize: 9, color: 'var(--ink)', letterSpacing: '0.08em', fontWeight: 700, marginBottom: 6 }}>
-                  {isAlumni ? 'CAPSTONE PROJECT' : 'CURRENT PROJECT'}
+                  {isAlumni ? 'CAPSTONE PROJECT' : primaryProject.role?.toUpperCase() || 'ASSIGNED PROJECT'}
                 </div>
                 <div className="t-heading" style={{ fontSize: 14, color: 'var(--off-white)', textTransform: 'none', letterSpacing: 0, margin: '0 0 10px 0' }}>
-                  {m.project.title}
+                  {primaryProject.title}
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 8 }}>
                   <div>
                     <div className="t-mono" style={{ fontSize: 8, color: 'var(--off-white-40)', letterSpacing: '0.1em', marginBottom: 3 }}>↳ OUTPUT</div>
-                    <div className="t-body" style={{ fontSize: 12, color: 'var(--off-white)', lineHeight: 1.5 }}>{m.project.output}</div>
+                    <div className="t-body" style={{ fontSize: 12, color: 'var(--off-white)', lineHeight: 1.5 }}>{primaryProject.output}</div>
                   </div>
                   <div>
                     <div className="t-mono" style={{ fontSize: 8, color: 'var(--ink)', letterSpacing: '0.1em', marginBottom: 3, fontWeight: 700 }}>↳ OUTCOME</div>
-                    <div className="t-body" style={{ fontSize: 12, color: 'var(--off-white)', lineHeight: 1.5 }}>{m.project.outcome}</div>
+                    <div className="t-body" style={{ fontSize: 12, color: 'var(--off-white)', lineHeight: 1.5 }}>{primaryProject.outcome}</div>
                   </div>
                 </div>
               </div>
             )}
 
             {/* Earlier projects for alumni — compact */}
-            {(m.projectsAll || []).filter(p => p.title !== m.project?.title).slice(0, 4).map((p, i) => (
+            {displayProjects.filter(p => p.id !== primaryProject?.id).map((p, i) => (
               <div key={i} style={{ padding: '12px 14px', border: '1px solid var(--off-white-15)', borderRadius: 2 }}>
                 <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', letterSpacing: '0.08em', fontWeight: 700, marginBottom: 4 }}>
-                  ASSIGNED PROJECT
+                  {p.role?.toUpperCase() || 'ASSIGNED PROJECT'}
                 </div>
                 <div className="t-body" style={{ fontSize: 12, color: 'var(--off-white)', marginBottom: 6, fontWeight: 500 }}>{p.title}</div>
                 <div className="t-body" style={{ fontSize: 11, color: 'var(--off-white-68)', lineHeight: 1.5 }}>

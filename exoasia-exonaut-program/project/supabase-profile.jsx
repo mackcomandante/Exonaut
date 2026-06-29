@@ -22,7 +22,7 @@ function profileToClient(row, user) {
     fullName,
     role: (row && row.role) || metadata.role || 'exonaut',
     cohortId: (row && row.cohort_id) || ME.cohort || 'c2627',
-    trackCode: (row && row.track_code) || ME.track || 'AIS',
+    trackCode: (row && row.track_code) || metadata.track_code || '',
     bio: (row && row.bio) || '',
     linkedinUrl: (row && row.linkedin_url) || '',
     dataRoomUrl: (row && row.data_room_url) || '',
@@ -53,7 +53,7 @@ function useCurrentUserProfile() {
     fullName: ME.name,
     role: 'exonaut',
     cohortId: ME.cohort || 'c2627',
-    trackCode: ME.track || 'AIS',
+    trackCode: '',
     bio: '',
     linkedinUrl: '',
     dataRoomUrl: '',
@@ -84,7 +84,7 @@ function useCurrentUserProfile() {
       if (!row) {
         const metadata = user.user_metadata || {};
         const requestedCohort = metadata.cohort_id || ME.cohort || 'c2627';
-        const requestedTrack = metadata.track_code || ME.track || 'AIS';
+        const requestedTrack = metadata.track_code || '';
         const insertResult = await window.__db
           .from('user_profiles')
           .upsert({
@@ -93,11 +93,11 @@ function useCurrentUserProfile() {
             full_name: metadata.full_name || metadata.name || user.email || 'Exonaut',
             role: 'exonaut',
             cohort_id: requestedCohort,
-            track_code: requestedTrack,
+            track_code: requestedTrack || null,
             approval_status: 'pending_approval',
             requested_role: normalizedRequestedRole(metadata.role),
             requested_cohort_id: requestedCohort,
-            requested_track_code: requestedTrack,
+            requested_track_code: requestedTrack || null,
             email_confirmed_at: user.email_confirmed_at || user.confirmed_at || null,
           }, { onConflict: 'id' })
           .select(PROFILE_SELECT)
@@ -141,7 +141,7 @@ function useCurrentUserProfile() {
 
     const update = {};
     if (Object.prototype.hasOwnProperty.call(patch, 'fullName')) update.full_name = patch.fullName;
-    if (Object.prototype.hasOwnProperty.call(patch, 'trackCode')) update.track_code = patch.trackCode;
+    if (Object.prototype.hasOwnProperty.call(patch, 'trackCode')) update.track_code = patch.trackCode || null;
     if (Object.prototype.hasOwnProperty.call(patch, 'cohortId')) update.cohort_id = patch.cohortId;
     if (Object.prototype.hasOwnProperty.call(patch, 'bio')) update.bio = patch.bio;
     if (Object.prototype.hasOwnProperty.call(patch, 'linkedinUrl')) update.linkedin_url = patch.linkedinUrl;
@@ -226,7 +226,7 @@ function useUserProfiles() {
     if (Object.prototype.hasOwnProperty.call(patch, 'fullName')) update.full_name = patch.fullName;
     if (Object.prototype.hasOwnProperty.call(patch, 'role')) update.role = patch.role;
     if (Object.prototype.hasOwnProperty.call(patch, 'cohortId')) update.cohort_id = patch.cohortId;
-    if (Object.prototype.hasOwnProperty.call(patch, 'trackCode')) update.track_code = patch.trackCode;
+    if (Object.prototype.hasOwnProperty.call(patch, 'trackCode')) update.track_code = patch.trackCode || null;
     if (Object.prototype.hasOwnProperty.call(patch, 'bio')) update.bio = patch.bio;
     if (Object.prototype.hasOwnProperty.call(patch, 'linkedinUrl')) update.linkedin_url = patch.linkedinUrl;
     if (Object.prototype.hasOwnProperty.call(patch, 'dataRoomUrl')) update.data_room_url = patch.dataRoomUrl;

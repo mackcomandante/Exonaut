@@ -535,22 +535,43 @@
         return thread;
       }
       const existingIds = activeParticipantIds(existing);
+      const profileById = new Map((profiles || []).filter(p => p.id).map(p => [p.id, p]));
+      const shouldKeepTrackGroupParticipant = (id) => {
+        if (ids.includes(id)) return true;
+        const participantProfile = profileById.get(id);
+        if (!participantProfile) return false;
+        return ['admin', 'commander', 'lead'].includes(participantProfile.role || 'exonaut');
+      };
       const missingIds = ids.filter(id => !existingIds.includes(id));
-      if (missingIds.length) {
-        existing.participantIds = Array.from(new Set([...existingIds, ...missingIds]));
+      const staleIds = existingIds.filter(id => !shouldKeepTrackGroupParticipant(id));
+      if (missingIds.length || staleIds.length) {
+        existing.participantIds = Array.from(new Set([...existingIds.filter(id => !staleIds.includes(id)), ...missingIds]));
         existing.participants = [
-          ...(existing.participants || []),
+          ...(existing.participants || [])
+            .map(p => staleIds.includes(p.userId) ? { ...p, removedAt: now } : p)
+            .filter(p => !missingIds.includes(p.userId)),
           ...missingIds.map(id => normalizeParticipant({ userId: id, memberRole: id === leadId ? 'track_lead' : 'member', createdAt: now })),
         ];
+        existing.updatedAt = now;
         notify();
         if (window.__db) {
-          const { error } = await window.__db.from('message_participants').upsert(missingIds.map(id => ({
-            thread_id: threadId,
-            user_id: id,
-            member_role: id === leadId ? 'track_lead' : 'member',
-            removed_at: null,
-          })), { onConflict: 'thread_id,user_id' });
-          if (error) throw error;
+          if (missingIds.length) {
+            const { error } = await window.__db.from('message_participants').upsert(missingIds.map(id => ({
+              thread_id: threadId,
+              user_id: id,
+              member_role: id === leadId ? 'track_lead' : 'member',
+              removed_at: null,
+            })), { onConflict: 'thread_id,user_id' });
+            if (error) throw error;
+          }
+          if (staleIds.length) {
+            const { error } = await window.__db
+              .from('message_participants')
+              .update({ removed_at: now })
+              .eq('thread_id', threadId)
+              .in('user_id', staleIds);
+            if (error) throw error;
+          }
           refresh(profile);
         }
       }

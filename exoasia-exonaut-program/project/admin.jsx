@@ -820,12 +820,12 @@ function AdminAssign() {
           ? (window.getTierKeyForPoints ? window.getTierKeyForPoints(pointsForUser(p.id)) : 'entry')
           : 'corps',
         cohort: p.cohortId || 'c2627',
-        track: p.trackCode || 'AIS',
+        track: p.trackCode || '',
         role: p.role || 'exonaut',
         avatarUrl: p.avatarUrl || '',
         supabaseProfile: true,
       }))
-    : USERS.map(u => ({ ...u, role: 'exonaut', cohort: getUserCohort(u.id), track: getUserTrack(u.id) || 'AIS' }));
+    : USERS.map(u => ({ ...u, role: 'exonaut', cohort: getUserCohort(u.id), track: getUserTrack(u.id) || '' }));
 
   const filtered = rows.filter(u => {
     const assignments = getAssignments();
@@ -921,7 +921,8 @@ function AdminAssign() {
               </label>
               <label className="admin-assignment-field">
                 <span className="admin-assignment-field-label">Track</span>
-                <select className="admin-assignment-select" aria-label={`Set track for ${u.name}`} value={curTrack} onChange={async (e) => { u.supabaseProfile ? await updateProfile(u.id, { trackCode: e.target.value }) : assignUserToTrack(u.id, e.target.value); setTick(t => t + 1); }} style={selectStyle}>
+                <select className="admin-assignment-select" aria-label={`Set track for ${u.name}`} value={curTrack || ''} onChange={async (e) => { u.supabaseProfile ? await updateProfile(u.id, { trackCode: e.target.value }) : assignUserToTrack(u.id, e.target.value); setTick(t => t + 1); }} style={selectStyle}>
+                  <option value="">Unassigned</option>
                   {tracks.map(t => (<option key={t.code} value={t.code}>{t.short} - {t.name}</option>))}
                 </select>
               </label>
@@ -957,7 +958,7 @@ function AdminPendingAccounts() {
   const draftFor = (profile) => drafts[profile.id] || {
     role: profile.requestedRole || 'exonaut',
     cohortId: profile.requestedCohortId || cohorts[0]?.id || 'c2627',
-    trackCode: profile.requestedTrackCode || tracks[0]?.code || 'AIS',
+    trackCode: profile.requestedTrackCode || profile.trackCode || '',
     reason: profile.approvalReason || '',
   };
 
@@ -1083,7 +1084,8 @@ function AdminPendingAccounts() {
                   </label>
                   <label className="admin-assignment-field">
                     <span className="admin-assignment-field-label">Track</span>
-                    <select className="admin-assignment-select" value={draft.trackCode} onChange={e => updateDraft(p.id, { trackCode: e.target.value })}>
+                    <select className="admin-assignment-select" value={draft.trackCode || ''} onChange={e => updateDraft(p.id, { trackCode: e.target.value })}>
+                      <option value="">Unassigned</option>
                       {tracks.map(t => <option key={t.code} value={t.code}>{t.short || t.code} - {t.name}</option>)}
                     </select>
                   </label>
@@ -1112,10 +1114,12 @@ function AdminUsers() {
   const { ledger } = usePoints();
   const manualCredits = useManualCredits();
   const missions = useMissions();
+  const projectState = useProjects();
   useSubs();
   const { crowns } = useCrownState();
   const { scope } = useAdminScope();
   const [selectedUserId, setSelectedUserId] = React.useState(null);
+  const [kpiModal, setKpiModal] = React.useState(null);
   const commanderCount = 1;
   const leadCount = (typeof LEADS !== 'undefined') ? LEADS.length : 0;
   const pointsForUser = React.useCallback((userId) => {
@@ -1147,6 +1151,36 @@ function AdminUsers() {
   const userRows = profileRows.length ? profileRows : seedRows;
   const scopedUsers = scope === 'all' ? userRows : userRows.filter(u => u.cohort === scope);
   const selectedUser = userRows.find(u => u.id === selectedUserId);
+  const activeCrowns = crowns
+    .filter(c => c.status === 'active')
+    .filter(c => scope === 'all' || (c.cohortId || 'c2627') === scope);
+  const projectsForUser = React.useCallback((user) => {
+    if (!user) return [];
+    const projects = projectState.projects || [];
+    const tasks = projectState.tasks || [];
+    const members = projectState.members || [];
+    const assignees = projectState.assignees || [];
+    return projects
+      .filter(project => project.status !== 'archived')
+      .filter(project => {
+        if (project.firstOfficerId === user.id) return true;
+        if (members.some(member => member.projectId === project.id && member.userId === user.id)) return true;
+        return tasks.some(task => task.projectId === project.id &&
+          assignees.some(assignment => assignment.taskId === task.id && assignment.userId === user.id)
+        );
+      })
+      .sort((a, b) => String(a.title || '').localeCompare(String(b.title || '')));
+  }, [projectState.projects, projectState.tasks, projectState.members, projectState.assignees]);
+  const projectCellForUser = React.useCallback((user) => {
+    const assignedProjects = projectsForUser(user);
+    if (!assignedProjects.length) return { label: 'Unassigned', title: 'Unassigned', assigned: false };
+    const names = assignedProjects.map(project => project.title || 'Untitled Project');
+    return {
+      label: names.length > 1 ? `${names[0]} +${names.length - 1} more` : names[0],
+      title: names.join(', '),
+      assigned: true,
+    };
+  }, [projectsForUser]);
   const completedTasksFor = React.useCallback((user) => {
     if (!user) return [];
     return missions
@@ -1162,6 +1196,41 @@ function AdminUsers() {
       .sort((a, b) => Number(a.week || 0) - Number(b.week || 0) || String(a.id).localeCompare(String(b.id)));
   }, [missions, manualCredits.credits, ledger]);
   const scopeLabel = scope === 'all' ? 'All Cohorts' : (all.find(c => c.id === scope)?.name || '—');
+  const commanderRows = scopedUsers.filter(u => u.role === 'commander');
+  const exonautRows = scopedUsers.filter(u => u.role === 'exonaut');
+  const crownRows = activeCrowns.map(crown => {
+    const user = userRows.find(u => u.id === crown.userId) || {
+      id: crown.userId,
+      name: 'Unknown Crown Holder',
+      role: 'exonaut',
+      cohort: crown.cohortId || '',
+      track: crown.trackCode || '',
+      points: 0,
+      tier: 'corps',
+      avatarUrl: '',
+    };
+    return { ...user, crown };
+  });
+  const kpiDetails = {
+    commanders: {
+      title: 'Commanders',
+      eyebrow: 'FOUNDER TIER',
+      rows: commanderRows,
+      empty: 'No commanders found in this scope.',
+    },
+    crowns: {
+      title: 'Crown Holders',
+      eyebrow: `${activeCrowns.length} ACTIVE CROWNS`,
+      rows: crownRows,
+      empty: 'No active crown holders found.',
+    },
+    exonauts: {
+      title: 'Exonauts',
+      eyebrow: scope === 'all' ? 'ACROSS ALL BATCHES' : 'IN COHORT',
+      rows: exonautRows,
+      empty: 'No exonauts found in this scope.',
+    },
+  };
 
   return (
     <div className="enter">
@@ -1182,19 +1251,19 @@ function AdminUsers() {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 24 }}>
         <KPI label="TOTAL USERS" value={scopedUsers.length} accent="sky" sub={scope === 'all' ? `${all.length} COHORTS` : 'IN SCOPE'} />
-        <KPI label="COMMANDERS" value={scopedUsers.filter(u => u.role === 'commander').length} accent="amber" sub="FOUNDER TIER" />
-        <KPI label="CROWN HOLDERS" value={crowns.filter(c => c.status === 'active').length} accent="platinum" sub={`${(typeof TRACKS !== 'undefined') ? TRACKS.length : 7} TRACKS`} />
-        <KPI label="EXONAUTS" value={scopedUsers.filter(u => u.role === 'exonaut').length} accent="lime" sub={scope === 'all' ? 'ACROSS ALL BATCHES' : 'IN COHORT'} />
+        <KPI label="COMMANDERS" value={commanderRows.length} accent="amber" sub="FOUNDER TIER" onClick={() => setKpiModal('commanders')} />
+        <KPI label="CROWN HOLDERS" value={activeCrowns.length} accent="platinum" sub={`${(typeof TRACKS !== 'undefined') ? TRACKS.length : 7} TRACKS`} onClick={() => setKpiModal('crowns')} />
+        <KPI label="EXONAUTS" value={exonautRows.length} accent="lime" sub={scope === 'all' ? 'ACROSS ALL BATCHES' : 'IN COHORT'} onClick={() => setKpiModal('exonauts')} />
       </div>
 
       <div className="lb-table">
-        <div className="lb-header" style={{ gridTemplateColumns: '48px 1fr 120px 140px 120px 140px 100px' }}>
+        <div className="lb-header" style={{ gridTemplateColumns: '48px 1fr 120px 140px 120px 180px 100px' }}>
           <div></div>
           <div>NAME</div>
           <div>ROLE</div>
           <div>COHORT</div>
           <div>TRACK</div>
-          <div>MANAGER</div>
+          <div>PROJECT</div>
           <div>STATUS</div>
         </div>
         {scopedUsers.slice(0, 40).map(u => {
@@ -1202,14 +1271,14 @@ function AdminUsers() {
           const cohortObj = all.find(c => c.id === curCohort);
           const trackCode = u.track;
           const track = TRACKS.find(t => t.code === trackCode);
-          const lead = getUserLead(u.id);
+          const projectCell = projectCellForUser(u);
           return (
             <div
               key={u.id}
               className="lb-row"
               onClick={() => setSelectedUserId(u.id)}
-              style={{ gridTemplateColumns: '48px 1fr 120px 140px 120px 140px 100px', cursor: 'pointer' }}
-              title="View completed track tasks"
+              style={{ gridTemplateColumns: '48px 1fr 120px 140px 120px 180px 100px', cursor: 'pointer' }}
+              title="View user summary"
             >
               <AvatarWithRing name={u.name} avatarUrl={u.avatarUrl} size={34} tier={u.tier} />
               <div className="lb-name">{u.name}</div>
@@ -1227,8 +1296,19 @@ function AdminUsers() {
                 {cohortObj?.name?.replace('Batch ', '') || '—'}
               </div>
               <div className="lb-track">{track?.short || trackCode}</div>
-              <div className="t-body" style={{ fontSize: 11, color: lead ? 'var(--off-white-68)' : 'var(--off-white-40)' }}>
-                {lead?.name || <span style={{ fontStyle: 'italic' }}>Unassigned</span>}
+              <div
+                className="t-body"
+                title={projectCell.title}
+                style={{
+                  fontSize: 11,
+                  color: projectCell.assigned ? 'var(--off-white-68)' : 'var(--off-white-40)',
+                  minWidth: 0,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {projectCell.assigned ? projectCell.label : <span style={{ fontStyle: 'italic' }}>Unassigned</span>}
               </div>
               <div className="t-mono" style={{ fontSize: 10, color: 'var(--green)', letterSpacing: '0.08em' }}>ACTIVE</div>
             </div>
@@ -1236,20 +1316,116 @@ function AdminUsers() {
         })}
       </div>
       {selectedUser && (
-        <AdminUserTasksModal
+        <AdminUserSummaryModal
           user={selectedUser}
           cohort={all.find(c => c.id === selectedUser.cohort)}
           track={TRACKS.find(t => t.code === selectedUser.track)}
           tasks={completedTasksFor(selectedUser)}
           points={pointsForUser(selectedUser.id)}
+          projects={projectsForUser(selectedUser)}
           onClose={() => setSelectedUserId(null)}
+        />
+      )}
+      {kpiModal && (
+        <AdminKpiDetailModal
+          detail={kpiDetails[kpiModal]}
+          cohortForUser={(user) => all.find(c => c.id === user.cohort)}
+          trackForUser={(user) => TRACKS.find(t => t.code === user.track)}
+          pointsForUser={pointsForUser}
+          projectCellForUser={projectCellForUser}
+          onSelectUser={(user) => {
+            setKpiModal(null);
+            setSelectedUserId(user.id);
+          }}
+          onClose={() => setKpiModal(null)}
         />
       )}
     </div>
   );
 }
 
-function AdminUserTasksModal({ user, cohort, track, tasks, points, onClose }) {
+function AdminKpiDetailModal({ detail, cohortForUser, trackForUser, pointsForUser, projectCellForUser, onSelectUser, onClose }) {
+  const rows = detail?.rows || [];
+  return (
+    <div className="modal-scrim" onClick={onClose} style={{ zIndex: 255 }}>
+      <div className="modal-body" onClick={e => e.stopPropagation()} style={{ width: 'min(820px, 94vw)', padding: 0 }}>
+        <button className="modal-close" onClick={onClose} aria-label="Close">
+          <i className="fa-solid fa-xmark" />
+        </button>
+        <div style={{ padding: '24px 28px 18px', borderBottom: '1px solid var(--off-white-07)' }}>
+          <div className="t-label" style={{ marginBottom: 6 }}>{detail?.eyebrow || 'USER DIRECTORY'}</div>
+          <h2 className="t-heading" style={{ fontSize: 24, margin: 0, textTransform: 'none', letterSpacing: 0 }}>
+            {detail?.title || 'Users'}
+          </h2>
+          <div className="t-body" style={{ fontSize: 12, color: 'var(--off-white-68)', marginTop: 6 }}>
+            {rows.length} {rows.length === 1 ? 'user' : 'users'} matched this card.
+          </div>
+        </div>
+        <div style={{ padding: 20, maxHeight: '62vh', overflowY: 'auto' }}>
+          {rows.length === 0 && (
+            <div className="card-flat" style={{ padding: 24, textAlign: 'center' }}>
+              <div className="t-heading" style={{ fontSize: 14, marginBottom: 6 }}>Nothing to show</div>
+              <div className="t-body" style={{ color: 'var(--off-white-68)', fontSize: 12 }}>{detail?.empty || 'No users found.'}</div>
+            </div>
+          )}
+          <div style={{ display: 'grid', gap: 10 }}>
+            {rows.map(user => {
+              const cohort = cohortForUser(user);
+              const track = trackForUser(user);
+              const projectCell = projectCellForUser(user);
+              const crownTrack = user.crown ? TRACKS.find(t => t.code === user.crown.trackCode) : null;
+              const statusText = user.crown
+                ? `CROWN - ${crownTrack?.short || user.crown.trackCode || 'TRACK'}`
+                : 'ACTIVE';
+              return (
+                <button
+                  key={`${user.id}-${user.crown?.id || 'row'}`}
+                  type="button"
+                  onClick={() => onSelectUser(user)}
+                  className="card-flat"
+                  style={{
+                    padding: 14,
+                    display: 'grid',
+                    gridTemplateColumns: '44px 1fr 100px 110px 150px 92px',
+                    gap: 12,
+                    alignItems: 'center',
+                    textAlign: 'left',
+                    width: '100%',
+                    cursor: 'pointer',
+                    color: 'inherit',
+                  }}
+                >
+                  <AvatarWithRing name={user.name} avatarUrl={user.avatarUrl} size={36} tier={user.tier} />
+                  <div style={{ minWidth: 0 }}>
+                    <div className="t-heading" style={{ fontSize: 14, textTransform: 'none', letterSpacing: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {user.name}
+                    </div>
+                    <div className="t-mono" style={{ fontSize: 9, color: 'var(--off-white-40)', marginTop: 4, letterSpacing: '0.08em' }}>
+                      {String(user.role || 'exonaut').toUpperCase()} - {pointsForUser(user.id)} PTS
+                    </div>
+                  </div>
+                  <div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-68)', letterSpacing: '0.06em' }}>
+                    {cohort?.name?.replace('Batch ', '') || user.cohort || 'Unassigned'}
+                  </div>
+                  <div className="lb-track">{track?.short || user.track || 'Unassigned'}</div>
+                  <div className="t-body" title={projectCell.title} style={{ fontSize: 11, color: projectCell.assigned ? 'var(--off-white-68)' : 'var(--off-white-40)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {projectCell.assigned ? projectCell.label : <span style={{ fontStyle: 'italic' }}>Unassigned</span>}
+                  </div>
+                  <div className="t-mono" style={{ fontSize: 9, color: user.crown ? 'var(--platinum)' : 'var(--green)', letterSpacing: '0.08em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {statusText}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AdminUserSummaryModal({ user, cohort, track, tasks, points, projects = [], onClose }) {
+  const roleLabel = String(user.role || 'exonaut').toUpperCase();
   return (
     <div className="modal-scrim" onClick={onClose} style={{ zIndex: 260 }}>
       <div className="modal-body" onClick={e => e.stopPropagation()} style={{ width: 'min(760px, 94vw)', padding: 0 }}>
@@ -1260,7 +1436,7 @@ function AdminUserTasksModal({ user, cohort, track, tasks, points, onClose }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, paddingRight: 38 }}>
             <AvatarWithRing name={user.name} avatarUrl={user.avatarUrl} size={52} tier={user.tier} />
             <div style={{ minWidth: 0 }}>
-              <div className="t-label" style={{ marginBottom: 5 }}>COMPLETED TRACK TASKS</div>
+              <div className="t-label" style={{ marginBottom: 5 }}>USER SUMMARY</div>
               <h2 className="t-heading" style={{ fontSize: 22, margin: 0, textTransform: 'none', letterSpacing: 0 }}>{user.name}</h2>
               <div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)', marginTop: 6, letterSpacing: '0.08em' }}>
                 {cohort?.name || user.cohort || 'No cohort'} · {track?.short || user.track || 'No track'} · {points} PTS
@@ -1270,6 +1446,80 @@ function AdminUserTasksModal({ user, cohort, track, tasks, points, onClose }) {
         </div>
 
         <div style={{ padding: 24, maxHeight: '62vh', overflowY: 'auto' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 10, marginBottom: 16 }}>
+            {[
+              { label: 'ROLE', value: roleLabel },
+              { label: 'COHORT', value: cohort?.name?.replace('Batch ', '') || user.cohort || 'Unassigned' },
+              { label: 'TRACK', value: track?.short || user.track || 'Unassigned' },
+              { label: 'STATUS', value: 'ACTIVE' },
+            ].map(item => (
+              <div key={item.label} className="card-flat" style={{ padding: 12, minWidth: 0 }}>
+                <div className="t-mono" style={{ fontSize: 8, color: 'var(--off-white-40)', letterSpacing: '0.08em' }}>{item.label}</div>
+                <div className="t-heading" style={{ fontSize: 13, color: 'var(--ink)', marginTop: 5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.value}>{item.value}</div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ marginBottom: 16 }}>
+            <div className="t-label" style={{ marginBottom: 10 }}>PROJECT ASSIGNMENT</div>
+            {!projects.length && (
+              <div className="card-flat" style={{ padding: 16 }}>
+                <div className="t-heading" style={{ fontSize: 14, textTransform: 'none', letterSpacing: 0, marginBottom: 6 }}>
+                  Unassigned
+                </div>
+                <div className="t-body" style={{ fontSize: 12, color: 'var(--off-white-68)', lineHeight: 1.5 }}>
+                  No project assigned to this user.
+                </div>
+              </div>
+            )}
+            {projects.length > 0 && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }}>
+                {projects.map(project => {
+                  const title = project.title || 'Untitled Project';
+                  const assignmentType = project.firstOfficerId === user.id ? 'Project Lead' : 'Assigned Project';
+                  return (
+                    <div key={project.id} className="card-flat" style={{ padding: 16, minWidth: 0 }}>
+                      <div className="t-mono" style={{ fontSize: 8, color: 'var(--sky)', letterSpacing: '0.08em', marginBottom: 8 }}>
+                        {assignmentType.toUpperCase()}
+                      </div>
+                      <div
+                        className="t-heading"
+                        title={title}
+                        style={{
+                          fontSize: 15,
+                          textTransform: 'none',
+                          letterSpacing: 0,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {title}
+                      </div>
+                      <div className="t-body" style={{ fontSize: 11, color: 'var(--off-white-55)', marginTop: 8, textTransform: 'capitalize' }}>
+                        {project.status || 'active'}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10, marginBottom: 16 }}>
+            {[
+              { label: 'POINTS', value: points },
+              { label: 'PROJECTS', value: projects.length },
+              { label: 'TRACK APPROVED', value: tasks.length },
+            ].map(item => (
+              <div key={item.label} className="card-flat" style={{ padding: 12 }}>
+                <div className="t-mono" style={{ fontSize: 8, color: 'var(--off-white-40)', letterSpacing: '0.08em' }}>{item.label}</div>
+                <div className="t-heading" style={{ fontSize: 18, marginTop: 5, color: 'var(--ink)' }}>{item.value}</div>
+              </div>
+            ))}
+          </div>
+
+          <div className="t-label" style={{ marginBottom: 12 }}>RECENT COMPLETED TRACK TASKS</div>
           {tasks.length === 0 && (
             <div className="card-flat" style={{ padding: 22, textAlign: 'center' }}>
               <div className="t-heading" style={{ fontSize: 14, marginBottom: 6 }}>No completed track tasks yet</div>
@@ -1278,7 +1528,7 @@ function AdminUserTasksModal({ user, cohort, track, tasks, points, onClose }) {
               </div>
             </div>
           )}
-          {tasks.map(task => {
+          {tasks.slice(0, 6).map(task => {
             const sub = task.submission || {};
             const isManual = !!sub.manualCredit || String(sub.deliverable || '').includes('manual');
             return (
@@ -1512,7 +1762,7 @@ function AdminTrackControl() {
 
   function rosterFor(trackCode) {
     return scopedExonauts
-      .filter(p => (p.trackCode || 'AIS') === trackCode)
+      .filter(p => p.trackCode === trackCode)
       .sort((a, b) => (a.fullName || a.email || '').localeCompare(b.fullName || b.email || ''));
   }
 
@@ -1533,7 +1783,7 @@ function AdminTrackControl() {
       return;
     }
     const target = profiles.find(p => p.id === userId);
-    if (!target || (target.trackCode || 'AIS') !== trackCode) {
+    if (!target || target.trackCode !== trackCode) {
       setError('Admin can only assign the crown to someone in that track roster.');
       return;
     }
@@ -1612,12 +1862,12 @@ function AdminTrackControl() {
     try {
       const updated = window.__adminTrackStore.update(trackCode, { name: cleanName, code: cleanCode, short: cleanCode });
       if (updated.code !== trackCode) {
-        for (const profile of profiles.filter(p => (p.trackCode || 'AIS') === trackCode)) {
+        for (const profile of profiles.filter(p => p.trackCode === trackCode)) {
           await updateProfile(profile.id, { trackCode: updated.code });
         }
         if (typeof USERS !== 'undefined') {
           USERS.forEach(u => {
-            if ((getUserTrack(u.id) || u.track || 'AIS') === trackCode) {
+            if ((getUserTrack(u.id) || u.track || '') === trackCode) {
               assignUserToTrack(u.id, updated.code);
               u.track = updated.code;
             }
@@ -1826,7 +2076,8 @@ function AdminTrackControl() {
                         <select value={p.cohortId || 'c2627'} onChange={(e) => updateMember(p.id, { cohortId: e.target.value })} style={selectStyle}>
                           {all.map(c => <option key={c.id} value={c.id}>{c.code || c.name}</option>)}
                         </select>
-                        <select value={p.trackCode || 'AIS'} onChange={(e) => updateMember(p.id, { trackCode: e.target.value })} style={selectStyle}>
+                        <select value={p.trackCode || ''} onChange={(e) => updateMember(p.id, { trackCode: e.target.value })} style={selectStyle}>
+                          <option value="">Unassigned</option>
                           {tracks.map(t => <option key={t.code} value={t.code}>{t.short}</option>)}
                         </select>
                       </div>

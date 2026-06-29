@@ -1,32 +1,5 @@
--- Allow active group chat members to add and remove group members.
+-- Allow platform accounts, including admins and commanders, to be added to group chats.
 -- Run after create_messages_tables.sql.
-
-CREATE OR REPLACE FUNCTION public.can_add_message_participant(target_thread_id text)
-RETURNS boolean
-LANGUAGE sql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-  SELECT EXISTS (
-    SELECT 1
-    FROM public.message_threads mt
-    WHERE mt.id = target_thread_id
-      AND (
-        mt.created_by = auth.uid()
-        OR public.is_message_participant(target_thread_id)
-        OR (
-          mt.thread_type = 'track_group'
-          AND EXISTS (
-            SELECT 1
-            FROM public.user_profiles up
-            WHERE up.id = auth.uid()
-              AND COALESCE(up.cohort_id, 'c2627') = mt.cohort_id
-              AND COALESCE(up.track_code, 'AIS') = mt.track_code
-          )
-        )
-      )
-  );
-$$;
 
 CREATE OR REPLACE FUNCTION public.can_add_message_participant(
   target_thread_id text,
@@ -46,7 +19,26 @@ AS $$
       WHERE target_profile.id = target_user_id
         AND target_profile.role IN ('exonaut', 'lead', 'commander', 'admin')
     )
-    AND public.can_add_message_participant(target_thread_id);
+    AND EXISTS (
+      SELECT 1
+      FROM public.message_threads mt
+      WHERE mt.id = target_thread_id
+        AND (
+          mt.created_by = auth.uid()
+          OR public.is_message_participant(target_thread_id)
+          OR public.has_any_role(ARRAY['admin', 'commander'])
+          OR (
+            mt.thread_type = 'track_group'
+            AND EXISTS (
+              SELECT 1
+              FROM public.user_profiles actor_profile
+              WHERE actor_profile.id = auth.uid()
+                AND COALESCE(actor_profile.cohort_id, 'c2627') = COALESCE(mt.cohort_id, 'c2627')
+                AND COALESCE(actor_profile.track_code, 'AIS') = COALESCE(mt.track_code, 'AIS')
+            )
+          )
+        )
+    );
 $$;
 
 CREATE OR REPLACE FUNCTION public.can_manage_message_participants(target_thread_id text)

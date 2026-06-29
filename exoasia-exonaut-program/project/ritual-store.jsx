@@ -205,6 +205,10 @@
     if (!ritual) return null;
     const existing = state.logs.find(log => log.userId === userId && log.ritualId === ritualId && Number(log.week) === Number(week));
     if (existing) return logToRecord(existing);
+    if (ritualId === 'iotw' && options.source !== 'auto-intern-of-week') {
+      console.warn('Intern of Week is awarded automatically by the weekly points job.');
+      return null;
+    }
 
     const filePath = await uploadProof(userId, ritualId, proof);
     const cleanProof = {

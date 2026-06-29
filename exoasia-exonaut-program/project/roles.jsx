@@ -1241,10 +1241,27 @@ function CommanderHealth() {
 }
 
 // ========== SHARED PRIMITIVES ==========
-function KPI({ label, value, sub, accent }) {
+function KPI({ label, value, sub, accent, onClick }) {
   const colorMap = { lime: 'var(--lime)', amber: 'var(--amber)', red: 'var(--red)', platinum: 'var(--platinum)' };
+  const clickable = typeof onClick === 'function';
   return (
-    <div className="card-flat" style={{ padding: 18 }}>
+    <div
+      className="card-flat"
+      onClick={onClick}
+      role={clickable ? 'button' : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      onKeyDown={clickable ? (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onClick();
+        }
+      } : undefined}
+      style={{
+        padding: 18,
+        cursor: clickable ? 'pointer' : undefined,
+        transition: clickable ? 'border-color 0.15s ease, transform 0.15s ease' : undefined,
+      }}
+    >
       <div className="t-label-muted">{label}</div>
       <div className="t-mono" style={{ fontSize: 32, color: colorMap[accent] || 'var(--off-white)', fontWeight: 700, marginTop: 8, lineHeight: 1 }}>{value}</div>
       <div className="t-mono" style={{ fontSize: 10, color: 'var(--off-white-40)', marginTop: 6, letterSpacing: '0.08em' }}>{sub}</div>

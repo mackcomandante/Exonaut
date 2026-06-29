@@ -154,7 +154,7 @@ function App() {
       if (!profile) {
         const metadata = user.user_metadata || {};
         const requestedCohort = metadata.cohort_id || ME.cohort || 'c2627';
-        const requestedTrack = metadata.track_code || ME.track || 'AIS';
+        const requestedTrack = metadata.track_code || '';
         const insertResult = await window.__db
           .from('user_profiles')
           .upsert({
@@ -163,11 +163,11 @@ function App() {
             full_name: metadata.full_name || metadata.name || user.email || 'Exonaut',
             role: 'exonaut',
             cohort_id: requestedCohort,
-            track_code: requestedTrack,
+            track_code: requestedTrack || null,
             approval_status: 'pending_approval',
             requested_role: ['exonaut', 'commander', 'admin'].includes(metadata.role) ? metadata.role : 'exonaut',
             requested_cohort_id: requestedCohort,
-            requested_track_code: requestedTrack,
+            requested_track_code: requestedTrack || null,
             email_confirmed_at: user.email_confirmed_at || user.confirmed_at || null,
           }, { onConflict: 'id' })
           .select('role, full_name, cohort_id, track_code, approval_status, approval_reason, requested_role, requested_cohort_id, requested_track_code, email_confirmed_at')

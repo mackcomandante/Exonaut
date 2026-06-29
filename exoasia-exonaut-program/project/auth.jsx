@@ -557,7 +557,7 @@ function RoleAuthScreen({ onAuthComplete, tweaks, setTweak }) {
     const metadata = user.user_metadata || {};
     const fullName = metadata.full_name || metadata.name || user.email || 'Exonaut';
     const requestedCohort = metadata.cohort_id || ME.cohort || 'c2627';
-    const requestedTrack = metadata.track_code || ME.track || 'AIS';
+    const requestedTrack = metadata.track_code || '';
     const profileResult = await window.__db
       .from('user_profiles')
       .select('role, full_name, cohort_id, track_code, approval_status, approval_reason, requested_role, requested_cohort_id, requested_track_code, email_confirmed_at')
@@ -575,11 +575,11 @@ function RoleAuthScreen({ onAuthComplete, tweaks, setTweak }) {
         full_name: fullName,
         role: selectedRole,
         cohort_id: requestedCohort,
-        track_code: requestedTrack,
+        track_code: requestedTrack || null,
         approval_status: 'pending_approval',
         requested_role: ['exonaut', 'commander', 'admin'].includes(metadata.role) ? metadata.role : selectedRole,
         requested_cohort_id: requestedCohort,
-        requested_track_code: requestedTrack,
+        requested_track_code: requestedTrack || null,
         email_confirmed_at: user.email_confirmed_at || user.confirmed_at || null,
       }, { onConflict: 'id' })
       .select('role, full_name, cohort_id, track_code, approval_status, approval_reason, requested_role, requested_cohort_id, requested_track_code, email_confirmed_at')

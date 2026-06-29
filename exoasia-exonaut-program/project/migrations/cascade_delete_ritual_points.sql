@@ -2,9 +2,19 @@
 -- The ledger id is always 'pts-' || ritual_logs.id (e.g. pts-ritual-w01-mon-ign-<userId>).
 
 CREATE OR REPLACE FUNCTION public.delete_ritual_ledger_entry()
-RETURNS TRIGGER LANGUAGE plpgsql AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
 BEGIN
-  DELETE FROM public.point_ledger WHERE id = 'pts-' || OLD.id;
+  DELETE FROM public.point_ledger
+  WHERE id = 'pts-' || OLD.id
+    OR (
+      source_type = 'ritual'
+      AND user_id = OLD.user_id
+      AND source_id = ('w' || lpad(OLD.week::text, 2, '0') || ':' || OLD.ritual_id)
+    );
   RETURN OLD;
 END;
 $$;

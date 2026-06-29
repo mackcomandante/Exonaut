@@ -523,7 +523,7 @@ function RitualTracker() {
             'fa-circle-dot';
           const cCls = state === 'done' ? 'done-c' : state === 'missed' ? 'miss-c' : 'pend-c';
           return (
-            <div key={r.id} className={'ritual-cell ' + state} title={r.id === 'iotw' ? 'Auto-logged from leaderboard' : 'Open Rituals page to submit proof'}>
+            <div key={r.id} className={'ritual-cell ' + state} title={r.id === 'iotw' ? 'Awarded automatically every Saturday at 12:00 AM' : 'Open Rituals page to submit proof'}>
               <div className="ritual-head">
                 <div className="ritual-name">{r.name}</div>
                 <i className={'fa-solid ' + iconCls + ' ritual-icon ' + cCls} />
